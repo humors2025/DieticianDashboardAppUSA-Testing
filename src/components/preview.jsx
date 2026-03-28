@@ -36,7 +36,7 @@ export default function Preview() {
   const [clientProfileLoading, setClientProfileLoading] = useState(false);
 
     const [dietPlanId, setDietPlanId] = useState(null);
-    console.log("dietPlanId39:-", dietPlanId);
+
   
 
   // NEW CODE ADDED:

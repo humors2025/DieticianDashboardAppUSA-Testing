@@ -266,7 +266,6 @@ export default function CreatePlanPopUp({ open,
  }) {
 
 
-console.log("selectedWeekText270:-", selectedWeekText);
 
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [expandedDay, setExpandedDay] = useState(null);
@@ -419,12 +418,7 @@ const fetchExistingFoodData = async () => {
   setIsLoading(true);
   
   try {
-    console.log("Fetching food data with:", {
-      profileId,
-      start_date,
-      end_date,
-      dieticianId
-    });
+
     
     const response = await fetchSavedWeeklyFoodJson(
       profileId, 
@@ -433,11 +427,11 @@ const fetchExistingFoodData = async () => {
       dieticianId
     );
     
-    console.log("API Response:", response);
+
     
     // Check for noData flag first
     if (response.noData) {
-      console.log("No existing food data for this week");
+   
       setDayFoods({});
       setExistingWeekId(null);
       return;
@@ -467,7 +461,7 @@ const fetchExistingFoodData = async () => {
     // Check if it's a "no data" error (fallback for any errors that still slip through)
     if (error.message?.includes("No data found") || 
         error.data?.message?.includes("No data found")) {
-      console.log("No existing food data for this week");
+  
       setDayFoods({});
       setExistingWeekId(null);
     } else {
@@ -534,7 +528,6 @@ const fetchExistingFoodData = async () => {
   try {
     const { start_date, end_date } = parseWeekDates(selectedWeekText);
 
-    console.log("Parsed dates:", { start_date, end_date });
 
     if (!start_date || !end_date) {
       toast.error("Invalid date format in week selection");
@@ -556,13 +549,6 @@ const fetchExistingFoodData = async () => {
     // ✅ Allow saving empty draft too (clears previous draft on backend)
     const food_json = { days: daysArray };
 
-    console.log("Saving draft payload:", {
-      dieticianId,
-      profileId,
-      start_date,
-      end_date,
-      food_json,
-    });
 
     const response = await saveWeeklyFoodJson(
       dieticianId,
@@ -682,13 +668,6 @@ const handleSubmit = async () => {
     // FORMAT 1: For save_weekly_food_json.php - expects food_json with days array
     const foodJsonForSave = { days: daysArray };
     
-    console.log("Saving to save_weekly_food_json.php:", {
-      dieticianId,
-      profileId,
-      start_date,
-      end_date,
-      food_json: foodJsonForSave
-    });
 
     // Save to database first
     const saveResp = await saveWeeklyFoodJson(
@@ -716,10 +695,6 @@ const handleSubmit = async () => {
       daysForAnalysis[`day${day.day_no}`] = day.items;
     });
     
-    console.log("Sending to MealLogged for analysis:", {
-      daysArray: daysArray, // Keep this format for your internal state
-      daysForAnalysis: daysForAnalysis // This would be used by weekly_analysis_complete1.php
-    });
 
     // Pass both formats to MealLogged so it can decide which to use
     // You can modify MealLogged to use the appropriate format based on the API

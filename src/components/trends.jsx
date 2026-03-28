@@ -204,7 +204,7 @@ function TrendsComponent({ selectedDate, showMainMarker = true, compactGraphs = 
   };
 
   const activeMarker = getActiveMarker();
-  console.log("Active Marker207:-", activeMarker);
+
 
   // Updated getMarkersForScoreType with 70% threshold
   const getMarkersForScoreType = (scoreType) => {

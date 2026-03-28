@@ -9,7 +9,6 @@ export default function ClientLists() {
   // 👇 First client active by default
   const [activeIndex, setActiveIndex] = useState(0);
   const [clientsData, setClientsData] = useState(null);
-  console.log("clientsData12:-", clientsData);
   const [page, setPage] = useState(1);
 const [loading, setLoading] = useState(false);
 const [hasMore, setHasMore] = useState(true);

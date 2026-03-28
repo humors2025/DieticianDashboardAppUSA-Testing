@@ -1135,7 +1135,7 @@ export default function DietPlanCreated() {
     if (!activePlans || activePlans.length === 0) return;
 
     const diet_plan_id = activePlans[0]?.id;
-    console.log("diet_plan_id121:-", diet_plan_id);
+ 
     if (!diet_plan_id) return;
 
     const loadDietPlan = async () => {
@@ -1748,7 +1748,7 @@ const handleFinishClick = async () => {
         ? activePlans[0].id
         : planSummary?.diet_plan_id;
 
-    console.log("diet_plan_id716:-", diet_plan_id);
+  
 
     if (!diet_plan_id) {
       toast.error("No active diet plan found.");

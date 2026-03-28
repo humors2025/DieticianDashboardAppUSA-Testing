@@ -137,7 +137,6 @@ export default function ClientsSection() {
   const [search, setSearch] = useState("");
 
   const [clients, setClients] = useState([]);
-  console.log("clients140:-", clients);
   // const [summary, setSummary] = useState({
   //   all_total: 0,
   //   tested_total: 0,
@@ -174,7 +173,7 @@ export default function ClientsSection() {
     try {
       // ✅ CHECK CACHE FIRST
       if (cache[cacheKey]) {
-        console.log("Serving from cache:", cacheKey);
+       
         setClients(cache[cacheKey]);
         return;
       }
@@ -198,7 +197,7 @@ export default function ClientsSection() {
       );
 
       const fetchedClients = res.clients || [];
-      console.log("fetchedClients201:-", fetchedClients);
+   
 
       setClients(fetchedClients);
       // setSummary(res.summary || {});

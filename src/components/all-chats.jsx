@@ -21,7 +21,7 @@ export default function AllChats() {
     { name: "Manoranjan", message: "Another sample message that is too long and needs trimming...", badgeCount: 2, isRead: false },
     { name: "Manoranjan", message: "Another sample message that is too long and needs trimming...", badgeCount: 2, isRead: false },
   ]);
-console.log("chats");
+
   const [search, setSearch] = useState("");
 
   const filteredChats = useMemo(() => {

@@ -632,7 +632,7 @@ export default function TestLogInfo({ onConfirmNext }) {
 
   // Store subtraction result separately, used in visible "Test remaining"
   const [subtractionResult, setSubtractionResult] = useState(0);
-  console.log("subtractionResult635:-", subtractionResult);
+
 
   const [isLoading, setIsLoading] = useState(false);
   const isExtracting = useSelector((state) => state.extraction.isExtracting);
@@ -703,7 +703,7 @@ const [isSavingDraft, setIsSavingDraft] = useState(false);
       if (typeof window === "undefined") return;
 
       const savedData = localStorage.getItem(storageKey);
-      console.log("TestLogInfo LS:", storageKey, savedData);
+  
 
       if (savedData) {
         const data = JSON.parse(savedData);
@@ -734,7 +734,7 @@ const [isSavingDraft, setIsSavingDraft] = useState(false);
   // ========= 3) Subtraction logic (CORE) =========
   useEffect(() => {
     const allotted = parseInt(planDays, 10) || 0;
-    console.log("allotted736:-", allotted);
+
     const remaining = parseInt(baseRemaining, 10) || 0;
 
     // sync testsAllotted with planDays (for submit)

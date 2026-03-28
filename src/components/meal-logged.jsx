@@ -11,9 +11,9 @@ import MealTracked from "./meal-tracked";
 
 export default function MealLogged() {
   const [activeFilter, setActiveFilter] = useState("low");
-  console.log("activeFilter14:-", activeFilter);
+
   const [weeklyAnalysisData, setWeeklyAnalysisData] = useState([]);
-  console.log("weeklyAnalysisData15:-", weeklyAnalysisData);
+
   const [apiMessage, setApiMessage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -470,7 +470,7 @@ const fetchWeeklyAnalysis = async (startDate, endDate, dietPlanId, daysPayload) 
     // ✅ CHECK FOR FOOD_LEVEL_EVALUATION IN DATA_JSON
     if (checkResponse?.status === true && 
         checkResponse?.data_json?.food_level_evaluation) {
-      console.log("Using existing analysis data from check API");
+
       setWeeklyAnalysisData(checkResponse.data_json.food_level_evaluation);
       setApiMessage(null);
       setLoading(false);
@@ -491,8 +491,7 @@ const fetchWeeklyAnalysis = async (startDate, endDate, dietPlanId, daysPayload) 
     
     // Only proceed to fetchWeeklyAnalysisComplete1 if we have days data
     if (daysPayload && Object.keys(daysPayload).length > 0) {
-      console.log("Raw days payload:", daysPayload);
-      
+   
       // Handle the days payload - it could be in different formats
       let daysForBackend = {}; // Format for weekly_analysis_complete1.php: {day1: [...], day2: [...]}
       let daysArray = []; // Format for internal use: [{day_no: 1, items: [...]}]
@@ -503,7 +502,7 @@ const fetchWeeklyAnalysis = async (startDate, endDate, dietPlanId, daysPayload) 
           daysArray = daysPayload.daysArray;
           daysForBackend = daysPayload.daysForAnalysis || {};
           
-          console.log("Using new format from CreatePlanPopUp:", { daysArray, daysForBackend });
+  
         } 
         else if (Array.isArray(daysPayload)) {
           // Format: [{day_no: 1, items: [...]}, ...]
@@ -516,7 +515,7 @@ const fetchWeeklyAnalysis = async (startDate, endDate, dietPlanId, daysPayload) 
             daysForBackend[`day${day.day_no}`] = day.items;
           });
           
-          console.log("Converted from array format:", { daysArray, daysForBackend });
+       
         } 
         else {
           // Might be in {day1: [...], day2: [...]} format already
@@ -530,13 +529,13 @@ const fetchWeeklyAnalysis = async (startDate, endDate, dietPlanId, daysPayload) 
               items: items
             }));
           
-          console.log("Using object format:", { daysArray, daysForBackend });
+         
         }
       }
 
       // Check if we have any valid days data
       if (Object.keys(daysForBackend).length === 0) {
-        console.log("No valid days data found in payload");
+       
         
         // Handle based on week type
         if (isCurrentWeek) {
@@ -583,10 +582,7 @@ const fetchWeeklyAnalysis = async (startDate, endDate, dietPlanId, daysPayload) 
         return;
       }
 
-      console.log("Final formats being sent:", {
-        daysForBackend, // For weekly_analysis_complete1.php
-        daysArray // For reference/logging
-      });
+
 
       // Prepare request body for weekly_analysis_complete1.php
       const requestBody = {

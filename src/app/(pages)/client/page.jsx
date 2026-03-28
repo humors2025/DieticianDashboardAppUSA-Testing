@@ -144,7 +144,6 @@ export default function Client() {
 
  const dispatch = useDispatch();
   const clients = useSelector(selectClients);
-  console.log("clients147:-", clients);
   const count = useSelector(selectClientsCount);
   const status = useSelector(selectClientsStatus);
   const error = useSelector(selectClientsError);

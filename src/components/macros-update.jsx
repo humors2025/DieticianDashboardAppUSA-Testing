@@ -222,7 +222,7 @@ export default function MacrosUpdate() {
 };
 
   const labels = getLabelPositions();
-  console.log("labels222:-", labels);
+
 
   return (
     <>

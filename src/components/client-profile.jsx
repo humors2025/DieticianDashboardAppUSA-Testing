@@ -554,7 +554,7 @@ export const ClientProfile = ({ showPlanDetails = true, showOverview = true, sho
        const clientsFromRedux = useSelector(selectClients);
 
     const [clientData, setClientData] = useState(null);
-    console.log("clientData557:-", clientData);
+
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState("");

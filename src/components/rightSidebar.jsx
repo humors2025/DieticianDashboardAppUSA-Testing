@@ -6,7 +6,7 @@ import EditRightSideBar from "./edit-rightsidebar";
 
 export default function RightSidebar({ isOpen, onClose }) {
     const [isEditOpen, setIsEditOpen] = useState(false);
-    console.log("isEditOpen09:-", isEditOpen);
+
 
     // Handle closing the entire sidebar (both main and edit)
     const handleCloseAll = () => {

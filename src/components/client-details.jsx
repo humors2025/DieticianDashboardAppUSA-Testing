@@ -4,7 +4,7 @@ import Image from "next/image";
 import { IoChevronBackOutline, IoChevronForwardOutline } from "react-icons/io5";
 import TestAnalysis from "./test-analysis";
 import DietAnalysis from "./diet-analysis";
-import RightSidebar from "./RightSidebar";
+import RightSidebar from "./rightSidebar";
 
 export default function ClientDetails() {
     const [activeTab, setActiveTab] = useState("test");

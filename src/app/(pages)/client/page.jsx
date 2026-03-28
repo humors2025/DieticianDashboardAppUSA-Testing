@@ -181,15 +181,26 @@ useEffect(() => {
   }, [dispatch]);
 
 
-    const activeCount = useMemo(
-    () => clients.filter(c => (c?.plans_count?.active ?? 0) > 0).length,
-    [clients]
-  );
-  const needsCount = useMemo(
-    () => clients.filter(c => (c?.plans_count?.total ?? 0) === 0).length,
-    [clients]
-  );
+  //   const activeCount = useMemo(
+  //   () => clients.filter(c => (c?.plans_count?.active ?? 0) > 0).length,
+  //   [clients]
+  // );
 
+ const activeCount = useMemo(
+  () => (clients || []).filter(c => (c?.plans_count?.active ?? 0) > 0).length,
+  [clients]
+);
+
+  // const needsCount = useMemo(
+  //   () => clients.filter(c => (c?.plans_count?.total ?? 0) === 0).length,
+  //   [clients]
+  // );
+
+
+  const needsCount = useMemo(
+  () => (clients || []).filter(c => (c?.plans_count?.total ?? 0) === 0).length,
+  [clients]
+);
 
    const tabs = useMemo(
     () => [

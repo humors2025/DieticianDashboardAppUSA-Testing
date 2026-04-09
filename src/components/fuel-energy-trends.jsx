@@ -104,107 +104,152 @@ function SegmentedProgressBar({
     );
 }
 
+// Helper function to get zone color and display text
+const getZoneConfig = (zone) => {
+    switch(zone?.toLowerCase()) {
+        case 'optimal':
+            return { text: 'Optimal', color: '#3FAF58' };
+        case 'moderate':
+            return { text: 'Moderate', color: '#FFBF2D' };
+        case 'focus':
+            return { text: 'Focus', color: '#E48326' };
+        case 'attention':
+            return { text: 'Attention', color: '#E65C3A' };
+        default:
+            return { text: zone || 'Moderate', color: '#FFBF2D' };
+    }
+};
 
-export default function FuelEnergyTrends() {
+export default function FuelEnergyTrends({ data }) {
+    
+    // Extract the two items from the data
+    const fuelUtilization = data?.items?.find(
+        item => item.title === "Fuel Utilization Trend"
+    );
+    
+    const energySource = data?.items?.find(
+        item => item.title === "Energy Source Trend"
+    );
+    
+    // Get scores and round to nearest integer
+    const fuelScore = fuelUtilization ? Math.round(fuelUtilization.score) : "NA";
+    const energyScore = energySource ? Math.round(energySource.score) : "NA";
+    
+    // Get zones
+    const fuelZone = fuelUtilization?.zone || "Moderate";
+    const energyZone = energySource?.zone || "Focus";
+    
+    // Get zone configurations
+    const fuelZoneConfig = getZoneConfig(fuelZone);
+    const energyZoneConfig = getZoneConfig(energyZone);
 
-    const value = 88; // <-- set from API
-       const status = "Optimal"; // <-- set from API
-   
-       return (
-           <>
-   
-   
-               <div className="flex gap-[97px] ">
-                   <div className="flex flex-col gap-[25px] w-full">
-                       <div className="flex flex-col gap-2.5">
-                           <div className="flex gap-[5px] items-center">
-                               <p className="text-[#252525] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
-                                  Fuel Utilization Trend
-                               </p>
-                               <Image
-                                   src="/icons/hugeicons_information-circle1.svg"
-                                   alt="info"
-                                   width={20}
-                                   height={20}
-                               />
-                           </div>
-   
-                           <div className="w-[100px] flex items-center px-[25px] py-1.5 rounded-[24px] bg-[#FFBF2D]">
-                               <p className="text-[#FFFFFF] text-[12px] font-semibold leading-normal tracking-[-0.24px]">Moderate</p>
-                           </div>
-                       </div>
-   
-   
-                       <SegmentedProgressBar
-                           value={value}
-                           totalSegments={55}
-                           labels={[0, 60, 80, 100]}
-                           segmentWeights={[80, 82, 172]} // ✅ ratio only
-                       />
-   
-                       <div className="flex flex-col gap-4 items-baseline">
-                           <div className="flex items-baseline gap-[4px]">
-                               <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
-                                   {value}
-                               </p>
-   
-                               <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
-                                   %
-                               </p>
-                           </div>
-   
-   
-                           <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">Utilization</p>
-                       </div>
-                   </div>
-   
-   
-                   <div className="flex flex-col gap-[25px] w-full">
-                       <div className="flex flex-col gap-2.5">
-                           <div className="flex gap-[5px] items-center">
-                               <p className="text-[#252525] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
-                                   Energy Source Trend
-                               </p>
-                               <Image
-                                   src="/icons/hugeicons_information-circle1.svg"
-                                   alt="info"
-                                   width={20}
-                                   height={20}
-                               />
-                           </div>
-   
-                           <div className="w-[100px] flex justify-center px-[25px] py-1.5 rounded-[24px] bg-[#E48326]">
-                               <p className="text-[#FFFFFF] text-[12px] font-semibold leading-normal tracking-[-0.24px]">Focus</p>
-                           </div>
-                       </div>
-   
-   
-                       <SegmentedProgressBar
-                           value={value}
-                           totalSegments={55}
-                           labels={[0, 60, 80, 100]}
-                           segmentWeights={[80, 82, 172]}
-                           filledColor="#E48326"
-                       />
-   
-                       <div className="flex flex-col gap-4 items-baseline">
-                           <div className="flex items-baseline gap-[4px]">
-                               <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
-                                   {value}
-                               </p>
-   
-                               <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
-                                   %
-                               </p>
-                           </div>
-   
-   
-                           <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">Fermentation (Focus)</p>
-                       </div>
-                   </div>
-   
-               </div>
-   
-           </>
-       )
-}   
+    return (
+        <>
+            <div className="flex gap-[97px] ">
+                <div className="flex flex-col gap-[25px] w-full">
+                    <div className="flex flex-col gap-2.5">
+                        <div className="flex gap-[5px] items-center">
+                            <p className="text-[#252525] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
+                                {fuelUtilization?.title || "Fuel Utilization Trend"}
+                            </p>
+                            <Image
+                                src="/icons/hugeicons_information-circle1.svg"
+                                alt="info"
+                                width={20}
+                                height={20}
+                            />
+                        </div>
+
+                        <div 
+                            className="w-[100px] flex justify-center items-center px-[25px] py-1.5 rounded-[24px]"
+                            style={{ backgroundColor: fuelZoneConfig.color }}
+                        >
+                            <p className="text-[#FFFFFF] text-[12px] font-semibold leading-normal tracking-[-0.24px]">
+                                {fuelZoneConfig.text}
+                            </p>
+                        </div>
+                    </div>
+
+                    <SegmentedProgressBar
+                        value={fuelScore}
+                        totalSegments={55}
+                        labels={[0, 60, 80, 100]}
+                        segmentWeights={[80, 82, 172]}
+                        filledColor={fuelZoneConfig.color}
+                    />
+
+                    <div className="flex flex-col gap-4 items-baseline">
+                        <div className="flex items-baseline gap-[4px]">
+                            <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
+                                {fuelScore}
+                            </p>
+
+                            <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
+                                %
+                            </p>
+                        </div>
+
+                        <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
+  <b className="font-semibold">
+    {(fuelUtilization?.intervention || "").split(":")[0]}:
+  </b>{" "}
+  {(fuelUtilization?.intervention || "").split(":").slice(1).join(":").trim()}
+</p>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-[25px] w-full">
+                    <div className="flex flex-col gap-2.5">
+                        <div className="flex gap-[5px] items-center">
+                            <p className="text-[#252525] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
+                                {energySource?.title || "Energy Source Trend"}
+                            </p>
+                            <Image
+                                src="/icons/hugeicons_information-circle1.svg"
+                                alt="info"
+                                width={20}
+                                height={20}
+                            />
+                        </div>
+
+                        <div 
+                            className="w-[100px] flex justify-center px-[25px] py-1.5 rounded-[24px]"
+                            style={{ backgroundColor: energyZoneConfig.color }}
+                        >
+                            <p className="text-[#FFFFFF] text-[12px] font-semibold leading-normal tracking-[-0.24px]">
+                                {energyZoneConfig.text}
+                            </p>
+                        </div>
+                    </div>
+
+                    <SegmentedProgressBar
+                        value={energyScore}
+                        totalSegments={55}
+                        labels={[0, 60, 80, 100]}
+                        segmentWeights={[80, 82, 172]}
+                        filledColor={energyZoneConfig.color}
+                    />
+
+                    <div className="flex flex-col gap-4 items-baseline">
+                        <div className="flex items-baseline gap-[4px]">
+                            <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
+                                {energyScore}
+                            </p>
+
+                            <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
+                                %
+                            </p>
+                        </div>
+
+                                              <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
+  <b className="font-semibold">
+    {(energySource?.intervention || "").split(":")[0]}:
+  </b>{" "}
+  {(energySource?.intervention || "").split(":").slice(1).join(":").trim()}
+</p>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+}

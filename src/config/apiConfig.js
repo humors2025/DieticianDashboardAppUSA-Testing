@@ -31,7 +31,12 @@ CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
     DELETEDIETPLAN:"/dietitian/api/web/delete_diet_plan.php"
   },
   CLIENTPROFILE:{
-    CLIENTPROFILEDATA:"/dietitian/api/web/get_client_data.php"
+    CLIENTPROFILEDATA:"/dietitian/api/web/get_client_data.php",
+    CLIENTPROFILEDETAILS:"/dietitian/api/web/get-graph-all-scores-weekly-month-all-fat-trends.php",
+    CLIENTINDIVIDUALPROFILE:"/dietitian/api/web/get-data-points-score-all-ranges-coach.php",
+    CLIENTPROFILEDATESLIST:"/dietitian/api/web/get-profile-details-dates-taken.php",
+    CLIENTWEEKLYDATES:"/dietitian/api/web/get-weekly-tab-list.php"
+
   },
   MEALANALYSIS:{
  WEEKLYANALYSISCOMPLETE:"/dietitian/api/web/weekly_analysis_complete.php",
@@ -50,6 +55,12 @@ CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
   },
   PLANHISTORY:{
     CLIENTLOG:"/dietitian/api/app/get_diet_plan_statistics.php"
+  },
+  SEARCH:{
+    SEARCHCLIENT:"/dietitian/api/web/get-search-clients-details.php"
+  },
+  DIETANALYSIS:{
+    DIETANALYSISPLAN:"/dietitian/api/web/get_weekly_food_json_suggestions_weeks.php"
   },
 
  

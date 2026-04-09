@@ -1,51 +1,13 @@
-// "use client";
-// import Image from "next/image";
-// export default function FatUsePatternTrend() {
-//     return (
-//         <>
-//             <h1>Fat Use Pattern Trend</h1>
-
-//             <div className="border border-[#E1E6ED] px-5 pt-[18px] pb-5 rounded-[15px]">
-//                 <div className="flex justify-between items-center">
-//                     <div className="flex gap-[5px]">
-//                         <p className="text-[#252525] text-[15px] font-semibold leading-normal tracking-[-0.3px]">Fat-use pattern Trend</p>
-//                         <Image
-//                             src="/icons/hugeicons_information-circle1.svg"
-//                             alt="info"
-//                             width={20}
-//                             height={20}
-//                         />
-//                     </div>
-
-//                     <div className="px-[25px] py-1.5 bg-[#3FAF58] rounded-[24px]">
-//                         <p className="text-white text-[12px] font-semibold leading-normal tracking-[-0.24px]">Optimal</p>
-//                     </div>
-//                 </div>
-//             </div>
-
-//         </>
-//     )
-// }
-
-
-
-
-
-
-
 "use client";
 
 import Image from "next/image";
-
+import { useSelector } from "react-redux";
 
 function SegmentedProgressBar({
   value = 85,
   totalSegments = 55,
   labels = [0, 60, 80, 100],
-
-  // ✅ treat as weights (ratio only), NOT px width
   segmentWeights = [80, 82, 172],
-
   filledColor = "#3FAF58",
   emptyColor = "#E1E6ED",
 }) {
@@ -53,19 +15,16 @@ function SegmentedProgressBar({
 
   const totalWeight = segmentWeights.reduce((a, b) => a + b, 0);
 
-  // label positions in % based on cumulative weights
   const labelLeftPct = [0];
   for (let i = 0; i < segmentWeights.length; i++) {
     labelLeftPct.push(labelLeftPct[i] + (segmentWeights[i] / totalWeight) * 100);
   }
 
-  // distribute totalSegments across zones by weight proportion
   const zoneSegments = (() => {
     const raw = segmentWeights.map((w) => (w / totalWeight) * totalSegments);
     const base = raw.map((x) => Math.floor(x));
     let used = base.reduce((a, b) => a + b, 0);
 
-    // allocate remaining segments to largest fractional parts
     const fracOrder = raw
       .map((x, i) => ({ i, frac: x - Math.floor(x) }))
       .sort((a, b) => b.frac - a.frac);
@@ -76,17 +35,15 @@ function SegmentedProgressBar({
       used += 1;
       idx += 1;
     }
-    return base; // [zone0, zone1, zone2]
+    return base;
   })();
 
-  // ranges matching labels [0,60,80,100]
   const ranges = [
     { from: 0, to: 60, weight: segmentWeights[0], segs: zoneSegments[0] },
     { from: 60, to: 80, weight: segmentWeights[1], segs: zoneSegments[1] },
     { from: 80, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
   ];
 
-  // filled segments per zone
   const filledByRange = ranges.map((r) => {
     const overlap = Math.max(0, Math.min(safeValue, r.to) - r.from);
     const span = r.to - r.from;
@@ -95,7 +52,6 @@ function SegmentedProgressBar({
 
   return (
     <div className="w-full">
-      {/* ✅ top labels (responsive) */}
       <div className="relative h-4 mb-[6px] w-full">
         {labels.map((lab, index) => {
           let alignment = "-translate-x-1/2";
@@ -114,7 +70,6 @@ function SegmentedProgressBar({
         })}
       </div>
 
-      {/* ✅ segmented bar (stretches full width) */}
       <div className="flex items-center gap-[3px] w-full">
         {ranges.map((r, ri) => (
           <div
@@ -142,8 +97,26 @@ function SegmentedProgressBar({
 }
 
 export default function FatUsePatternTrend() {
-  const value = 88; // <-- set from API
-  const status = "Optimal"; // <-- set from API
+  const clientIndividualProfile = useSelector(
+    (state) => state.clientIndividualProfile.data
+  );
+  const fatUsePatternData =
+    clientIndividualProfile?.data?.fat_use_pattern_trend || {};
+
+  const value = fatUsePatternData.score || "NA";
+  const status = fatUsePatternData.zone || "NA";
+  const scoreText = fatUsePatternData.score_text || "NA";
+
+  const scientificTitle = fatUsePatternData.scientific_title || "NA";
+  const scientificText = fatUsePatternData.scientific_text || "NA";
+
+  const statusColorMap = {
+    Moderate: "#FFBF2D",
+    Optimal: "#3FAF58",
+    Focus: "#E48326",
+  };
+
+  const statusColor = statusColorMap[status] || "#3FAF58";
 
   return (
     <div className="w-[410px] flex flex-col gap-[28px] border border-[#E1E6ED] px-5 pt-[18px] pb-5 rounded-[15px] bg-white">
@@ -160,47 +133,35 @@ export default function FatUsePatternTrend() {
           />
         </div>
 
-        <div className="px-[25px] py-1.5 bg-[#3FAF58] rounded-[24px]">
+        <div
+          className="px-[25px] py-1.5 rounded-[24px]"
+          style={{ backgroundColor: statusColor }}
+        >
           <p className="text-white text-[12px] font-semibold leading-normal tracking-[-0.24px]">
             {status}
           </p>
         </div>
       </div>
 
-      {/* ✅ Progress bar graph */}
       <div className="flex flex-col gap-[25px]">
         <SegmentedProgressBar
           value={value}
           totalSegments={55}
           labels={[0, 60, 80, 100]}
-          segmentWeights={[80, 82, 172]} // ✅ ratio only
+          segmentWeights={[80, 82, 172]}
+          filledColor={statusColor}
         />
 
         <div className="flex items-baseline">
           <div className="flex items-baseline gap-[4px]">
-            <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
-              {value}
-            </p>
+          <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
+  {value !== "NA" && !isNaN(Number(value))
+    ? Math.round(Number(value))
+    : value}
+</p>
 
             <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
               %
-            </p>
-          </div>
-
-          <div className="flex gap-[5px] items-center">
-            <div className="flex items-center">
-              <Image
-                src="/icons/hugeicons_arrow-down-02.svg"
-                alt="hugeicons_arrow-down-02.svg"
-                width={20}
-                height={20}
-              />
-              <p className="text-[#252525] text-[10px] font-semibold leading-normal tracking-[-0.2px]">
-                5%
-              </p>
-            </div>
-            <p className="text-[#252525] text-[10px] font-normal leading-normal tracking-[-0.2px]">
-              than last week
             </p>
           </div>
         </div>
@@ -208,10 +169,8 @@ export default function FatUsePatternTrend() {
 
       <div>
         <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
-          <b className="font-semibold">Digestive activity is high (&gt;30). </b>
-          This commonly indicates a higher fermentation response to meal
-          composition/portion size. Reducing trigger foods and keeping meals
-          simple is the usual first step.
+          <b className="font-semibold">{scientificTitle}. </b>
+          {scientificText}
         </p>
       </div>
     </div>

@@ -105,106 +105,153 @@ function SegmentedProgressBar({
     );
 }
 
-export default function MetabolicRecoveryTrends() {
+// Helper function to get zone color and display text
+const getZoneConfig = (zone) => {
+    switch (zone?.toLowerCase()) {
+        case 'optimal':
+            return { text: 'Optimal', color: '#3FAF58' };
+        case 'moderate':
+            return { text: 'Moderate', color: '#FFBF2D' };
+        case 'focus':
+            return { text: 'Focus', color: '#E48326' };
+        case 'attention':
+            return { text: 'Attention', color: '#E65C3A' };
+        default:
+            return { text: zone || 'Moderate', color: '#FFBF2D' };
+    }
+};
 
-   const value = 88; // <-- set from API
-      const status = "Optimal"; // <-- set from API
-  
-      return (
-          <>
-  
-  
-              <div className="flex gap-[97px] ">
-                  <div className="flex flex-col gap-[25px] w-full">
-                      <div className="flex flex-col gap-2.5">
-                          <div className="flex gap-[5px] items-center">
-                              <p className="text-[#252525] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
-                                  Metabolic Load Trend
-                              </p>
-                              <Image
-                                  src="/icons/hugeicons_information-circle1.svg"
-                                  alt="info"
-                                  width={20}
-                                  height={20}
-                              />
-                          </div>
-  
-                          <div className="w-[100px] flex items-center px-[25px] py-1.5 rounded-[24px] bg-[#FFBF2D]">
-                              <p className="text-[#FFFFFF] text-[12px] font-semibold leading-normal tracking-[-0.24px]">Moderate</p>
-                          </div>
-                      </div>
-  
-  
-                      <SegmentedProgressBar
-                          value={value}
-                          totalSegments={55}
-                          labels={[0, 60, 80, 100]}
-                          segmentWeights={[80, 82, 172]} // ✅ ratio only
-                      />
-  
-                      <div className="flex flex-col gap-4 items-baseline">
-                          <div className="flex items-baseline gap-[4px]">
-                              <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
-                                  {value}
-                              </p>
-  
-                              <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
-                                  %
-                              </p>
-                          </div>
-  
-  
-                          <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">Utilization</p>
-                      </div>
-                  </div>
-  
-  
-                  <div className="flex flex-col gap-[25px] w-full">
-                      <div className="flex flex-col gap-2.5">
-                          <div className="flex gap-[5px] items-center">
-                              <p className="text-[#252525] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
-                                  Recovery Activity Trend
-                              </p>
-                              <Image
-                                  src="/icons/hugeicons_information-circle1.svg"
-                                  alt="info"
-                                  width={20}
-                                  height={20}
-                              />
-                          </div>
-  
-                          <div className="w-[100px] flex justify-center px-[25px] py-1.5 rounded-[24px] bg-[#E48326]">
-                              <p className="text-[#FFFFFF] text-[12px] font-semibold leading-normal tracking-[-0.24px]">Focus</p>
-                          </div>
-                      </div>
-  
-  
-                      <SegmentedProgressBar
-                          value={value}
-                          totalSegments={55}
-                          labels={[0, 60, 80, 100]}
-                          segmentWeights={[80, 82, 172]}
-                          filledColor="#E48326"
-                      />
-  
-                      <div className="flex flex-col gap-4 items-baseline">
-                          <div className="flex items-baseline gap-[4px]">
-                              <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
-                                  {value}
-                              </p>
-  
-                              <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
-                                  %
-                              </p>
-                          </div>
-  
-  
-                          <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">Fermentation (Focus)</p>
-                      </div>
-                  </div>
-  
-              </div>
-  
-          </>
-      )
+export default function MetabolicRecoveryTrends({ data }) {
+    console.log("MetabolicRecoveryTrends data:", data);
+
+    // Extract the two items from the data
+    const metabolicLoad = data?.items?.find(
+        item => item.title === "Metabolic Load Trend"
+    );
+
+    const recoveryActivity = data?.items?.find(
+        item => item.title === "Recovery Activity Trend"
+    );
+
+    // Get scores and round to nearest integer
+    const metabolicScore = metabolicLoad ? Math.round(metabolicLoad.score) : "NA";
+    const recoveryScore = recoveryActivity ? Math.round(recoveryActivity.score) : "NA";
+
+    // Get zones
+    const metabolicZone = metabolicLoad?.zone || "Moderate";
+    const recoveryZone = recoveryActivity?.zone || "Focus";
+
+    // Get zone configurations
+    const metabolicZoneConfig = getZoneConfig(metabolicZone);
+    const recoveryZoneConfig = getZoneConfig(recoveryZone);
+
+    return (
+        <>
+            <div className="flex gap-[97px] ">
+                <div className="flex flex-col gap-[25px] w-full">
+                    <div className="flex flex-col gap-2.5">
+                        <div className="flex gap-[5px] items-center">
+                            <p className="text-[#252525] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
+                                {metabolicLoad?.title || "Metabolic Load Trend"}
+                            </p>
+                            <Image
+                                src="/icons/hugeicons_information-circle1.svg"
+                                alt="info"
+                                width={20}
+                                height={20}
+                            />
+                        </div>
+
+                        <div
+                            className="w-[100px] flex justify-center items-center px-[25px] py-1.5 rounded-[24px]"
+                            style={{ backgroundColor: metabolicZoneConfig.color }}
+                        >
+                            <p className="text-[#FFFFFF] text-[12px] font-semibold leading-normal tracking-[-0.24px]">
+                                {metabolicZoneConfig.text}
+                            </p>
+                        </div>
+                    </div>
+
+                    <SegmentedProgressBar
+                        value={metabolicScore}
+                        totalSegments={55}
+                        labels={[0, 60, 80, 100]}
+                        segmentWeights={[80, 82, 172]}
+                        filledColor={metabolicZoneConfig.color}
+                    />
+
+                    <div className="flex flex-col gap-4 items-baseline">
+                        <div className="flex items-baseline gap-[4px]">
+                            <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
+                                {metabolicScore}
+                            </p>
+
+                            <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
+                                %
+                            </p>
+                        </div>
+
+                        <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
+                            <b className="font-semibold">
+                                {(metabolicLoad?.intervention || "").split(":")[0]}:
+                            </b>{" "}
+                            {(metabolicLoad?.intervention || "").split(":").slice(1).join(":").trim()}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-[25px] w-full">
+                    <div className="flex flex-col gap-2.5">
+                        <div className="flex gap-[5px] items-center">
+                            <p className="text-[#252525] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
+                                {recoveryActivity?.title || "Recovery Activity Trend"}
+                            </p>
+                            <Image
+                                src="/icons/hugeicons_information-circle1.svg"
+                                alt="info"
+                                width={20}
+                                height={20}
+                            />
+                        </div>
+
+                        <div
+                            className="w-[100px] flex justify-center px-[25px] py-1.5 rounded-[24px]"
+                            style={{ backgroundColor: recoveryZoneConfig.color }}
+                        >
+                            <p className="text-[#FFFFFF] text-[12px] font-semibold leading-normal tracking-[-0.24px]">
+                                {recoveryZoneConfig.text}
+                            </p>
+                        </div>
+                    </div>
+
+                    <SegmentedProgressBar
+                        value={recoveryScore}
+                        totalSegments={55}
+                        labels={[0, 60, 80, 100]}
+                        segmentWeights={[80, 82, 172]}
+                        filledColor={recoveryZoneConfig.color}
+                    />
+
+                    <div className="flex flex-col gap-4 items-baseline">
+                        <div className="flex items-baseline gap-[4px]">
+                            <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
+                                {recoveryScore}
+                            </p>
+
+                            <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
+                                %
+                            </p>
+                        </div>
+
+                        <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
+                            <b className="font-semibold">
+                                {(recoveryActivity?.intervention || "").split(":")[0]}:
+                            </b>{" "}
+                            {(recoveryActivity?.intervention || "").split(":").slice(1).join(":").trim()}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
 }

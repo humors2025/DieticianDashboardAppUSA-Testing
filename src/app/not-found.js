@@ -1,24 +1,40 @@
-"use client"
-import Link from "next/link"
-export default function NotFound(){
-    return(
-        <>
-<section className="">
-    <div className="py-8 px-4 mx-auto max-w-screen-xl lg:py-16 lg:px-6">
-        <div className="mx-auto max-w-screen-sm text-center">
-            <h1 className="mb-4 text-7xl tracking-tight font-extrabold lg:text-9xl text-primary-600 dark:text-primary-500">404</h1>
-            <p className="mb-4 text-3xl tracking-tight font-bold text-gray-900 md:text-4xl dark:text-white">Something&apos;s missing.</p>
-            <p className="mb-4 text-lg font-light text-gray-500 dark:text-gray-400">Sorry, we cant find that page. You will find lots to explore on the home page. </p>
-            <div className="border border-[#D9D9D9] rounded-[15px]">
-            <Link 
-            href="/dashboard" 
-            className="text-[#252525] inline-flex  bg-primary-600 hover:bg-primary-800 focus:ring-4 focus:outline-none focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:focus:ring-primary-900 my-4">
-            Back to Homepage
+"use client";
+
+import Link from "next/link";
+
+export default function NotFound() {
+  return (
+    <section className="min-h-screen bg-[#F8FAFC] flex items-center justify-center px-4">
+      <div className="w-full max-w-[1200px]">
+        <div className="mx-auto max-w-[620px] rounded-[24px] border border-[#E5E7EB] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.06)] px-6 py-12 sm:px-10 sm:py-14 text-center">
+          <div className="mx-auto mb-6 flex h-[84px] w-[84px] items-center justify-center rounded-full bg-[#EEF4FF]">
+            <span className="text-[32px] font-bold text-[#2874F0]">404</span>
+          </div>
+
+          <h1 className="text-[32px] sm:text-[42px] font-extrabold leading-[110%] tracking-[-0.03em] text-[#111827]">
+            Page not found
+          </h1>
+
+          <p className="mt-4 text-[16px] sm:text-[18px] font-medium leading-[160%] text-[#4B5563]">
+            Sorry, the page you are looking for does not exist.
+          </p>
+
+        
+         
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/dashboard"
+              className="inline-flex min-w-[220px] items-center justify-center rounded-[12px] bg-[#2874F0] px-6 py-3 text-[15px] font-semibold text-white transition-all duration-200 hover:bg-[#1D68D8]"
+            >
+              Go to Dashboard
             </Link>
-            </div>
-        </div>   
-    </div>
-</section>
-        </>
-    )
+
+          
+          </div>
+
+        
+        </div>
+      </div>
+    </section>
+  );
 }

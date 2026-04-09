@@ -16,10 +16,16 @@ export default function ClientTable({
   testAssigned = false,
   clients: clientsList,
   activeTab = "all",
+  search: externalSearch = "", // Add prop to receive search from parent
+  onSearchChange = null, // Add prop to handle search changes
 }) {
-  const [search, setSearch] = useState("");
+  const [internalSearch, setInternalSearch] = useState("");
   const [sortOption, setSortOption] = useState("Recently Added");
   const router = useRouter();
+
+  // Use external search if provided, otherwise use internal
+  const search = externalSearch !== undefined ? externalSearch : internalSearch;
+  const handleSearchChange = onSearchChange || setInternalSearch;
 
   // Handle sort change from UserProfile
   const handleSortChange = (option) => {
@@ -115,45 +121,79 @@ export default function ClientTable({
     }
   };
 
-const transformClientData = (apiData) => {
-  if (!apiData || !Array.isArray(apiData)) return [];
 
-  return apiData.map((client) => ({
-    name: client.client_name || "N/A",
-    age: client.age || "N/A",
-    gender: client.gender || "N/A",
+  // Helper function to format last tested text
+const formatLastLoggedDate = (dateString) => {
+  if (!dateString) return "No test yet";
 
-    displayAge: `${client.age || "N/A"} years, ${client.gender || "N/A"}`,
+  try {
+    const testDate = new Date(dateString);
+    const now = new Date();
 
-    // Date
-    // dateCreated: client.p_created || "No test yet",
-    dateCreated: client.p_created
-  ? client.p_created.split(" ")[0]
-  : "No date",
-    rawDate: client.last_logged_date || null,
+    if (isNaN(testDate.getTime())) return "No test yet";
 
-    referenceCode: client.profile_id,
+    const diffMs = now - testDate;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
 
-    // Fitness goal
-    fitness_goal: client.fitness_goal || "-",
+    if (diffHours < 24) {
+      if (diffMinutes < 1) return "Last tested just now";
+      if (diffMinutes < 60) return `Last tested ${diffMinutes} min${diffMinutes > 1 ? "s" : ""} ago`;
+      return `Last tested ${diffHours} hr${diffHours > 1 ? "s" : ""} ago`;
+    }
 
-    // Metabolism
- metabolism_score:
-  client.metabolism_score !== null && !isNaN(client.metabolism_score)
-    ? `${Number(client.metabolism_score).toFixed(0)}%`
-    : "No test",
-
-    // Last test
-    last_logged: client.last_logged || "No test yet",
-
-    image: client.p_image && client.p_image !== "NA"
-  ? client.p_image
-  : "/icons/hugeicons_user-circle-02.svg",
-
-    dieticianId: client.dietician_id,
-    profileId: client.profile_id,
-  }));
+    return testDate.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch (error) {
+    return "No test yet";
+  }
 };
+
+
+  const transformClientData = (apiData) => {
+    if (!apiData || !Array.isArray(apiData)) return [];
+
+    return apiData.map((client) => ({
+      name: client.client_name || client.name || "N/A",
+      age: client.age || "N/A",
+      gender: client.gender || "N/A",
+
+      displayAge: `${client.age || "N/A"} years, ${client.gender || "N/A"}`,
+
+      // Date
+      dateCreated: client.p_created
+        ? client.p_created.split(" ")[0]
+        : "No date",
+      rawDate: client.last_logged_date || client.joined_dttm || null,
+
+      referenceCode: client.profile_id,
+
+      // Fitness goal
+      fitness_goal: client.fitness_goal_display || "-",
+
+      // Metabolism
+      metabolism_score:
+        client.metabolism_score !== null && !isNaN(client.metabolism_score)
+          ? `${Number(client.metabolism_score).toFixed(0)}%`
+          : "No test",
+
+      // Last test
+      last_logged: formatLastLoggedDate(client.last_logged_date),
+
+      image: client.p_image && client.p_image !== "NA"
+        ? client.p_image
+        : "/icons/hugeicons_user-circle-02.svg",
+
+      dieticianId: client.dietician_id,
+      profileId: client.profile_id,
+      phone: client.phone,
+      dob: client.dob,
+      joined_dttm: client.joined_dttm,
+    }));
+  };
 
   // Filter data based on activeTab
   let filteredByTab = clientsList;
@@ -168,7 +208,7 @@ const transformClientData = (apiData) => {
     [filteredByTab]
   );
 
-  // Sort clients based on selected option
+  // Sort clients based on selected option (NO LOCAL SEARCH FILTERING)
   const sortedClients = useMemo(() => {
     if (!clients.length) return [];
 
@@ -176,7 +216,12 @@ const transformClientData = (apiData) => {
 
     switch (sortOption) {
       case "Recently Added":
-        return clientsCopy.sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
+        return clientsCopy.sort((a, b) => {
+          if (!a.rawDate && !b.rawDate) return 0;
+          if (!a.rawDate) return 1;
+          if (!b.rawDate) return -1;
+          return new Date(b.rawDate) - new Date(a.rawDate);
+        });
 
       case "A to Z":
         return clientsCopy.sort((a, b) => a.name.localeCompare(b.name));
@@ -185,22 +230,18 @@ const transformClientData = (apiData) => {
         return clientsCopy.sort((a, b) => b.name.localeCompare(a.name));
 
       case "By Age Asc":
-        // Youngest first
         return clientsCopy.sort((a, b) => {
           const ageA = parseInt(a.age, 10);
           const ageB = parseInt(b.age, 10);
 
-          // push invalid ages to bottom
           if (isNaN(ageA) && isNaN(ageB)) return 0;
           if (isNaN(ageA)) return 1;
           if (isNaN(ageB)) return -1;
 
-          return ageA - ageB; // ascending
+          return ageA - ageB;
         });
 
       case "By Age Desc":
-      case "by Age": // keep old option working also
-        // Oldest first
         return clientsCopy.sort((a, b) => {
           const ageA = parseInt(a.age, 10);
           const ageB = parseInt(b.age, 10);
@@ -209,13 +250,16 @@ const transformClientData = (apiData) => {
           if (isNaN(ageA)) return 1;
           if (isNaN(ageB)) return -1;
 
-          return ageB - ageA; // descending
+          return ageB - ageA;
         });
 
       default:
         return clientsCopy;
     }
   }, [clients, sortOption]);
+
+  // NO LOCAL SEARCH FILTERING - use sortedClients directly
+  const filteredClients = sortedClients;
 
   const copyToClipboard = (text) => {
     navigator.clipboard
@@ -233,29 +277,22 @@ const transformClientData = (apiData) => {
     const params = new URLSearchParams({
       profile_id: client.profileId,
     });
-    // router.push(`/profile?${params.toString()}`);
-    router.push(`/partners/clients-demo`);
+    router.push(`/partners/clients-profile?${params.toString()}`);
   };
-
-  // Filter sorted clients based on search
-  const filteredClients = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return sortedClients;
-    return sortedClients.filter((c) => c.name.toLowerCase().includes(q));
-  }, [search, sortedClients]);
 
   return (
     <>
       {/* Pass the sort handler to UserProfile */}
-      {showUserProfile && (
+      {/* {showUserProfile && (
         <div className="">
           <UserProfile
             searchQuery={search}
-            onSearchChange={setSearch}
+            onSearchChange={handleSearchChange}
             onSortChange={handleSortChange}
+            showOnlySearch={true}
           />
         </div>
-      )}
+      )} */}
 
       <div>
         <div className="rounded-[15px] overflow-hidden h-[calc(100vh-220px)] ">
@@ -335,7 +372,7 @@ const transformClientData = (apiData) => {
                         <div className="flex gap-[15px]">
                           <div className="relative h-8 w-8 rounded-full overflow-hidden bg-[#F0F0F0]">
                             <Image
-                               src={
+                              src={
                                 client.image || "/icons/hugeicons_user-circle-02.svg"
                               }
                               alt={client.name || "profile"}
@@ -428,15 +465,3 @@ const transformClientData = (apiData) => {
     </>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-

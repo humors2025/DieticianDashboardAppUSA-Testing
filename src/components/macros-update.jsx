@@ -1,4 +1,5 @@
 "use client";
+
 import Image from "next/image";
 import { Doughnut } from "react-chartjs-2";
 import {
@@ -8,15 +9,19 @@ import {
   Legend,
 } from "chart.js";
 import { useEffect } from "react";
+import { useSelector } from "react-redux";
+import {
+  selectDietAnalysisData,
+  selectDietAnalysisLoading,
+  selectDietAnalysisError,
+} from "../store/dietAnalysisSlice";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-// ✅ One-sided rounded cap with clipping fix - Now only runs on doughnut charts
 const oneEndRoundedPlugin = {
   id: "oneEndRounded",
   afterDatasetDraw(chart) {
-    // ✅ Only run for doughnut/pie charts, not for line/bar charts
-    if (chart.config.type !== 'doughnut' && chart.config.type !== 'pie') {
+    if (chart.config.type !== "doughnut" && chart.config.type !== "pie") {
       return;
     }
 
@@ -24,20 +29,18 @@ const oneEndRoundedPlugin = {
     const meta = chart.getDatasetMeta(0);
 
     meta.data.forEach((arc) => {
-      const { startAngle, endAngle, innerRadius, outerRadius, x, y } = arc;
+      const { endAngle, innerRadius, outerRadius, x, y } = arc;
 
       const capRadius = (outerRadius - innerRadius) / 2;
       const midRadius = (outerRadius + innerRadius) / 2;
 
-      // ✅ Skip tiny arcs to prevent cap bleeding into neighbors
-      const arcSpan = Math.abs(endAngle - startAngle);
+      const arcSpan = Math.abs(arc.endAngle - arc.startAngle);
       const minAngle = (2 * capRadius) / midRadius;
       if (arcSpan < minAngle * 0.5) return;
 
       const capX = x + midRadius * Math.cos(endAngle);
       const capY = y + midRadius * Math.sin(endAngle);
 
-      // ✅ Clip to donut ring so cap never bleeds outside its segment
       ctx.save();
       ctx.beginPath();
       ctx.arc(x, y, outerRadius, 0, Math.PI * 2, false);
@@ -51,26 +54,35 @@ const oneEndRoundedPlugin = {
       ctx.restore();
     });
 
-    // Add custom border for inner and outer circle
     const { chartArea } = chart;
-    const innerCircleRadius = chartArea.width / 2 * 0.78;  // Adjust this for inner radius
-    const outerCircleRadius = chartArea.width / 2;         // Adjust this for outer radius
-    const lineWidth = 4;  // Set the border width
-    const borderColor = '#E1E6ED';  // Set the border color
+    const innerCircleRadius = (chartArea.width / 2) * 0.78;
+    const outerCircleRadius = chartArea.width / 2;
+    const lineWidth = 4;
+    const borderColor = "#E1E6ED";
 
-    // Draw the inner circle border
     ctx.save();
     ctx.beginPath();
-    ctx.arc(chartArea.left + chartArea.width / 2, chartArea.top + chartArea.height / 2, innerCircleRadius, 0, Math.PI * 2);
+    ctx.arc(
+      chartArea.left + chartArea.width / 2,
+      chartArea.top + chartArea.height / 2,
+      innerCircleRadius,
+      0,
+      Math.PI * 2
+    );
     ctx.lineWidth = lineWidth;
     ctx.strokeStyle = borderColor;
     ctx.stroke();
     ctx.restore();
 
-    // Draw the outer circle border
     ctx.save();
     ctx.beginPath();
-    ctx.arc(chartArea.left + chartArea.width / 2, chartArea.top + chartArea.height / 2, outerCircleRadius, 0, Math.PI * 2);
+    ctx.arc(
+      chartArea.left + chartArea.width / 2,
+      chartArea.top + chartArea.height / 2,
+      outerCircleRadius,
+      0,
+      Math.PI * 2
+    );
     ctx.lineWidth = lineWidth;
     ctx.strokeStyle = borderColor;
     ctx.stroke();
@@ -79,106 +91,77 @@ const oneEndRoundedPlugin = {
 };
 
 export default function MacrosUpdate() {
-  // Register plugin only when this component mounts
+  const dietAnalysisData = useSelector(selectDietAnalysisData);
+  const dietAnalysisLoading = useSelector(selectDietAnalysisLoading);
+  const dietAnalysisError = useSelector(selectDietAnalysisError);
+
   useEffect(() => {
-    // Register the plugin
     ChartJS.register(oneEndRoundedPlugin);
-    
-    // Cleanup: unregister the plugin when component unmounts
+
     return () => {
       ChartJS.unregister(oneEndRoundedPlugin);
     };
   }, []);
 
-  // Calories per gram for each macro
-  const CALORIES_PER_GRAM = {
-    Carbs: 4,
-    Fats: 9,
-    Protein: 4,
-    Fibre: 2,
-  };
+  const weeklyData =
+    dietAnalysisData?.data?.food_json?.weekly_json_data || {};
 
-  // Helper function to extract numeric value from grams string
-  const extractGramsNumber = (gramsString) => {
-    return parseInt(gramsString.replace('g', ''));
-  };
+  const title = "Macros Update";
+  const totalCalories = Number(weeklyData?.calories || 0);
+  const description = weeklyData?.note || "";
+  const unit = "Kcal";
 
-  // Base macros data without hardcoded values
-  const baseMacros = [
-    { 
-      name: "Carbs", 
-      color: "#F4A261", 
-      grams: "120g",
-      icon: "/icons/hugeicons_arrow-down-020.svg" 
+  const macros = [
+    {
+      name: "Carbs",
+      color: "#F4A261",
+      grams: `${Number(weeklyData?.carbs_g || 0).toFixed(2)}g`,
+      value: Number(weeklyData?.carbs_g || 0),
+      icon: "/icons/hugeicons_arrow-down-020.svg",
+      change: "0%",
     },
-    { 
-      name: "Fats", 
-      color: "#3A86FF", 
-      grams: "150g",
-      icon: "/icons/hugeicons_arrow-down-0244.svg" 
+    {
+      name: "Fats",
+      color: "#3A86FF",
+      grams: `${Number(weeklyData?.fat_g || 0).toFixed(2)}g`,
+      value: Number(weeklyData?.fat_g || 0),
+      icon: "/icons/hugeicons_arrow-down-0244.svg",
+      change: "0%",
     },
-    { 
-      name: "Protein", 
-      color: "#E76F51", 
-      grams: "250g",
-      icon: "/icons/hugeicons_arrow-down-0244.svg" 
+    {
+      name: "Protein",
+      color: "#E76F51",
+      grams: `${Number(weeklyData?.protein_g || 0).toFixed(2)}g`,
+      value: Number(weeklyData?.protein_g || 0),
+      icon: "/icons/hugeicons_arrow-down-0244.svg",
+      change: "0%",
     },
-    { 
-      name: "Fibre", 
-      color: "#2A9D8F", 
-      grams: "150g",
-      icon: "/icons/hugeicons_arrow-down-0244.svg" 
+    {
+      name: "Fibre",
+      color: "#2A9D8F",
+      grams: `${Number(weeklyData?.fiber_g || 0).toFixed(2)}g`,
+      value: Number(weeklyData?.fiber_g || 0),
+      icon: "/icons/hugeicons_arrow-down-0244.svg",
+      change: "0%",
     },
   ];
 
-  // Calculate total calories
-  const totalCalories = baseMacros.reduce((total, macro) => {
-    const gramsNum = extractGramsNumber(macro.grams);
-    return total + (gramsNum * CALORIES_PER_GRAM[macro.name]);
-  }, 0);
+  const total = macros.reduce((acc, item) => acc + item.value, 0);
 
-  // Calculate percentages based on calorie contribution and add value property
-  const macros = baseMacros.map(macro => {
-    const gramsNum = extractGramsNumber(macro.grams);
-    const macroCalories = gramsNum * CALORIES_PER_GRAM[macro.name];
-    const percentage = Math.round((macroCalories / totalCalories) * 100);
-    return {
-      ...macro,
-      value: percentage, // Dynamically calculated percentage
-    };
-  });
-
-  // Fixed order for colors in Cartesian quadrants
-  const fixedOrderMacros = ['Carbs', 'Fats', 'Protein', 'Fibre'];
-  
-  // Get data and colors in fixed order for the chart
-  const getChartDataInFixedOrder = () => {
-    const dataInOrder = fixedOrderMacros.map(macroName => {
-      const macro = macros.find(m => m.name === macroName);
-      return macro ? macro.value : 0;
-    });
-
-    const colorsInOrder = fixedOrderMacros.map(macroName => {
-      const macro = macros.find(m => m.name === macroName);
-      return macro ? macro.color : '#000000';
-    });
-
-    return { dataInOrder, colorsInOrder };
-  };
-
-  const { dataInOrder, colorsInOrder } = getChartDataInFixedOrder();
+  const dataInOrder = macros.map((macro) => macro.value);
+  const colorsInOrder = macros.map((macro) => macro.color);
 
   const donutData = {
     datasets: [
       {
-        data: dataInOrder, // [15, 43, 32, 10] in fixed order
-        backgroundColor: colorsInOrder, // Colors in fixed order: [#F4A261, #3A86FF, #E76F51, #2A9D8F]
+        data: dataInOrder,
+        backgroundColor: colorsInOrder,
         borderWidth: 0,
         borderRadius: 0,
         spacing: 0,
         cutout: "78%",
         circumference: 360,
-        rotation: -45, // -45° positions first segment (Carbs) in top-right quadrant
+        rotation: -45,
       },
     ],
   };
@@ -192,57 +175,84 @@ export default function MacrosUpdate() {
     },
   };
 
-  const total = macros.reduce((acc, m) => acc + m.value, 0);
+  const getLabelPositions = () => {
+    let cumulative = 0;
+    const rotation = (-45 * Math.PI) / 180;
+    const outerRadius = 100;
+    const innerRadius = 78;
+    const radius = (outerRadius + innerRadius) / 2;
 
-  // Updated label positioning function with fixed order - positions labels at the center of each arc
- const getLabelPositions = () => {
-  let cumulative = 0;
-  const rotation = (-45 * Math.PI) / 180; // Match the chart rotation
-  const outerRadius = 100;
-  const innerRadius = 78;
-  const radius = (outerRadius + innerRadius) / 2; // This places labels in the center of the ring
+    return macros.map((item) => {
+      const sliceAngle =
+        total > 0 ? (item.value / total) * 2 * Math.PI : 0;
+      const centerAngle = cumulative + sliceAngle / 2 + rotation;
 
-  // Use fixed order for labels to match chart
-  const orderedMacros = fixedOrderMacros.map(name => 
-    macros.find(m => m.name === name)
-  );
+      const x = radius * Math.cos(centerAngle);
+      const y = radius * Math.sin(centerAngle);
 
-  return orderedMacros.map((item) => {
-    const sliceAngle = (item.value / total) * 2 * Math.PI;
-    const centerAngle = cumulative + sliceAngle / 2 + rotation; // Center of the segment
+      cumulative += sliceAngle;
 
-    // Calculate position at the center of the arc (midpoint of the ring)
-    const x = radius * Math.cos(centerAngle);
-    const y = radius * Math.sin(centerAngle);
-
-    cumulative += sliceAngle;
-
-    return { ...item, x, y };
-  });
-};
+      return {
+        ...item,
+        percentage: total > 0 ? Math.round((item.value / total) * 100) : 0,
+        x,
+        y,
+      };
+    });
+  };
 
   const labels = getLabelPositions();
 
-
-  return (
-    <>
+  if (dietAnalysisLoading) {
+    return (
       <div className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
         <p className="pl-[18px] text-[#738298] text-[12px] font-semibold uppercase">
           Macros Update
         </p>
+        <div className="flex justify-center items-center py-10">
+          <p className="text-[#738298] text-[12px]">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-        <div className="flex justify-center items-center py-5">
-          <div className="relative w-[200px] h-[200px]">
-            <Doughnut data={donutData} options={donutOptions} />
+  if (dietAnalysisError) {
+    return (
+      <div className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
+        <p className="pl-[18px] text-[#738298] text-[12px] font-semibold uppercase">
+          Macros Update
+        </p>
+        <div className="flex justify-center items-center py-10 px-4">
+          <p className="text-red-500 text-[12px] text-center">
+            {dietAnalysisError}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-            <div className="absolute inset-0 flex flex-col gap-[2px] items-center justify-center pointer-events-none">
-              <p className="text-[#535359] text-[10px] font-semibold">Calories</p>
-              <p className="text-[#252525] text-[40px]">{totalCalories}</p>
-              <p className="text-[#535359] text-[10px]">Kcal</p>
-            </div>
+  return (
+    <div className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
+      <p className="pl-[18px] text-[#738298] text-[12px] font-semibold uppercase">
+        {title}
+      </p>
 
-            {/* Percentage labels positioned at the center of each colored segment */}
-            {labels.map((label, index) => (
+      <div className="flex justify-center items-center py-5">
+        <div className="relative w-[200px] h-[200px]">
+          <Doughnut data={donutData} options={donutOptions} />
+
+          <div className="absolute inset-0 flex flex-col gap-[2px] items-center justify-center pointer-events-none">
+            <p className="text-[#535359] text-[10px] font-semibold">
+              Calories
+            </p>
+            <p className="text-[#252525] text-[40px]">
+              {totalCalories.toFixed(2)}
+            </p>
+            <p className="text-[#535359] text-[10px]">{unit}</p>
+          </div>
+
+          {total > 0 &&
+            labels.map((label, index) => (
               <div
                 key={index}
                 className="absolute min-w-[47px] h-[24px] p-2 rounded-full bg-white shadow-[0px_4px_10px_rgba(0,0,0,0.12)] flex items-center justify-center"
@@ -252,47 +262,60 @@ export default function MacrosUpdate() {
                   transform: "translate(-50%, -50%)",
                 }}
               >
-                <p className="text-[#252525] text-[12px] font-semibold">{label.value}%</p>
+                <p className="text-[#252525] text-[12px] font-semibold">
+                  {label.percentage}%
+                </p>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* MACRO LEGEND */}
-        <div className="flex flex-col gap-2.5">
-          <div className="flex">
-            {macros.map((macro, index) => (
-              <div key={index} className="flex flex-col gap-2.5 w-[87px] items-center">
-                <div className="flex gap-[5px] items-center">
-                  <div className="w-[6px] h-[6px] rounded-full" style={{ background: macro.color }}></div>
-                  <p className="text-[#252525] text-[10px] font-semibold capitalize">{macro.name}</p>
-                </div>
-                <div className="flex flex-col justify-center">
-                  <p className="text-[#252525] text-[15px] font-semibold">{macro.grams}</p>
-                  <div className="flex items-center">
-                    <Image src={macro.icon} alt="arrow" width={20} height={20} />
-                    <p className="text-[#252525] text-[10px] font-semibold py-[2.5px]">5%</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="pl-[18px]">
-            <p className="text-[#738298] text-[12px] leading-[130%]">
-              Digestive Comfort Day shifts calories away from higher-volume carbs; fat rises to maintain calories
-              with lower food volume and typically better comfort. Protein remains anchored for recovery and fiber is
-              capped to reduce gut load today.
-            </p>
-          </div>
         </div>
       </div>
-    </>
+
+      <div className="flex flex-col gap-2.5">
+        <div className="flex">
+          {macros.map((macro, index) => (
+            <div
+              key={index}
+              className="flex flex-col gap-2.5 w-[87px] items-center"
+            >
+              <div className="flex gap-[5px] items-center">
+                <div
+                  className="w-[6px] h-[6px] rounded-full"
+                  style={{ background: macro.color }}
+                ></div>
+                <p className="text-[#252525] text-[10px] font-semibold capitalize">
+                  {macro.name}
+                </p>
+              </div>
+
+              <div className="flex flex-col justify-center">
+                <p className="text-[#252525] text-[15px] font-semibold">
+                  {macro.grams}
+                </p>
+                <div className="flex items-center">
+                  <Image
+                    src={macro.icon}
+                    alt="arrow"
+                    width={20}
+                    height={20}
+                  />
+                  <p className="text-[#252525] text-[10px] font-semibold py-[2.5px]">
+                    {macro.change}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="pl-[18px] pr-[10px]">
+          <p className="text-[#738298] text-[12px] leading-[130%]">
+            {description}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
-
-
-
 
 
 

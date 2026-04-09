@@ -130,6 +130,7 @@ export default function ProfileSettings() {
               placeholder=" "
               value={form.name}
               onChange={onChange}
+              readOnly
             />
             <label htmlFor="name" className="form-label">
               Name
@@ -172,6 +173,7 @@ export default function ProfileSettings() {
               placeholder=" "
               value={form.mobile}
               onChange={onChange}
+              readOnly
             />
             <label htmlFor="mobile" className="form-label">
               Mobile Number

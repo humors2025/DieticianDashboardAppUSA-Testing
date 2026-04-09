@@ -399,13 +399,116 @@ export const fetchCalendarData = async (dieticianId) => {
 
 
 
+export const fetchClientProfileDetails = async (profileId, range) => {
+  // Add validation to ensure range is not undefined
+  if (!range) {
+    range = "weekly"; // fallback to weekly if undefined
+  }
+  
+  const url = `${API_ENDPOINTS.CLIENTPROFILE.CLIENTPROFILEDETAILS}?profile_id=${profileId}&range=${range}`;
+  
+  return apiFetcher(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+};
 
 
 
+export const fetchClientIndividualProfile = async (profileId, date) => {
+  return apiFetcher(API_ENDPOINTS.CLIENTPROFILE.CLIENTINDIVIDUALPROFILE, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      profile_id: profileId,
+      date: date,
+    }),
+  });
+};
 
 
 
+// Add to authService.js
+export const fetchClientProfileDatesList = async (profileId) => {
+  return apiFetcher(API_ENDPOINTS.CLIENTPROFILE.CLIENTPROFILEDATESLIST, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      profile_id: profileId,
+    }),
+  });
+};
 
+
+
+export const searchClientsService = async (dieticianId, searchTerm) => {
+  return apiFetcher(API_ENDPOINTS.SEARCH.SEARCHCLIENT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      dietician_id: dieticianId,
+      search: searchTerm,
+    }),
+  });
+};
+
+
+
+export const fetchDietAnalysisPlan = async (
+  profileId,
+  weekStartDate,
+  weekEndDate
+) => {
+  return apiFetcher(API_ENDPOINTS.DIETANALYSIS.DIETANALYSISPLAN, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      profile_id: profileId,
+      week_start_date: weekStartDate,
+      week_end_date: weekEndDate,
+    }),
+  });
+};
+
+
+export const fetchClientWeeklyDates = async (profileId) => {
+  try {
+    const response = await apiFetcher(API_ENDPOINTS.CLIENTPROFILE.CLIENTWEEKLYDATES, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        profile_id: profileId,
+      }),
+    });
+    
+    return response;
+  } catch (error) {
+    // Check if it's the "no weekly data found" error
+    if (error.message?.includes("No weekly data found") || 
+        error.data?.message?.includes("No weekly data found")) {
+      // Return a special response object instead of throwing
+      return { 
+        status: false, 
+        message: error.message || "No weekly data found for last 3 months",
+        profile_id: profileId
+      };
+    }
+    // Re-throw other errors
+    throw error;
+  }
+};
 
 
 

@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux"; // Add these imports
 import { IoIosArrowDown } from "react-icons/io";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 
 import {
   Chart as ChartJS,
@@ -16,6 +18,8 @@ import {
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 
+import { fetchProgressData, setSelectedRange } from "@/store/progressSlice"; // Import actions
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -27,49 +31,85 @@ ChartJS.register(
 );
 
 export default function Progress() {
-  const [selectedRange, setSelectedRange] = useState("One Week");
+  const dispatch = useDispatch();
+  const searchParams = useSearchParams();
+  const profileId = searchParams.get("profile_id");
+
+  // Get data from Redux store
+  const { 
+    data: graphData, 
+    loading, 
+    error, 
+    selectedRange 
+  } = useSelector((state) => state.progress);
+
   const [openDropdown, setOpenDropdown] = useState(false);
   const dropdownRef = useRef(null);
 
-  const rangeData = {
-    "One Week": {
-      labels: ["05 Aug", "06 Aug", "07 Aug", "08 Aug", "09 Aug", "10 Aug", "11 Aug"],
-      values: [35, 52, 52, 60, 60, 60, 72],
-    },
-    "One Month": {
-      labels: ["Week 1", "Week 2", "Week 3", "Week 4"],
-      values: [40, 58, 64, 70],
-    },
-    "All Time": {
-      labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"],
-      values: [28, 35, 42, 50, 55, 61, 67, 72],
-    },
+  const rangeToDisplay = {
+    weekly: "One Week",
+    monthly: "One Month",
+    all_time: "All Time",
   };
 
-  const { labels, values } = rangeData[selectedRange];
+  const displayToRange = {
+    "One Week": "weekly",
+    "One Month": "monthly",
+    "All Time": "all_time",
+  };
 
   const ranges = ["One Week", "One Month", "All Time"];
 
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setOpenDropdown(false);
-      }
+    if (profileId) {
+      dispatch(fetchProgressData({ profileId, range: selectedRange }));
+    }
+  }, [profileId, selectedRange, dispatch]);
+
+  const handleRangeChange = (range) => {
+    dispatch(setSelectedRange(displayToRange[range]));
+    setOpenDropdown(false);
+  };
+
+  const chartData = useMemo(() => {
+    if (!graphData?.graphs || !Array.isArray(graphData.graphs)) {
+      return null;
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+    const overallFatLossGraph = graphData.graphs.find(
+      (item) => item.key === "overall_fat_loss_score"
+    );
 
-  const data = useMemo(() => {
+    if (!overallFatLossGraph || !Array.isArray(overallFatLossGraph.data)) {
+      return null;
+    }
+
+    const labels = overallFatLossGraph.data.map((point) => point.label);
+    const values = overallFatLossGraph.data.map((point) => point.value);
+
     return {
       labels,
+      values,
+      title: overallFatLossGraph.title || "Overall Fat Loss Score",
+      recommendedRange: graphData.recommended_trend_range,
+      rangeLabel: graphData.range_label,
+    };
+  }, [graphData]);
+
+  const data = useMemo(() => {
+    if (!chartData) {
+      return {
+        labels: [],
+        datasets: [],
+      };
+    }
+
+    return {
+      labels: chartData.labels,
       datasets: [
         {
-          label: "Progress",
-          data: values,
+          label: chartData.title,
+          data: chartData.values,
           borderColor: "#308BF9",
           borderWidth: 3,
           tension: 0.35,
@@ -90,7 +130,8 @@ export default function Progress() {
             gradient.addColorStop(1, "rgba(30,120,255,0)");
             return gradient;
           },
-          pointRadius: (ctx) => (ctx.dataIndex === values.length - 1 ? 6 : 0),
+          pointRadius: (ctx) =>
+            ctx.dataIndex === chartData.values.length - 1 ? 6 : 0,
           pointHoverRadius: 6,
           pointBackgroundColor: "#308BF9",
           pointBorderColor: "#308BF9",
@@ -98,7 +139,7 @@ export default function Progress() {
         },
       ],
     };
-  }, [labels, values]);
+  }, [chartData]);
 
   const options = useMemo(() => {
     return {
@@ -134,10 +175,13 @@ export default function Progress() {
           },
         },
         y: {
-          min: 20,
-          max: 80,
+          min: 0,
+          max: 100,
           ticks: {
             stepSize: 20,
+            callback: function (value) {
+              return value;
+            },
             color: "#8A8A8F",
             font: { size: 11, weight: "500" },
           },
@@ -155,7 +199,48 @@ export default function Progress() {
         },
       },
     };
-  }, [values.length]);
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpenDropdown(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  if (loading && !graphData) {
+    return (
+      <div className="w-[410px] flex flex-col border border-[#E1E6ED] px-5 pt-[18px] pb-5 rounded-[15px] bg-white">
+        <div className="flex justify-center items-center h-[300px]">
+          <div className="text-[#535359]">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !graphData) {
+    return (
+      <div className="w-[410px] flex flex-col border border-[#E1E6ED] px-5 pt-[18px] pb-5 rounded-[15px] bg-white">
+        <div className="flex justify-center items-center h-[300px]">
+          <div className="text-red-500 text-center">
+            <p>Error loading data</p>
+            <button
+              onClick={() => dispatch(fetchProgressData({ profileId, range: selectedRange }))}
+              className="mt-2 text-[#308BF9] text-sm"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-[410px] flex flex-col border border-[#E1E6ED] px-5 pt-[18px] pb-5 rounded-[15px] bg-white">
@@ -173,7 +258,7 @@ export default function Progress() {
             className="flex gap-[15px] px-[11px] py-1 border border-[#E1E6ED] rounded-[4px] items-center bg-white cursor-pointer"
           >
             <p className="text-[#535359] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
-              {selectedRange}
+              {rangeToDisplay[selectedRange]}
             </p>
             <IoIosArrowDown
               className={`text-[#A1A1A1] w-[15px] h-[15px] transition-transform duration-200 ${
@@ -188,12 +273,9 @@ export default function Progress() {
                 <button
                   key={item}
                   type="button"
-                  onClick={() => {
-                    setSelectedRange(item);
-                    setOpenDropdown(false);
-                  }}
+                  onClick={() => handleRangeChange(item)}
                   className={`w-full text-left px-3 py-2 text-[12px] leading-[110%] tracking-[-0.24px] transition-colors cursor-pointer ${
-                    selectedRange === item
+                    rangeToDisplay[selectedRange] === item
                       ? "bg-[#F5F7FA] text-[#252525] font-medium"
                       : "text-[#535359] hover:bg-[#F5F7FA]"
                   }`}
@@ -226,13 +308,19 @@ export default function Progress() {
           </div>
 
           <p className="text-[#252525] text-[10px] font-semibold leading-[110%] tracking-[-0.2px]">
-            60%-100%
+            {chartData?.recommendedRange?.label || "NA"}
           </p>
         </div>
       </div>
 
       <div className="mt-4 w-full h-[170px]">
-        <Line data={data} options={options} />
+        {chartData && chartData.values.length > 0 ? (
+          <Line data={data} options={options} />
+        ) : (
+          <div className="flex justify-center items-center h-full text-[#535359]">
+            No data available
+          </div>
+        )}
       </div>
     </div>
   );

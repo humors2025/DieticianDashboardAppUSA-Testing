@@ -1,334 +1,586 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { IoChevronBackOutline, IoChevronForwardOutline } from "react-icons/io5";
+import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "next/navigation";
 import TestAnalysis from "./test-analysis";
 import DietAnalysis from "./diet-analysis";
 import RightSidebar from "./rightSidebar";
+import {
+  getClientIndividualProfile,
+  selectClientIndividualProfileData,
+} from "../store/clientIndividualProfileSlice";
+import { getDietAnalysisPlan } from "../store/dietAnalysisSlice";
+import {
+  fetchClientProfileDatesList,
+  fetchClientWeeklyDates,
+} from "../services/authService";
 
 export default function ClientDetails() {
-    const [activeTab, setActiveTab] = useState("test");
-    const [activeIndex, setActiveIndex] = useState(0);
-    const [startIndex, setStartIndex] = useState(0);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const dispatch = useDispatch();
+  const searchParams = useSearchParams();
 
-    const dateData = [
-        { date: "04 Jul, 2025", score: "82%", status: "Optimal" },
-        { date: "05 Jul, 2025", score: "78%", status: "Moderate" },
-        { date: "06 Jul, 2025", score: "69%", status: "Focus" },
-        { date: "07 Jul, 2025", score: "85%", status: "Optimal" },
-        { date: "08 Jul, 2025", score: "80%", status: "Optimal" },
-        { date: "09 Jul, 2025", score: "76%", status: "Moderate" },
-        { date: "10 Jul, 2025", score: "90%", status: "Optimal" },
-        { date: "11 Jul, 2025", score: "72%", status: "Focus" },
-        { date: "12 Jul, 2025", score: "88%", status: "Optimal" },
-        { date: "13 Jul, 2025", score: "79%", status: "Moderate" },
-    ];
+  const individualProfileData = useSelector(selectClientIndividualProfileData);
 
-    const weekData = [
-        { week: "Week 1", range: "04 Jul, 2025 - 12 Jul, 2025" },
-        { week: "Week 2", range: "13 Jul, 2025 - 19 Jul, 2025" },
-        { week: "Week 3", range: "20 Jul, 2025 - 26 Jul, 2025" },
-        { week: "Week 4", range: "27 Jul, 2025 - 02 Aug, 2025" },
-        { week: "Week 5", range: "03 Aug, 2025 - 09 Aug, 2025" },
-    ];
+  const [profileDates, setProfileDates] = useState([]);
+  const [datesLoading, setDatesLoading] = useState(false);
+  const [datesError, setDatesError] = useState(null);
 
-    const ITEMS_TO_SHOW = 4;
-    const currentData = activeTab === "test" ? dateData : weekData;
+  const [weeklyDates, setWeeklyDates] = useState([]);
+  const [weeklyDatesLoading, setWeeklyDatesLoading] = useState(false);
+  const [weeklyDatesError, setWeeklyDatesError] = useState(null);
+  const [isDietAnalysisAvailable, setIsDietAnalysisAvailable] = useState(true);
+  const [isLoadingWeeklyData, setIsLoadingWeeklyData] = useState(true); // New state for initial load
 
-    const handleBack = () => {
-        if (startIndex > 0) {
-            const newStartIndex = startIndex - 1;
-            setStartIndex(newStartIndex);
+  const [activeTab, setActiveTab] = useState("test");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [startIndex, setStartIndex] = useState(0);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-            if (!(activeIndex >= newStartIndex && activeIndex < newStartIndex + ITEMS_TO_SHOW)) {
-                setActiveIndex(newStartIndex);
-            }
+  const profileId = searchParams.get("profile_id");
+
+  const transformDatesToDisplay = () => {
+    if (!profileDates || profileDates.length === 0) return [];
+
+    return profileDates.map((dateObj) => ({
+      date: dateObj.display_date,
+      rawDate: dateObj.date,
+      score: dateObj.fat_loss_metabolism_score
+        ? `${dateObj.fat_loss_metabolism_score}%`
+        : "NA",
+      status: dateObj.zone || "NA",
+    }));
+  };
+
+  const transformWeeklyDatesToDisplay = () => {
+    if (!weeklyDates || weeklyDates.length === 0) return [];
+
+    return weeklyDates.map((weekObj) => ({
+      week: weekObj.week_label,
+      range: weekObj.week_range,
+      weekStartDate: weekObj.week_start_date,
+      weekEndDate: weekObj.week_end_date,
+      monthLabel: weekObj.month_label,
+      weekNoInMonth: weekObj.week_no_in_month,
+    }));
+  };
+
+  const testDateData = transformDatesToDisplay();
+  const weekData = transformWeeklyDatesToDisplay();
+
+  useEffect(() => {
+    const loadProfileDates = async () => {
+      if (!profileId) return;
+
+      setDatesLoading(true);
+      setDatesError(null);
+      setProfileDates([]);
+      setActiveIndex(0);
+      setStartIndex(0);
+
+      try {
+        const response = await fetchClientProfileDatesList(profileId);
+
+        if (response.status && response.data) {
+          const dates = response.data.dates || [];
+          setProfileDates(dates);
+
+          if (dates.length > 0) {
+            dispatch(
+              getClientIndividualProfile({
+                profileId,
+                date: dates[0].date,
+              })
+            );
+          }
+        } else {
+          setProfileDates([]);
         }
+      } catch (error) {
+        console.error("Error fetching profile dates:", error);
+        setDatesError(error.message || "Failed to load dates");
+        setProfileDates([]);
+      } finally {
+        setDatesLoading(false);
+      }
     };
 
-    const handleForward = () => {
-        if (startIndex + ITEMS_TO_SHOW < currentData.length) {
-            const newStartIndex = startIndex + 1;
-            setStartIndex(newStartIndex);
+    loadProfileDates();
+  }, [profileId, dispatch]);
 
-            if (!(activeIndex >= newStartIndex && activeIndex < newStartIndex + ITEMS_TO_SHOW)) {
-                setActiveIndex(newStartIndex);
-            }
+  useEffect(() => {
+    const loadWeeklyDates = async () => {
+      if (!profileId) return;
+
+      setWeeklyDatesLoading(true);
+      setIsLoadingWeeklyData(true);
+      setWeeklyDatesError(null);
+      setWeeklyDates([]);
+      setIsDietAnalysisAvailable(true);
+
+      try {
+        const response = await fetchClientWeeklyDates(profileId);
+
+        // Check if the response indicates no weekly data
+        if (response && response.status === false && response.message?.includes("No weekly data")) {
+          setIsDietAnalysisAvailable(false);
+          setWeeklyDates([]);
+
+          // If diet analysis is not available and currently on diet tab, switch to test tab
+          if (activeTab === "diet") {
+            setActiveTab("test");
+          }
+        } else if (response && response.status === true && response.data) {
+          const weeks = response.data || [];
+          setWeeklyDates(weeks);
+          setIsDietAnalysisAvailable(true);
+
+          if (weeks.length > 0) {
+            const firstWeek = weeks[0];
+            dispatch(
+              getDietAnalysisPlan({
+                profileId,
+                weekStartDate: firstWeek.week_start_date,
+                weekEndDate: firstWeek.week_end_date,
+              })
+            );
+          }
+        } else {
+          // Handle any other response format
+          setWeeklyDates([]);
+          setIsDietAnalysisAvailable(true);
         }
+      } catch (error) {
+        console.error("Error fetching weekly dates:", error);
+
+        // Check if error message indicates no data
+        if (error.message?.includes("No weekly data")) {
+          setIsDietAnalysisAvailable(false);
+          setWeeklyDates([]);
+
+          if (activeTab === "diet") {
+            setActiveTab("test");
+          }
+        } else {
+          setWeeklyDatesError(error.message || "Failed to load weekly dates");
+          setWeeklyDates([]);
+          setIsDietAnalysisAvailable(true);
+        }
+      } finally {
+        setWeeklyDatesLoading(false);
+        setIsLoadingWeeklyData(false);
+      }
     };
 
-    const handleTabChange = (tab) => {
-        setActiveTab(tab);
-        setActiveIndex(0);
-        setStartIndex(0);
-    };
+    loadWeeklyDates();
+  }, [profileId, dispatch, activeTab]);
 
-    const visibleItems = currentData.slice(startIndex, startIndex + ITEMS_TO_SHOW);
+  const profileDetails = individualProfileData?.data?.profile_details || {};
 
+  const formatJoinedDate = (dateString) => {
+    if (!dateString || dateString === "NA") return "NA";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "NA";
+    return date.toLocaleDateString("en-GB", {
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const ITEMS_TO_SHOW = 4;
+  const currentData = activeTab === "test" ? testDateData : weekData;
+
+  const handleBack = () => {
+    if (startIndex > 0) {
+      const newStartIndex = startIndex - 1;
+      setStartIndex(newStartIndex);
+      if (
+        !(
+          activeIndex >= newStartIndex &&
+          activeIndex < newStartIndex + ITEMS_TO_SHOW
+        )
+      ) {
+        setActiveIndex(newStartIndex);
+      }
+    }
+  };
+
+  const handleForward = () => {
+    if (startIndex + ITEMS_TO_SHOW < currentData.length) {
+      const newStartIndex = startIndex + 1;
+      setStartIndex(newStartIndex);
+      if (
+        !(
+          activeIndex >= newStartIndex &&
+          activeIndex < newStartIndex + ITEMS_TO_SHOW
+        )
+      ) {
+        setActiveIndex(newStartIndex);
+      }
+    }
+  };
+
+  const handleTabChange = (tab) => {
+    // Prevent switching to diet tab if diet analysis is not available
+    if (tab === "diet" && !isDietAnalysisAvailable) {
+      console.log("Diet analysis not available, cannot switch tab");
+      return;
+    }
+    setActiveTab(tab);
+    setActiveIndex(0);
+    setStartIndex(0);
+  };
+
+  const handleDateSelect = (actualIndex) => {
+    setActiveIndex(actualIndex);
+    const selectedDate = testDateData[actualIndex];
+
+    if (selectedDate?.rawDate) {
+      dispatch(
+        getClientIndividualProfile({
+          profileId,
+          date: selectedDate.rawDate,
+        })
+      );
+    }
+  };
+
+  const handleWeekSelect = (actualIndex) => {
+    setActiveIndex(actualIndex);
+    const selectedWeek = weekData[actualIndex];
+
+    if (selectedWeek?.weekStartDate && selectedWeek?.weekEndDate) {
+      dispatch(
+        getDietAnalysisPlan({
+          profileId,
+          weekStartDate: selectedWeek.weekStartDate,
+          weekEndDate: selectedWeek.weekEndDate,
+        })
+      );
+    }
+  };
+
+  const visibleItems = currentData.slice(startIndex, startIndex + ITEMS_TO_SHOW);
+
+  // Show loading state while checking weekly data availability
+  if (isLoadingWeeklyData) {
     return (
-        <>
-            <div className="w-full relative h-[calc(88vh-24px)] overflow-hidden">
-                {/* Overlay for blur effect - now positioned relative to parent */}
-                {isSidebarOpen && (
-                    <div 
-                        className="absolute inset-0 bg-black/30  z-40 transition-all duration-300 rounded-[15px]"
-                        onClick={() => setIsSidebarOpen(false)}
-                    />
+      <div className="w-full h-[calc(88vh-24px)] bg-white rounded-[15px] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading client data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    (datesLoading && activeTab === "test") ||
+    (weeklyDatesLoading && activeTab === "diet")
+  ) {
+    return (
+      <div className="w-full h-[calc(88vh-24px)] bg-white rounded-[15px] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">
+            {activeTab === "test" ? "Loading dates..." : "Loading weeks..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    (datesError && activeTab === "test") ||
+    (weeklyDatesError && activeTab === "diet")
+  ) {
+    return (
+      <div className="w-full h-[calc(88vh-24px)] bg-white rounded-[15px] flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-4xl mb-4">⚠️</div>
+          <p className="text-red-600 mb-2">
+            {activeTab === "test"
+              ? "Failed to load dates"
+              : "Failed to load weeks"}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="w-full relative h-[calc(88vh-24px)] overflow-hidden">
+        {isSidebarOpen && (
+          <div
+            className="absolute inset-0 bg-black/30 z-40 transition-all duration-300 rounded-[15px]"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        <div
+          className={`w-full bg-white px-[15px] pt-[23px] pb-5 rounded-[15px] flex flex-col h-[calc(88vh-24px)] overflow-hidden transition-all duration-300 relative ${isSidebarOpen ? "opacity-90" : "opacity-100"
+            }`}
+        >
+          <div className="flex justify-between items-center pb-[22px] border-b border-[#E1E6ED]">
+            <div className="flex gap-[15px]">
+              <div className=" rounded-full w-12 h-12 flex items-center justify-center overflow-hidden">
+                {profileDetails?.profile_image &&
+                  profileDetails?.profile_image !== "NA" ? (
+                  <Image
+                    src={profileDetails.profile_image}
+                    alt={profileDetails?.profile_name || "user"}
+                    width={48}
+                    height={48}
+                    className="rounded-full object-cover w-[48px] h-[48px]"
+                  />
+                ) : (
+                  <Image
+                    src="/icons/hugeicons_user-circle-02.svg"
+                    alt="user"
+                    width={48}
+                    height={48}
+                  />
                 )}
-                
-                <div
-                    className={`
-                        w-full bg-white px-[15px] pt-[23px] pb-5 rounded-[15px]
-                        flex flex-col
-                        h-[calc(88vh-24px)]
-                        overflow-hidden
-                        transition-all duration-300
-                        relative
-                        ${isSidebarOpen ? 'opacity-90' : 'opacity-100'}
-                    `}
-                >
-                    {/* Header Section */}
-                    <div className="flex justify-between items-center pb-[22px] border-b border-[#E1E6ED]">
-                        <div className="flex gap-[15px]">
-                            <div className="bg-[#F0F0F0] rounded-full p-2 w-12 h-12 flex items-center justify-center">
-                                <Image
-                                    src="/icons/hugeicons_user-circle-02.svg"
-                                    alt="user"
-                                    width={32}
-                                    height={32}
-                                />
-                            </div>
+              </div>
 
-                            <div className="flex flex-col gap-3">
-                                <div className="flex gap-3 items-center">
-                                    <p className="text-[#252525] text-[20px] font-semibold">
-                                        Sagar Hosur
-                                    </p>
-
-                                    <div className="flex items-center justify-center px-2.5 py-2 rounded-[5px] bg-[#E9F3FF] text-[#006FFF] text-[10px] font-semibold">
-                                        Weight Loss
-                                    </div>
-
-                                    <p className="text-[#535359] text-[12px]">
-                                        32 tests taken
-                                    </p>
-                                </div>
-
-                                <div className="flex gap-1.5 items-center">
-                                    <p className="text-[#535359] text-[12px]">
-                                        28 years, Male
-                                    </p>
-
-                                    <div className="mx-1.5">
-                                        <Image
-                                            src="/icons/Ellipse 765.svg"
-                                            width={3}
-                                            height={3}
-                                            alt="dot"
-                                        />
-                                    </div>
-
-                                    <p className="text-[#535359] text-[12px]">
-                                        Joined on Aug 2024
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-[30px]">
-                            <Image
-                                src="/icons/hugeicons_file-export.svg"
-                                width={26}
-                                height={26}
-                                alt="export"
-                                className="cursor-pointer"
-                            />
-
-                            <Image
-                                src="/icons/right button.svg"
-                                width={26}
-                                height={26}
-                                alt="right"
-                                className="cursor-pointer"
-                                onClick={() => setIsSidebarOpen(true)}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Tabs */}
-                    <div className="flex py-[11px] pl-[5px]">
-                        <div className="flex bg-[#F5F7FA] rounded-[6px]">
-                            <div
-                                onClick={() => handleTabChange("test")}
-                                className={`flex items-center rounded-[6px] py-[11px] px-[31px] cursor-pointer ${
-                                    activeTab === "test" ? "bg-[#252525]" : "bg-[#F5F7FA]"
-                                }`}
-                            >
-                                <p
-                                    className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${
-                                        activeTab === "test" ? "text-white" : "text-[#535359]"
-                                    }`}
-                                >
-                                    Test Analysis
-                                </p>
-                            </div>
-
-                            <div
-                                onClick={() => handleTabChange("diet")}
-                                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] cursor-pointer ${
-                                    activeTab === "diet" ? "bg-[#252525]" : "bg-[#F5F7FA]"
-                                }`}
-                            >
-                                <p
-                                    className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${
-                                        activeTab === "diet" ? "text-white" : "text-[#535359]"
-                                    }`}
-                                >
-                                    Diet Analysis
-                                </p>
-
-                                <Image
-                                    src="/icons/hugeicons_information-circle1.svg"
-                                    alt="info"
-                                    width={20}
-                                    height={20}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Date / Week Section */}
-                    <div className="flex items-center gap-[26px] border-t border-b border-[#E1E6ED] pl-[38px] py-[5px]">
-                        <p className="text-[#535359] text-[15px] font-semibold whitespace-nowrap">
-                            {activeTab === "test" ? "Select a date" : "Select a week"}
-                        </p>
-
-                        <div className="flex gap-3 items-center w-full">
-                            <IoChevronBackOutline
-                                onClick={handleBack}
-                                className={`text-[#252525] w-6 h-6 cursor-pointer ${
-                                    startIndex === 0 ? "opacity-50 cursor-not-allowed" : ""
-                                }`}
-                            />
-
-                            <div className="w-full flex gap-[5px] items-center overflow-x-auto no-scrollbar">
-                                {visibleItems.map((item, index) => {
-                                    const actualIndex = startIndex + index;
-
-                                    return (
-                                        <div
-                                            key={actualIndex}
-                                            onClick={() => setActiveIndex(actualIndex)}
-                                            className={`flex flex-col gap-[5px] rounded-[8px] pl-[15px] pt-[15px] pr-[15px] pb-[15px] cursor-pointer min-w-[160px] ${
-                                                activeIndex === actualIndex ? "bg-[#308BF9]" : ""
-                                            }`}
-                                        >
-                                            {activeTab === "test" ? (
-                                                <>
-                                                    <p
-                                                        className={`${
-                                                            activeIndex === actualIndex
-                                                                ? "text-white"
-                                                                : "text-[#535359]"
-                                                        } text-[12px] font-semibold`}
-                                                    >
-                                                        {item.date}
-                                                    </p>
-
-                                                    <div className="flex items-center">
-                                                        <p
-                                                            className={`${
-                                                                activeIndex === actualIndex
-                                                                    ? "text-white"
-                                                                    : "text-[#535359]"
-                                                            } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
-                                                        >
-                                                            {item.score}
-                                                        </p>
-
-                                                        <div
-                                                            className={`mx-2.5 border-r h-[13px] ${
-                                                                activeIndex === actualIndex
-                                                                    ? "border-white"
-                                                                    : "border-[#A1A1A1]"
-                                                            }`}
-                                                        ></div>
-
-                                                        <p
-                                                            className={`${
-                                                                activeIndex === actualIndex
-                                                                    ? "text-white"
-                                                                    : "text-[#535359]"
-                                                            } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
-                                                        >
-                                                            {item.status}
-                                                        </p>
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <p
-                                                        className={`${
-                                                            activeIndex === actualIndex
-                                                                ? "text-white"
-                                                                : "text-[#535359]"
-                                                        } text-[12px] font-semibold`}
-                                                    >
-                                                        {item.week}
-                                                    </p>
-
-                                                    <p
-                                                        className={`${
-                                                            activeIndex === actualIndex
-                                                                ? "text-white"
-                                                                : "text-[#535359]"
-                                                        } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
-                                                    >
-                                                        {item.range}
-                                                    </p>
-                                                </>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="flex justify-end">
-                                <IoChevronForwardOutline
-                                    onClick={handleForward}
-                                    className={`text-[#252525] w-6 h-6 cursor-pointer ${
-                                        startIndex + ITEMS_TO_SHOW >= currentData.length
-                                            ? "opacity-50 cursor-not-allowed"
-                                            : ""
-                                    }`}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div
-                        className={`${
-                            activeTab === "test" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
-                        }`}
-                    >
-                        <TestAnalysis />
-                    </div>
-
-                    <div
-                        className={`${
-                            activeTab === "diet" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
-                        }`}
-                    >
-                        <DietAnalysis />
-                    </div>
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-3 items-center">
+                  <p className="text-[#252525] text-[20px] font-semibold">
+                    {profileDetails?.profile_name || "NA"}
+                  </p>
                 </div>
 
-                <RightSidebar
-                    isOpen={isSidebarOpen}
-                    onClose={() => setIsSidebarOpen(false)}
-                />
+                <div className="flex gap-1.5 items-center">
+                  <p className="text-[#535359] text-[12px]">
+                    {profileDetails?.age || "NA"} years,{" "}
+                    {profileDetails?.gender || "NA"}
+                  </p>
+
+                  <div className="mx-1.5">
+                    <Image
+                      src="/icons/Ellipse 765.svg"
+                      width={3}
+                      height={3}
+                      alt="dot"
+                    />
+                  </div>
+
+                  <p className="text-[#535359] text-[12px]">
+                    Joined on {formatJoinedDate(profileDetails?.joined_dttm)}
+                  </p>
+                </div>
+              </div>
             </div>
-        </>
-    );
+
+            <div className="flex gap-[30px]">
+              <Image
+                src="/icons/hugeicons_file-export.svg"
+                width={26}
+                height={26}
+                alt="export"
+                className="cursor-pointer"
+              />
+
+              <Image
+                src="/icons/right button.svg"
+                width={26}
+                height={26}
+                alt="right"
+                className="cursor-pointer"
+                onClick={() => setIsSidebarOpen(true)}
+              />
+            </div>
+          </div>
+
+          <div className="flex py-[11px] pl-[5px]">
+            <div className="flex bg-[#F5F7FA] rounded-[6px]">
+              <div
+                onClick={() => handleTabChange("test")}
+                className={`flex items-center rounded-[6px] py-[11px] px-[31px] cursor-pointer ${activeTab === "test" ? "bg-[#252525]" : "bg-[#F5F7FA]"
+                  }`}
+              >
+                <p
+                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${activeTab === "test" ? "text-white" : "text-[#535359]"
+                    }`}
+                >
+                  Test Analysis
+                </p>
+              </div>
+
+              <div
+                onClick={() => handleTabChange("diet")}
+                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${!isDietAnalysisAvailable
+                    ? "opacity-50 cursor-not-allowed bg-[#F5F7FA]"
+                    : activeTab === "diet"
+                      ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+                      : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
+                  }`}
+                title={!isDietAnalysisAvailable ? "No diet analysis data available for this client" : ""}
+              >
+                <p
+                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${!isDietAnalysisAvailable
+                      ? "text-[#A1A1A1]"
+                      : activeTab === "diet"
+                        ? "text-white"
+                        : "text-[#535359]"
+                    }`}
+                >
+                  Diet Analysis
+                </p>
+
+                <Image
+                  src="/icons/hugeicons_information-circle1.svg"
+                  alt="info"
+                  width={20}
+                  height={20}
+                  className={`${!isDietAnalysisAvailable ? "opacity-50" : ""}`}
+                />
+              </div>
+
+            </div>
+          </div>
+
+          <div className="flex items-center gap-[26px] border-t border-b border-[#E1E6ED] pl-[38px] py-[5px]">
+            <p className="text-[#535359] text-[15px] font-semibold whitespace-nowrap">
+              {activeTab === "test" ? "Select a date" : "Select a week"}
+            </p>
+
+            <div className="flex gap-3 items-center w-full">
+              <IoChevronBackOutline
+                onClick={handleBack}
+                className={`text-[#252525] w-6 h-6 cursor-pointer ${startIndex === 0 || currentData.length === 0
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
+                  }`}
+              />
+
+              <div className="w-full flex gap-[5px] items-center overflow-x-auto no-scrollbar">
+                {currentData.length === 0 ? (
+                  <div className="text-center py-4 text-gray-500 w-full">
+                    {activeTab === "test"
+                      ? "No test dates available"
+                      : "No weeks available"}
+                  </div>
+                ) : (
+                  visibleItems.map((item, index) => {
+                    const actualIndex = startIndex + index;
+                    return (
+                      <div
+                        key={actualIndex}
+                        onClick={() =>
+                          activeTab === "test"
+                            ? handleDateSelect(actualIndex)
+                            : handleWeekSelect(actualIndex)
+                        }
+                        className={`flex flex-col gap-[5px] rounded-[8px] pl-[15px] pt-[15px] pr-[15px] pb-[15px] cursor-pointer min-w-[160px] ${activeIndex === actualIndex ? "bg-[#308BF9]" : ""
+                          }`}
+                      >
+                        {activeTab === "test" ? (
+                          <>
+                            <p
+                              className={`${activeIndex === actualIndex
+                                  ? "text-white"
+                                  : "text-[#535359]"
+                                } text-[12px] font-semibold`}
+                            >
+                              {item.date}
+                            </p>
+
+                            <div className="flex items-center">
+                              <p
+                                className={`${activeIndex === actualIndex
+                                    ? "text-white"
+                                    : "text-[#535359]"
+                                  } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                              >
+                                {item.score || "—"}
+                              </p>
+
+                              <div
+                                className={`mx-2.5 border-r h-[13px] ${activeIndex === actualIndex
+                                    ? "border-white"
+                                    : "border-[#A1A1A1]"
+                                  }`}
+                              ></div>
+
+                              <p
+                                className={`${activeIndex === actualIndex
+                                    ? "text-white"
+                                    : "text-[#535359]"
+                                  } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                              >
+                                {item.status || "Pending"}
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p
+                              className={`${activeIndex === actualIndex
+                                  ? "text-white"
+                                  : "text-[#535359]"
+                                } text-[12px] font-semibold`}
+                            >
+                              {item.week}
+                            </p>
+
+                            <p
+                              className={`${activeIndex === actualIndex
+                                  ? "text-white"
+                                  : "text-[#535359]"
+                                } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                            >
+                              {item.range}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <IoChevronForwardOutline
+                  onClick={handleForward}
+                  className={`text-[#252525] w-6 h-6 cursor-pointer ${startIndex + ITEMS_TO_SHOW >= currentData.length ||
+                      currentData.length === 0
+                      ? "opacity-50 cursor-not-allowed"
+                      : ""
+                    }`}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div
+            className={`${activeTab === "test" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+              }`}
+          >
+            <TestAnalysis />
+          </div>
+
+          <div
+            className={`${activeTab === "diet" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+              }`}
+          >
+            <DietAnalysis />
+          </div>
+        </div>
+
+        <RightSidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+      </div>
+    </>
+  );
 }

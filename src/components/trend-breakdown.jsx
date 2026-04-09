@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { IoIosArrowForward } from "react-icons/io";
-
+import { useSelector } from "react-redux";
 import DigestiveBalanceTrends from "./digestive-balance-trends";
 import FuelEnergyTrends from "./fuel-energy-trends";
 import MetabolicRecoveryTrends from "./metabolic-recovery-trends";
@@ -9,15 +9,56 @@ import TrendPopUp from "./pop-folder/trend-popup";
 
 
 export default function TrendBreakdown() {
+    const clientIndividualProfile = useSelector((state) => state.clientIndividualProfile.data);
+
 
     const [activeTab, setActiveTab] = useState("digestive");
-      const [showPopup, setShowPopup] = useState(false);
+    const [showPopup, setShowPopup] = useState(false);
+
+    const trendBreakdownData = clientIndividualProfile?.data?.trend_breakdown || {};
+
+
+    const getZoneColor = (zone) => {
+        if (zone === "Optimal") return "#3FAF58";
+        if (zone === "Moderate") return "#FFBF2D";
+        if (zone === "Focus") return "#E48326";
+        return "#A1A1A1";
+    };
+
+
+    const getTabZone = (items = []) => {
+        if (!items.length) return "";
+
+        if (items.some((item) => item?.zone === "Focus")) return "Focus";
+        if (items.some((item) => item?.zone === "Moderate")) return "Moderate";
+        if (items.some((item) => item?.zone === "Optimal")) return "Optimal";
+
+        return "";
+    };
+
+    const digestiveZone = getTabZone(
+        trendBreakdownData?.digestive_balance_trend?.items
+    );
+    const fuelZone = getTabZone(
+        trendBreakdownData?.fuel_and_energy_trend?.items
+    );
+    const metabolicZone = getTabZone(
+        trendBreakdownData?.metabolic_recovery_trend?.items
+    );
+
 
     const renderComponent = () => {
-        if (activeTab === "digestive") return <DigestiveBalanceTrends />;
-        if (activeTab === "fuel") return <FuelEnergyTrends />;
-        if (activeTab === "metabolic") return <MetabolicRecoveryTrends />;
+        if (activeTab === "digestive") {
+            return <DigestiveBalanceTrends data={trendBreakdownData.digestive_balance_trend} />;
+        }
+        if (activeTab === "fuel") {
+            return <FuelEnergyTrends data={trendBreakdownData.fuel_and_energy_trend} />;
+        }
+        if (activeTab === "metabolic") {
+            return <MetabolicRecoveryTrends data={trendBreakdownData.metabolic_recovery_trend} />;
+        }
     };
+
 
     return (
         <>
@@ -29,9 +70,9 @@ export default function TrendBreakdown() {
                         Trend Breakdown
                     </p>
 
-                    <div 
-                     onClick={() => setShowPopup(true)}
-                    className="flex gap-[15px] items-center px-[11px] py-1 border border-[#E1E6ED] rounded-[4px] cursor-pointer">
+                    <div
+                        onClick={() => setShowPopup(true)}
+                        className="flex gap-[15px] items-center px-[11px] py-1 border border-[#E1E6ED] rounded-[4px] cursor-pointer">
                         <p className="text-[#308BF9] text-[12px] font-semibold leading-normal tracking-[-0.24px]">
                             See Detailed Analysis
                         </p>
@@ -55,7 +96,10 @@ export default function TrendBreakdown() {
                         >
                             Digestive Balance Trend
                         </span>
-                        <div className="w-[6px] h-[6px] rounded-full bg-[#3FAF58]" />
+                        <div
+                            className="w-[6px] h-[6px] rounded-full"
+                            style={{ backgroundColor: getZoneColor(digestiveZone) }}
+                        />
                     </button>
 
 
@@ -71,7 +115,10 @@ export default function TrendBreakdown() {
                         >
                             Fuel & Energy Trend
                         </span>
-                        <div className="w-[6px] h-[6px] rounded-full bg-[#E48326]" />
+                        <div
+                            className="w-[6px] h-[6px] rounded-full"
+                            style={{ backgroundColor: getZoneColor(fuelZone) }}
+                        />
                     </button>
 
 
@@ -87,7 +134,10 @@ export default function TrendBreakdown() {
                         >
                             Metabolic Recovery Trend
                         </span>
-                        <div className="w-[6px] h-[6px] rounded-full bg-[#FFBF2D]" />
+                        <div
+                            className="w-[6px] h-[6px] rounded-full"
+                            style={{ backgroundColor: getZoneColor(metabolicZone) }}
+                        />
                     </button>
 
                 </div>
@@ -99,7 +149,7 @@ export default function TrendBreakdown() {
                 </div>
 
             </div>
-             {showPopup && (
+            {showPopup && (
                 <TrendPopUp closePopup={() => setShowPopup(false)} />
             )}
         </>

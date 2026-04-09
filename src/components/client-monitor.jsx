@@ -122,6 +122,234 @@
 
 
 
+// "use client";
+
+// import { useState, useEffect } from "react";
+// import ClientTable from "./clientTable";
+// import { UserProfile } from "./user-profile";
+// import { fetchClientsDashboard } from "../services/authService";
+// import { cookieManager } from "../lib/cookies";
+// import { useSelector, useDispatch  } from "react-redux";
+// import { setSummary } from "../store/clientsDashboardSlice";
+
+// export default function ClientsSection() {
+//   const [activeTab, setActiveTab] = useState("all");
+//   const [search, setSearch] = useState("");
+
+//   const [clients, setClients] = useState([]);
+//   // const [summary, setSummary] = useState({
+//   //   all_total: 0,
+//   //   tested_total: 0,
+//   //   missed_total: 0,
+//   // });
+
+//   const [loading, setLoading] = useState(false);
+
+//   // pagination
+//   const [page, setPage] = useState(1);
+
+//   // cache storage
+//   const [cache, setCache] = useState({});
+
+//   // const selectedDate = new Date().toISOString().split("T")[0];
+//   // console.log("selectedDate153:-", selectedDate);
+
+//     const summary = useSelector((state) => state.clients.summary);
+
+//   const selectedDate = useSelector((state) => state.date.selectedDate);
+//     const dispatch = useDispatch();
+
+//   const formattedDate = `${selectedDate.year}-${String(selectedDate.month).padStart(2, "0")}-${String(selectedDate.day).padStart(2, "0")}`;
+
+
+
+//   useEffect(() => {
+//     loadClients();
+//   }, [activeTab, page, formattedDate]);
+
+//   const loadClients = async () => {
+//     const cacheKey = `${activeTab}-${page}-${formattedDate}`;
+
+//     try {
+//       // ✅ CHECK CACHE FIRST
+//       if (cache[cacheKey]) {
+       
+//         setClients(cache[cacheKey]);
+//         return;
+//       }
+
+//       // ✅ only show loader if not cached
+//       setLoading(true);
+
+//       const dietician = cookieManager.getJSON("dietician");
+//       const dieticianId = dietician?.dietician_id;
+
+//       if (!dieticianId) {
+//         console.error("Dietician ID not found");
+//         return;
+//       }
+
+//       const res = await fetchClientsDashboard(
+//         dieticianId,
+//         activeTab,
+//         page,
+//         formattedDate
+//       );
+
+//       const fetchedClients = res.clients || [];
+   
+
+//       setClients(fetchedClients);
+//       // setSummary(res.summary || {});
+//        dispatch(setSummary(res.summary || {}));
+
+//       // ✅ STORE IN CACHE
+//       setCache((prev) => ({
+//         ...prev,
+//         [cacheKey]: fetchedClients,
+//       }));
+//     } catch (error) {
+//       console.error("Error loading clients:", error);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const tabClass = (tabName) =>
+//     `px-[30px] py-[11px] rounded-[20px] cursor-pointer transition-all duration-200 whitespace-nowrap ${activeTab === tabName ? "bg-[#252525]" : "border border-[#E1E6ED]"
+//     }`;
+
+//   const textClass = (tabName) =>
+//     `text-[12px] font-normal tracking-[-0.24px] whitespace-nowrap ${activeTab === tabName ? "text-white" : "text-[#A1A1A1]"
+//     }`;
+
+//   const changeTab = (tab) => {
+//     setActiveTab(tab);
+//     setPage(1);
+
+//     // ✅ clear cache when tab changes
+//     setCache({});
+//   };
+
+//   return (
+//     <div className="flex flex-col gap-7">
+//       <div className="flex flex-col gap-[15px] border-[#E1E6ED] rounded-[10px]">
+
+//         {/* Tabs + Search */}
+//         <div className="flex items-center justify-between w-full">
+
+//           <div className="flex gap-2.5">
+
+//             <div
+//               className={tabClass("all")}
+//               onClick={() => changeTab("all")}
+//             >
+//               <p className={textClass("all")}>
+//                 All ({summary.all_total})
+//               </p>
+//             </div>
+
+//             <div
+//               className={tabClass("tested")}
+//               onClick={() => changeTab("tested")}
+//             >
+//               <p className={textClass("tested")}>
+//                 Tested ({summary.tested_total})
+//               </p>
+//             </div>
+
+//             <div
+//               className={tabClass("missed")}
+//               onClick={() => changeTab("missed")}
+//             >
+//               <p className={textClass("missed")}>
+//                 Missed ({summary.missed_total})
+//               </p>
+//             </div>
+
+//           </div>
+
+//           <div className="">
+//             <UserProfile
+//               showOnlySearch={true}
+//               searchQuery={search}
+//               onSearchChange={setSearch}
+//             />
+//           </div>
+
+//         </div>
+
+//         {/* ✅ TABLE WITH OVERLAY LOADER (NO BLINK) */}
+//         <div className="relative min-h-[200px]">
+
+//           <ClientTable
+//             clients={clients}
+//             search={search}
+//           />
+
+//           {loading && (
+//             <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
+//               <p className="text-gray-500 text-sm">Loading...</p>
+//             </div>
+//           )}
+
+//         </div>
+
+//         {/* Pagination */}
+//         <div className="flex justify-center items-center gap-2 py-5 flex-wrap">
+
+//           {/* Previous */}
+//           <button
+//             disabled={page === 1}
+//             onClick={() => setPage((p) => p - 1)}
+//             className={`px-3 py-1 border rounded ${page === 1
+//                 ? "opacity-40 cursor-not-allowed"
+//                 : "cursor-pointer"
+//               }`}
+//           >
+//             Prev
+//           </button>
+
+//           {/* Page Numbers */}
+//           {Array.from({ length: 5 }, (_, i) => i + 1).map((num) => (
+//             <button
+//               key={num}
+//               onClick={() => setPage(num)}
+//               className={`px-3 py-1 text-[14px] border rounded ${page === num
+//                   ? "bg-[#252525] text-white cursor-pointer"
+//                   : "text-[#535359] cursor-pointer"
+//                 }`}
+//             >
+//               {num}
+//             </button>
+//           ))}
+
+//           {/* Next */}
+//           <button
+//             disabled={clients.length < 10}
+//             onClick={() => setPage((p) => p + 1)}
+//             className={`px-3 py-1 border rounded ${clients.length < 10
+//                 ? "opacity-40 cursor-not-allowed"
+//                 : "cursor-pointer"
+//               }`}
+//           >
+//             Next
+//           </button>
+
+//         </div>
+
+//       </div>
+//     </div>
+//   );
+// }
+
+
+
+
+
+
+
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -129,56 +357,43 @@ import ClientTable from "./clientTable";
 import { UserProfile } from "./user-profile";
 import { fetchClientsDashboard } from "../services/authService";
 import { cookieManager } from "../lib/cookies";
-import { useSelector, useDispatch  } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { setSummary } from "../store/clientsDashboardSlice";
 
 export default function ClientsSection() {
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
-
+  const [searchResults, setSearchResults] = useState(null);
   const [clients, setClients] = useState([]);
-  // const [summary, setSummary] = useState({
-  //   all_total: 0,
-  //   tested_total: 0,
-  //   missed_total: 0,
-  // });
-
   const [loading, setLoading] = useState(false);
-
-  // pagination
   const [page, setPage] = useState(1);
-
-  // cache storage
   const [cache, setCache] = useState({});
 
-  // const selectedDate = new Date().toISOString().split("T")[0];
-  // console.log("selectedDate153:-", selectedDate);
-
-    const summary = useSelector((state) => state.clients.summary);
-
+  const summary = useSelector((state) => state.clients.summary);
   const selectedDate = useSelector((state) => state.date.selectedDate);
-    const dispatch = useDispatch();
+  const dispatch = useDispatch();
 
   const formattedDate = `${selectedDate.year}-${String(selectedDate.month).padStart(2, "0")}-${String(selectedDate.day).padStart(2, "0")}`;
 
-
+  const handleSearchResults = (results) => {
+    setSearchResults(results);
+  };
 
   useEffect(() => {
-    loadClients();
-  }, [activeTab, page, formattedDate]);
+    if (!search.trim()) {
+      loadClients();
+    }
+  }, [activeTab, page, formattedDate, search]);
 
   const loadClients = async () => {
     const cacheKey = `${activeTab}-${page}-${formattedDate}`;
 
     try {
-      // ✅ CHECK CACHE FIRST
       if (cache[cacheKey]) {
-       
         setClients(cache[cacheKey]);
         return;
       }
 
-      // ✅ only show loader if not cached
       setLoading(true);
 
       const dietician = cookieManager.getJSON("dietician");
@@ -197,13 +412,9 @@ export default function ClientsSection() {
       );
 
       const fetchedClients = res.clients || [];
-   
-
       setClients(fetchedClients);
-      // setSummary(res.summary || {});
-       dispatch(setSummary(res.summary || {}));
+      dispatch(setSummary(res.summary || {}));
 
-      // ✅ STORE IN CACHE
       setCache((prev) => ({
         ...prev,
         [cacheKey]: fetchedClients,
@@ -215,38 +426,36 @@ export default function ClientsSection() {
     }
   };
 
+  const isValidSearch = search.trim().length >= 3;
+
+  const displayClients =
+    isValidSearch && searchResults !== null ? searchResults : clients;
+
   const tabClass = (tabName) =>
-    `px-[30px] py-[11px] rounded-[20px] cursor-pointer transition-all duration-200 whitespace-nowrap ${activeTab === tabName ? "bg-[#252525]" : "border border-[#E1E6ED]"
+    `px-[30px] py-[11px] rounded-[20px] cursor-pointer transition-all duration-200 whitespace-nowrap ${
+      activeTab === tabName ? "bg-[#252525]" : "border border-[#E1E6ED]"
     }`;
 
   const textClass = (tabName) =>
-    `text-[12px] font-normal tracking-[-0.24px] whitespace-nowrap ${activeTab === tabName ? "text-white" : "text-[#A1A1A1]"
+    `text-[12px] font-normal tracking-[-0.24px] whitespace-nowrap ${
+      activeTab === tabName ? "text-white" : "text-[#A1A1A1]"
     }`;
 
   const changeTab = (tab) => {
     setActiveTab(tab);
     setPage(1);
-
-    // ✅ clear cache when tab changes
+    setSearch("");
+    setSearchResults(null);
     setCache({});
   };
 
   return (
     <div className="flex flex-col gap-7">
       <div className="flex flex-col gap-[15px] border-[#E1E6ED] rounded-[10px]">
-
-        {/* Tabs + Search */}
         <div className="flex items-center justify-between w-full">
-
           <div className="flex gap-2.5">
-
-            <div
-              className={tabClass("all")}
-              onClick={() => changeTab("all")}
-            >
-              <p className={textClass("all")}>
-                All ({summary.all_total})
-              </p>
+            <div className={tabClass("all")} onClick={() => changeTab("all")}>
+              <p className={textClass("all")}>All ({summary.all_total})</p>
             </div>
 
             <div
@@ -266,78 +475,75 @@ export default function ClientsSection() {
                 Missed ({summary.missed_total})
               </p>
             </div>
-
           </div>
 
-          <div className="">
+          <div className="w-full sm:w-[323px]">
             <UserProfile
               showOnlySearch={true}
               searchQuery={search}
               onSearchChange={setSearch}
+              onSearchResults={handleSearchResults}
             />
           </div>
-
         </div>
 
-        {/* ✅ TABLE WITH OVERLAY LOADER (NO BLINK) */}
         <div className="relative min-h-[200px]">
-
           <ClientTable
-            clients={clients}
+            clients={displayClients}
             search={search}
+            onSearchChange={setSearch}
           />
 
-          {loading && (
+          {(loading || (isValidSearch && searchResults === null)) && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
-              <p className="text-gray-500 text-sm">Loading...</p>
+              <p className="text-gray-500 text-sm">
+                {isValidSearch ? "Searching..." : "Loading..."}
+              </p>
             </div>
           )}
-
         </div>
 
-        {/* Pagination */}
-        <div className="flex justify-center items-center gap-2 py-5 flex-wrap">
-
-          {/* Previous */}
-          <button
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-            className={`px-3 py-1 border rounded ${page === 1
-                ? "opacity-40 cursor-not-allowed"
-                : "cursor-pointer"
-              }`}
-          >
-            Prev
-          </button>
-
-          {/* Page Numbers */}
-          {Array.from({ length: 5 }, (_, i) => i + 1).map((num) => (
+        {!search.trim() && (
+          <div className="flex justify-center items-center gap-2 py-5 flex-wrap">
             <button
-              key={num}
-              onClick={() => setPage(num)}
-              className={`px-3 py-1 text-[14px] border rounded ${page === num
-                  ? "bg-[#252525] text-white cursor-pointer"
-                  : "text-[#535359] cursor-pointer"
-                }`}
-            >
-              {num}
-            </button>
-          ))}
-
-          {/* Next */}
-          <button
-            disabled={clients.length < 10}
-            onClick={() => setPage((p) => p + 1)}
-            className={`px-3 py-1 border rounded ${clients.length < 10
-                ? "opacity-40 cursor-not-allowed"
-                : "cursor-pointer"
+              disabled={page === 1}
+              onClick={() => setPage((p) => p - 1)}
+              className={`px-3 py-1 border rounded ${
+                page === 1
+                  ? "opacity-40 cursor-not-allowed"
+                  : "cursor-pointer"
               }`}
-          >
-            Next
-          </button>
+            >
+              Prev
+            </button>
 
-        </div>
+            {Array.from({ length: 5 }, (_, i) => i + 1).map((num) => (
+              <button
+                key={num}
+                onClick={() => setPage(num)}
+                className={`px-3 py-1 text-[14px] border rounded ${
+                  page === num
+                    ? "bg-[#252525] text-white cursor-pointer"
+                    : "text-[#535359] cursor-pointer"
+                }`}
+              >
+                {num}
+              </button>
+            ))}
 
+            <button
+              disabled={clients.length < 10}
+              onClick={() => setPage((p) => p + 1)}
+              className={`px-3 py-1 border rounded ${
+                clients.length < 10
+                  ? "opacity-40 cursor-not-allowed"
+                  : "cursor-pointer"
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

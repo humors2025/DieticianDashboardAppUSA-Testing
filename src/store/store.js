@@ -8,6 +8,9 @@ import scoresInsightReducer from "./scoresInsightSlice";
 import extractionReducer from './extractionSlice';
 import dateReducer from "./dateSlice";
 import clientsDashboardReducer from "./clientsDashboardSlice";
+import clientIndividualProfileReducer from "./clientIndividualProfileSlice";
+import progressReducer from "./progressSlice";
+import dietAnalysisReducer from "./dietAnalysisSlice";
 
 export const store = configureStore({
   reducer: {
@@ -19,6 +22,9 @@ export const store = configureStore({
        scoresInsight: scoresInsightReducer,
       extraction: extractionReducer,
       date: dateReducer,
+      clientIndividualProfile: clientIndividualProfileReducer,
+       progress: progressReducer,
+        dietAnalysis: dietAnalysisReducer,
   },
 
   middleware: (getDefaultMiddleware) =>

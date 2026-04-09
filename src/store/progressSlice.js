@@ -1,15 +1,23 @@
 // progressSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { fetchClientProfileDetails } from "@/services/authService";
+import { cookieManager } from "../lib/cookies";
 
-// Async thunk for fetching progress data
 export const fetchProgressData = createAsyncThunk(
   "progress/fetchProgressData",
   async ({ profileId, range }, { rejectWithValue }) => {
     try {
-      const response = await fetchClientProfileDetails(profileId, range);
-      
+      const dietitian = cookieManager.getJSON("dietician");
+      const dietitianId = dietitian?.dietician_id;
+
+      if (!dietitianId) {
+        return rejectWithValue("Dietitian ID not found in cookies");
+      }
+
+      const response = await fetchClientProfileDetails(profileId, range, dietitianId);
+
       if (response?.status && response?.data) {
+        // Return the full data structure including graphs
         return response.data;
       } else {
         return rejectWithValue(response?.message || "Failed to fetch data");
@@ -48,21 +56,19 @@ const progressSlice = createSlice({
       })
       .addCase(fetchProgressData.fulfilled, (state, action) => {
         state.loading = false;
-        // FIXED: Normalize the data structure to handle both formats
-        // This ensures that data.graphs always exists regardless of API response structure
+        // Store the complete data structure
         state.data = {
-          graphs: action.payload?.graphs || action.payload?.data?.graphs || [],
-          recommended_trend_range: action.payload?.recommended_trend_range || 
-                                    action.payload?.data?.recommended_trend_range || 
-                                    null,
-          // Preserve original data if needed for debugging
-          _original: action.payload
+          dietitian_id: action.payload?.dietitian_id || "",
+          profile_id: action.payload?.profile_id || "",
+          range: action.payload?.range || "",
+          range_label: action.payload?.range_label || "",
+          graphs: action.payload?.graphs || {}, // Store graphs object
         };
         state.error = null;
       })
       .addCase(fetchProgressData.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
+        state.error = action.payload || "Failed to fetch progress data";
       });
   },
 });

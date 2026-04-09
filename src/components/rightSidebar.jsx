@@ -55,13 +55,13 @@ export default function RightSidebar({ isOpen, onClose }) {
                                     </div>
                                     <div className="flex flex-col gap-[18px] py-1">
                                         <p className="text-[#252525] text-[20px] font-semibold leading-[110%] tracking-[-0.4px]">
-                                            Sagar Hosur
+                                            Sagar Hosur lorem
                                         </p>
 
                                         <div>
                                             <div className="flex gap-1.5 items-center">
                                                 <p className="text-[#535359] text-[12px] font-normal leading-normal tracking-[-0.24px]">
-                                                    +1 3463743898
+                                                    +1 3463743898 lorem
                                                 </p>
                                                 <Image
                                                     src="/icons/Ellipse 765.svg"
@@ -70,17 +70,17 @@ export default function RightSidebar({ isOpen, onClose }) {
                                                     height={3}
                                                 />
                                                 <p className="text-[#535359] text-[12px] font-normal leading-normal tracking-[-0.24px]">
-                                                    sagarhoosur@gmail.com
+                                                    sagarhoosur@gmail.com lorem
                                                 </p>
                                             </div>
 
                                             <div className="flex gap-2.5 items-center">
                                                 <p className="text-[#252525] text-[12px] font-semibold leading-[110%] tracking-[-0.24px]">
-                                                    Reference ID
+                                                    Reference ID lorem
                                                 </p>
 
                                                 <p className="text-[#535359] text-[12px] font-normal leading-normal tracking-[-0.24px]">
-                                                    58128376790
+                                                    58128376790 lorem
                                                 </p>
                                             </div>
                                         </div>
@@ -91,21 +91,21 @@ export default function RightSidebar({ isOpen, onClose }) {
                                     <div className="flex justify-between px-5 pt-6 pb-9 border-t border-b border-[#E1E6ED]">
                                         <div className="flex flex-col gap-[15px]">
                                             <p className="text-[#252525] text-[12px] font-normal leading-normal tracking-[-0.24px]">
-                                                Personal Info
+                                                Personal Info lorem
                                             </p>
                                             <p className="text-[#252525] text-[15px] font-semibold leading-[110%] tracking-[-0.3px]">
-                                                Male, 28 years, 180 cm, 20kg
+                                                Male, 28 years, 180 cm, 20kg lorem
                                             </p>
                                         </div>
 
-                                        <Image
+                                        {/* <Image
                                             src="/icons/hugeicons_edit-0466.svg"
                                             alt="hugeicons_edit-0466.svg"
                                             width={24}
                                             height={24}
                                             className="cursor-pointer"
                                             onClick={() => setIsEditOpen(true)}
-                                        />
+                                        /> */}
                                     </div>
 
                                     <div className="flex justify-between px-5 pt-6 pb-9 border-t border-b border-[#E1E6ED]">
@@ -140,14 +140,14 @@ export default function RightSidebar({ isOpen, onClose }) {
                                             </p>
                                         </div>
 
-                                        <Image
+                                        {/* <Image
                                             src="/icons/hugeicons_edit-0466.svg"
                                             alt="hugeicons_edit-0466.svg"
                                             width={24}
                                             height={24}
                                             className="cursor-pointer"
                                             onClick={() => setIsEditOpen(true)}
-                                        />
+                                        /> */}
                                     </div>
 
                                     <div className="flex justify-between px-5 pt-6 pb-9 border-t border-b border-[#E1E6ED]">
@@ -165,14 +165,14 @@ export default function RightSidebar({ isOpen, onClose }) {
                                             </div>
                                         </div>
 
-                                        <Image
+                                        {/* <Image
                                             src="/icons/hugeicons_edit-0466.svg"
                                             alt="hugeicons_edit-0466.svg"
                                             width={24}
                                             height={24}
                                             className="cursor-pointer"
                                             onClick={() => setIsEditOpen(true)}
-                                        />
+                                        /> */}
                                     </div>
 
                                     <div className="flex justify-between px-5 pt-6 pb-9 border-t border-b border-[#E1E6ED]">
@@ -185,14 +185,14 @@ export default function RightSidebar({ isOpen, onClose }) {
                                             </p>
                                         </div>
 
-                                        <Image
+                                        {/* <Image
                                             src="/icons/hugeicons_edit-0466.svg"
                                             alt="hugeicons_edit-0466.svg"
                                             width={24}
                                             height={24}
                                             className="cursor-pointer"
                                             onClick={() => setIsEditOpen(true)}
-                                        />
+                                        /> */}
                                     </div>
 
                                     <div className="flex justify-between px-5 pt-6 pb-9 border-t border-b border-[#E1E6ED]">
@@ -223,14 +223,14 @@ export default function RightSidebar({ isOpen, onClose }) {
                                             </div>
                                         </div>
 
-                                        <Image
+                                        {/* <Image
                                             src="/icons/hugeicons_edit-0466.svg"
                                             alt="hugeicons_edit-0466.svg"
                                             width={24}
                                             height={24}
                                             className="cursor-pointer"
                                             onClick={() => setIsEditOpen(true)}
-                                        />
+                                        /> */}
                                     </div>
                                 </div>
                             </div>

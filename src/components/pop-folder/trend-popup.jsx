@@ -502,7 +502,6 @@
 
 
 
-
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
@@ -545,14 +544,18 @@ function getGraphKeyByTitle(title) {
   const normalizedTitle = String(title || "").trim().toLowerCase();
 
   const graphKeyMap = {
-    "nutrient utilization trend": "nutrient_utilization",
-    "nutrient utilization": "nutrient_utilization",
-    "digestive activity trend": "digestive_activity",
-    "digestive activity": "digestive_activity",
+    "nutrient utilization trend": "nutrient_utilization_trend",
+    "nutrient utilization": "nutrient_utilization_trend",
+    "digestive activity trend": "digestive_activity_trend",
+    "digestive activity": "digestive_activity_trend",
     "fuel utilization trend": "fuel_utilization_trend",
+    "fuel utilization": "fuel_utilization_trend",
     "energy source trend": "energy_source_trend",
+    "energy source": "energy_source_trend",
     "metabolic load trend": "metabolic_load_trend",
+    "metabolic load": "metabolic_load_trend",
     "recovery activity trend": "recovery_activity_trend",
+    "recovery activity": "recovery_activity_trend",
     "overall fat loss score": "overall_fat_loss_score",
   };
 
@@ -609,14 +612,25 @@ function ProgressCard({
     );
   }, [dispatch, profileId, selectedRange]);
 
+  // Get graph data from the graphs object
   const graphItem = useMemo(() => {
-    if (!progressSliceData) return null;
-
-    const graphs = progressSliceData?.graphs || progressSliceData?.data?.graphs;
-
-    if (!graphs || !Array.isArray(graphs)) return null;
-
-    return graphs.find((item) => item.key === graphKey);
+    if (!progressSliceData?.graphs) return null;
+    
+    // graphs is an object, not an array
+    const graphs = progressSliceData.graphs;
+    
+    // Get the specific graph by key
+    const graphData = graphs[graphKey];
+    
+    if (!graphData) return null;
+    
+    // Transform the data to the format expected by the chart
+    return {
+      title: graphData.title,
+      data: graphData.graph_points || [],
+      recommended_trend_range: graphData.recommended_trend_range,
+      total_points: graphData.total_points,
+    };
   }, [progressSliceData, graphKey]);
 
   const labels = useMemo(() => {
@@ -632,7 +646,7 @@ function ProgressCard({
       labels,
       datasets: [
         {
-          label: "Progress",
+          label: graphItem?.title || "Progress",
           data: values,
           borderColor: "#308BF9",
           borderWidth: 3,
@@ -642,16 +656,12 @@ function ProgressCard({
             const chart = context.chart;
             const { ctx, chartArea } = chart;
 
-            if (!chartArea) return "rgba(48,139,249,0.12)";
+            if (!chartArea) return "rgba(48,139,249,0.3)";
 
-            const gradient = ctx.createLinearGradient(
-              0,
-              chartArea.top,
-              0,
-              chartArea.bottom
-            );
-            gradient.addColorStop(0, "rgba(48,139,249,0.25)");
-            gradient.addColorStop(1, "rgba(48,139,249,0)");
+            // Create gradient: #30ADF9 at top to transparent at bottom with 0.3 opacity
+            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            gradient.addColorStop(0, "rgba(48, 173, 249, 0.3)");
+            gradient.addColorStop(1, "rgba(48, 139, 249, 0)");
             return gradient;
           },
           pointRadius: (ctx) => (ctx.dataIndex === values.length - 1 ? 6 : 0),
@@ -662,7 +672,7 @@ function ProgressCard({
         },
       ],
     };
-  }, [labels, values]);
+  }, [labels, values, graphItem]);
 
   const options = useMemo(() => {
     return {
@@ -801,6 +811,7 @@ function ProgressCard({
     </div>
   );
 }
+
 
 function TrendCard({
   title,

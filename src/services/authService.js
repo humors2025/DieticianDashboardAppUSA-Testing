@@ -399,14 +399,19 @@ export const fetchCalendarData = async (dieticianId) => {
 
 
 
-export const fetchClientProfileDetails = async (profileId, range) => {
-  // Add validation to ensure range is not undefined
-  if (!range) {
-    range = "weekly"; // fallback to weekly if undefined
+export const fetchClientProfileDetails = async (profileId, range = "weekly", dietitianId) => {
+  if (!profileId) {
+    throw new Error("Profile ID is required");
   }
-  
-  const url = `${API_ENDPOINTS.CLIENTPROFILE.CLIENTPROFILEDETAILS}?profile_id=${profileId}&range=${range}`;
-  
+
+  if (!dietitianId) {
+    throw new Error("Dietitian ID is required");
+  }
+
+  const url = `${API_ENDPOINTS.CLIENTPROFILE.CLIENTPROFILEDETAILS}?profile_id=${encodeURIComponent(
+    profileId
+  )}&range=${encodeURIComponent(range)}&dietitian_id=${encodeURIComponent(dietitianId)}`;
+
   return apiFetcher(url, {
     method: "GET",
     headers: {
@@ -417,7 +422,7 @@ export const fetchClientProfileDetails = async (profileId, range) => {
 
 
 
-export const fetchClientIndividualProfile = async (profileId, date) => {
+export const fetchClientIndividualProfile = async (profileId, date, dietitianId) => {
   return apiFetcher(API_ENDPOINTS.CLIENTPROFILE.CLIENTINDIVIDUALPROFILE, {
     method: "POST",
     headers: {
@@ -426,6 +431,7 @@ export const fetchClientIndividualProfile = async (profileId, date) => {
     body: JSON.stringify({
       profile_id: profileId,
       date: date,
+      dietitian_id: dietitianId,
     }),
   });
 };
@@ -433,7 +439,7 @@ export const fetchClientIndividualProfile = async (profileId, date) => {
 
 
 // Add to authService.js
-export const fetchClientProfileDatesList = async (profileId) => {
+export const fetchClientProfileDatesList = async (profileId, dietitianId) => {
   return apiFetcher(API_ENDPOINTS.CLIENTPROFILE.CLIENTPROFILEDATESLIST, {
     method: "POST",
     headers: {
@@ -441,6 +447,7 @@ export const fetchClientProfileDatesList = async (profileId) => {
     },
     body: JSON.stringify({
       profile_id: profileId,
+       dietitian_id: dietitianId,  
     }),
   });
 };
@@ -465,7 +472,8 @@ export const searchClientsService = async (dieticianId, searchTerm) => {
 export const fetchDietAnalysisPlan = async (
   profileId,
   weekStartDate,
-  weekEndDate
+  weekEndDate,
+  dietitianId  
 ) => {
   return apiFetcher(API_ENDPOINTS.DIETANALYSIS.DIETANALYSISPLAN, {
     method: "POST",
@@ -476,12 +484,13 @@ export const fetchDietAnalysisPlan = async (
       profile_id: profileId,
       week_start_date: weekStartDate,
       week_end_date: weekEndDate,
+       dietitian_id: dietitianId,
     }),
   });
 };
 
 
-export const fetchClientWeeklyDates = async (profileId) => {
+export const fetchClientWeeklyDates = async (profileId, dietitianId) => {
   try {
     const response = await apiFetcher(API_ENDPOINTS.CLIENTPROFILE.CLIENTWEEKLYDATES, {
       method: "POST",
@@ -490,6 +499,7 @@ export const fetchClientWeeklyDates = async (profileId) => {
       },
       body: JSON.stringify({
         profile_id: profileId,
+        dietitian_id: dietitianId,
       }),
     });
     

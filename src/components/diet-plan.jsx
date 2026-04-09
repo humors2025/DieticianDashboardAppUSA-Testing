@@ -127,14 +127,14 @@ export default function DietPlan() {
               })}
             </div>
 
-            <Image
+            {/* <Image
               src="/icons/hugeicons_edit-040.svg"
               alt="edit"
               width={24}
               height={24}
               className="cursor-pointer shrink-0"
               onClick={() => setShowPopup(true)}
-            />
+            /> */}
           </div>
         </div>
 

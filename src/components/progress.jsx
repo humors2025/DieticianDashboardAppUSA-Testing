@@ -1,7 +1,8 @@
+// progress.jsx (replace the existing Progress component)
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
-import { useDispatch, useSelector } from "react-redux"; // Add these imports
+import { useDispatch, useSelector } from "react-redux";
 import { IoIosArrowDown } from "react-icons/io";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -18,7 +19,7 @@ import {
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 
-import { fetchProgressData, setSelectedRange } from "@/store/progressSlice"; // Import actions
+import { fetchProgressData, setSelectedRange } from "@/store/progressSlice";
 
 ChartJS.register(
   CategoryScale,
@@ -35,13 +36,9 @@ export default function Progress() {
   const searchParams = useSearchParams();
   const profileId = searchParams.get("profile_id");
 
-  // Get data from Redux store
-  const { 
-    data: graphData, 
-    loading, 
-    error, 
-    selectedRange 
-  } = useSelector((state) => state.progress);
+  const { data: graphData, loading, error, selectedRange } = useSelector(
+    (state) => state.progress
+  );
 
   const [openDropdown, setOpenDropdown] = useState(false);
   const dropdownRef = useRef(null);
@@ -71,30 +68,37 @@ export default function Progress() {
     setOpenDropdown(false);
   };
 
+  // Get overall_fat_loss_score data from graphs
+  const overallFatLossData = useMemo(() => {
+    if (!graphData?.graphs) return null;
+    
+    const fatLossScore = graphData.graphs.overall_fat_loss_score;
+    if (!fatLossScore) return null;
+    
+    return {
+      title: fatLossScore.title || "Overall Fat Loss Score",
+      graph_points: fatLossScore.graph_points || [],
+      recommended_trend_range: fatLossScore.recommended_trend_range || null,
+      total_points: fatLossScore.total_points || 0,
+    };
+  }, [graphData]);
+
   const chartData = useMemo(() => {
-    if (!graphData?.graphs || !Array.isArray(graphData.graphs)) {
+    if (!overallFatLossData || !Array.isArray(overallFatLossData.graph_points)) {
       return null;
     }
 
-    const overallFatLossGraph = graphData.graphs.find(
-      (item) => item.key === "overall_fat_loss_score"
-    );
-
-    if (!overallFatLossGraph || !Array.isArray(overallFatLossGraph.data)) {
-      return null;
-    }
-
-    const labels = overallFatLossGraph.data.map((point) => point.label);
-    const values = overallFatLossGraph.data.map((point) => point.value);
+    const labels = overallFatLossData.graph_points.map((point) => point.label);
+    const values = overallFatLossData.graph_points.map((point) => Number(point.value) || 0);
 
     return {
       labels,
       values,
-      title: overallFatLossGraph.title || "Overall Fat Loss Score",
-      recommendedRange: graphData.recommended_trend_range,
-      rangeLabel: graphData.range_label,
+      title: overallFatLossData.title,
+      recommendedRange: overallFatLossData.recommended_trend_range,
+      rangeLabel: graphData?.range_label,
     };
-  }, [graphData]);
+  }, [overallFatLossData, graphData]);
 
   const data = useMemo(() => {
     if (!chartData) {
@@ -231,7 +235,9 @@ export default function Progress() {
           <div className="text-red-500 text-center">
             <p>Error loading data</p>
             <button
-              onClick={() => dispatch(fetchProgressData({ profileId, range: selectedRange }))}
+              onClick={() =>
+                dispatch(fetchProgressData({ profileId, range: selectedRange }))
+              }
               className="mt-2 text-[#308BF9] text-sm"
             >
               Retry
@@ -290,7 +296,7 @@ export default function Progress() {
 
       <div className="flex flex-col gap-[5px] mt-3">
         <p className="text-[#252525] text-[25px] font-semibold leading-normal tracking-[-0.5px]">
-          In Range
+          {overallFatLossData?.title || "Overall Fat Loss Score"}
         </p>
 
         <div className="flex gap-5 items-center px-[15px] py-[5px] rounded-[5px] bg-[#E0E0E0] whitespace-nowrap w-fit">

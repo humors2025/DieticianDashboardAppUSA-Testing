@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { fetchDietAnalysisPlan } from "../services/authService";
+import { cookieManager } from "../lib/cookies";
 
 const initialState = {
   data: null,
@@ -11,10 +12,14 @@ export const getDietAnalysisPlan = createAsyncThunk(
   "dietAnalysis/getDietAnalysisPlan",
   async ({ profileId, weekStartDate, weekEndDate }, { rejectWithValue }) => {
     try {
+      const dietitianData = cookieManager.getJSON('dietician');
+      const dietitianId = dietitianData?.dietician_id || null;
+
       const response = await fetchDietAnalysisPlan(
         profileId,
         weekStartDate,
-        weekEndDate
+        weekEndDate,
+        dietitianId  
       );
       return response;
     } catch (error) {

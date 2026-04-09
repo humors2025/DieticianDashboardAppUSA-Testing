@@ -32,7 +32,7 @@ CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
   },
   CLIENTPROFILE:{
     CLIENTPROFILEDATA:"/dietitian/api/web/get_client_data.php",
-    CLIENTPROFILEDETAILS:"/dietitian/api/web/get-graph-all-scores-weekly-month-all-fat-trends.php",
+    CLIENTPROFILEDETAILS:"/dietitian/api/web/get-graph-all-seven-trends-graph.php",
     CLIENTINDIVIDUALPROFILE:"/dietitian/api/web/get-data-points-score-all-ranges-coach.php",
     CLIENTPROFILEDATESLIST:"/dietitian/api/web/get-profile-details-dates-taken.php",
     CLIENTWEEKLYDATES:"/dietitian/api/web/get-weekly-tab-list.php"

@@ -16,6 +16,7 @@ import {
   fetchClientProfileDatesList,
   fetchClientWeeklyDates,
 } from "../services/authService";
+import { cookieManager } from "../lib/cookies"; 
 
 export default function ClientDetails() {
   const dispatch = useDispatch();
@@ -39,6 +40,8 @@ export default function ClientDetails() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const profileId = searchParams.get("profile_id");
+  const dietitianData = cookieManager.getJSON('dietician');
+  const dietitianId = dietitianData?.dietician_id || null;
 
   const transformDatesToDisplay = () => {
     if (!profileDates || profileDates.length === 0) return [];
@@ -80,7 +83,7 @@ export default function ClientDetails() {
       setStartIndex(0);
 
       try {
-        const response = await fetchClientProfileDatesList(profileId);
+        const response = await fetchClientProfileDatesList(profileId, dietitianId);
 
         if (response.status && response.data) {
           const dates = response.data.dates || [];
@@ -91,6 +94,7 @@ export default function ClientDetails() {
               getClientIndividualProfile({
                 profileId,
                 date: dates[0].date,
+                dietitianId: dietitianId,
               })
             );
           }
@@ -106,8 +110,10 @@ export default function ClientDetails() {
       }
     };
 
-    loadProfileDates();
-  }, [profileId, dispatch]);
+     if (dietitianId) { // Only load if dietitianId is available
+      loadProfileDates();
+    }
+  }, [profileId, dispatch, dietitianId]);
 
   useEffect(() => {
     const loadWeeklyDates = async () => {
@@ -120,7 +126,7 @@ export default function ClientDetails() {
       setIsDietAnalysisAvailable(true);
 
       try {
-        const response = await fetchClientWeeklyDates(profileId);
+        const response = await fetchClientWeeklyDates(profileId, dietitianId);
 
         // Check if the response indicates no weekly data
         if (response && response.status === false && response.message?.includes("No weekly data")) {
@@ -174,7 +180,7 @@ export default function ClientDetails() {
     };
 
     loadWeeklyDates();
-  }, [profileId, dispatch, activeTab]);
+  }, [profileId, dispatch, activeTab, dietitianId]);
 
   const profileDetails = individualProfileData?.data?.profile_details || {};
 
@@ -241,6 +247,7 @@ export default function ClientDetails() {
         getClientIndividualProfile({
           profileId,
           date: selectedDate.rawDate,
+          dietitianId: dietitianId,
         })
       );
     }

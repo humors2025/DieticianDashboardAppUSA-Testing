@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { IoChevronBackOutline, IoChevronForwardOutline } from "react-icons/io5";
@@ -7,22 +8,28 @@ import { useSearchParams } from "next/navigation";
 import TestAnalysis from "./test-analysis";
 import DietAnalysis from "./diet-analysis";
 import RightSidebar from "./rightSidebar";
+import PDFLoadingModal from "./PDFLoadingModal";
+import { exportDietAnalysisPDF } from "../lib/pdfExport";
 import {
   getClientIndividualProfile,
   selectClientIndividualProfileData,
 } from "../store/clientIndividualProfileSlice";
-import { getDietAnalysisPlan } from "../store/dietAnalysisSlice";
+import {
+  getDietAnalysisPlan,
+  selectDietAnalysisData,
+} from "../store/dietAnalysisSlice";
 import {
   fetchClientProfileDatesList,
   fetchClientWeeklyDates,
 } from "../services/authService";
-import { cookieManager } from "../lib/cookies"; 
+import { cookieManager } from "../lib/cookies";
 
 export default function ClientDetails() {
   const dispatch = useDispatch();
   const searchParams = useSearchParams();
 
   const individualProfileData = useSelector(selectClientIndividualProfileData);
+  const dietAnalysisData = useSelector(selectDietAnalysisData);
 
   const [profileDates, setProfileDates] = useState([]);
   const [datesLoading, setDatesLoading] = useState(false);
@@ -32,7 +39,8 @@ export default function ClientDetails() {
   const [weeklyDatesLoading, setWeeklyDatesLoading] = useState(false);
   const [weeklyDatesError, setWeeklyDatesError] = useState(null);
   const [isDietAnalysisAvailable, setIsDietAnalysisAvailable] = useState(true);
-  const [isLoadingWeeklyData, setIsLoadingWeeklyData] = useState(true); // New state for initial load
+  const [isLoadingWeeklyData, setIsLoadingWeeklyData] = useState(true);
+  const [isPDFExporting, setIsPDFExporting] = useState(false);
 
   const [activeTab, setActiveTab] = useState("test");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -40,7 +48,7 @@ export default function ClientDetails() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const profileId = searchParams.get("profile_id");
-  const dietitianData = cookieManager.getJSON('dietician');
+  const dietitianData = cookieManager.getJSON("dietician");
   const dietitianId = dietitianData?.dietician_id || null;
 
   const transformDatesToDisplay = () => {
@@ -71,6 +79,40 @@ export default function ClientDetails() {
 
   const testDateData = transformDatesToDisplay();
   const weekData = transformWeeklyDatesToDisplay();
+
+  const getSelectedWeekInfo = () => {
+    if (activeTab === "diet" && weekData[activeIndex]) {
+      return weekData[activeIndex].week;
+    }
+    return "report";
+  };
+
+  const profileDetails = individualProfileData?.data?.profile_details || {};
+
+  const handleExportPDF = async () => {
+    if (activeTab !== "diet") {
+    toast.warning("PDF export is only available for Diet Analysis tab");
+      return;
+    }
+
+    if (!dietAnalysisData?.data?.food_json) {
+     toast.error("Diet analysis data is not available yet.");
+      return;
+    }
+
+    setIsPDFExporting(true);
+    try {
+      const clientName = profileDetails?.profile_name || "client";
+      const selectedWeek = getSelectedWeekInfo();
+
+      await exportDietAnalysisPDF(clientName, selectedWeek, dietAnalysisData);
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error("Failed to export PDF. Please try again.");
+    } finally {
+      setIsPDFExporting(false);
+    }
+  };
 
   useEffect(() => {
     const loadProfileDates = async () => {
@@ -110,7 +152,7 @@ export default function ClientDetails() {
       }
     };
 
-     if (dietitianId) { // Only load if dietitianId is available
+    if (dietitianId) {
       loadProfileDates();
     }
   }, [profileId, dispatch, dietitianId]);
@@ -128,12 +170,14 @@ export default function ClientDetails() {
       try {
         const response = await fetchClientWeeklyDates(profileId, dietitianId);
 
-        // Check if the response indicates no weekly data
-        if (response && response.status === false && response.message?.includes("No weekly data")) {
+        if (
+          response &&
+          response.status === false &&
+          response.message?.includes("No weekly data")
+        ) {
           setIsDietAnalysisAvailable(false);
           setWeeklyDates([]);
 
-          // If diet analysis is not available and currently on diet tab, switch to test tab
           if (activeTab === "diet") {
             setActiveTab("test");
           }
@@ -153,14 +197,12 @@ export default function ClientDetails() {
             );
           }
         } else {
-          // Handle any other response format
           setWeeklyDates([]);
           setIsDietAnalysisAvailable(true);
         }
       } catch (error) {
         console.error("Error fetching weekly dates:", error);
 
-        // Check if error message indicates no data
         if (error.message?.includes("No weekly data")) {
           setIsDietAnalysisAvailable(false);
           setWeeklyDates([]);
@@ -181,8 +223,6 @@ export default function ClientDetails() {
 
     loadWeeklyDates();
   }, [profileId, dispatch, activeTab, dietitianId]);
-
-  const profileDetails = individualProfileData?.data?.profile_details || {};
 
   const formatJoinedDate = (dateString) => {
     if (!dateString || dateString === "NA") return "NA";
@@ -228,9 +268,7 @@ export default function ClientDetails() {
   };
 
   const handleTabChange = (tab) => {
-    // Prevent switching to diet tab if diet analysis is not available
     if (tab === "diet" && !isDietAnalysisAvailable) {
-      console.log("Diet analysis not available, cannot switch tab");
       return;
     }
     setActiveTab(tab);
@@ -270,7 +308,6 @@ export default function ClientDetails() {
 
   const visibleItems = currentData.slice(startIndex, startIndex + ITEMS_TO_SHOW);
 
-  // Show loading state while checking weekly data availability
   if (isLoadingWeeklyData) {
     return (
       <div className="w-full h-[calc(88vh-24px)] bg-white rounded-[15px] flex items-center justify-center">
@@ -324,6 +361,8 @@ export default function ClientDetails() {
 
   return (
     <>
+      <PDFLoadingModal isOpen={isPDFExporting} />
+
       <div className="w-full relative h-[calc(88vh-24px)] overflow-hidden">
         {isSidebarOpen && (
           <div
@@ -333,14 +372,15 @@ export default function ClientDetails() {
         )}
 
         <div
-          className={`w-full bg-white px-[15px] pt-[23px] pb-5 rounded-[15px] flex flex-col h-[calc(88vh-24px)] overflow-hidden transition-all duration-300 relative ${isSidebarOpen ? "opacity-90" : "opacity-100"
-            }`}
+          className={`w-full bg-white px-[15px] pt-[23px] pb-5 rounded-[15px] flex flex-col h-[calc(88vh-24px)] overflow-hidden transition-all duration-300 relative ${
+            isSidebarOpen ? "opacity-90" : "opacity-100"
+          }`}
         >
           <div className="flex justify-between items-center pb-[22px] border-b border-[#E1E6ED]">
             <div className="flex gap-[15px]">
-              <div className=" rounded-full w-12 h-12 flex items-center justify-center overflow-hidden">
+              <div className="rounded-full w-12 h-12 flex items-center justify-center overflow-hidden">
                 {profileDetails?.profile_image &&
-                  profileDetails?.profile_image !== "NA" ? (
+                profileDetails?.profile_image !== "NA" ? (
                   <Image
                     src={profileDetails.profile_image}
                     alt={profileDetails?.profile_name || "user"}
@@ -393,7 +433,8 @@ export default function ClientDetails() {
                 width={26}
                 height={26}
                 alt="export"
-                className="cursor-pointer"
+                className="cursor-pointer hover:opacity-70 transition-opacity"
+                onClick={handleExportPDF}
               />
 
               <Image
@@ -411,12 +452,14 @@ export default function ClientDetails() {
             <div className="flex bg-[#F5F7FA] rounded-[6px]">
               <div
                 onClick={() => handleTabChange("test")}
-                className={`flex items-center rounded-[6px] py-[11px] px-[31px] cursor-pointer ${activeTab === "test" ? "bg-[#252525]" : "bg-[#F5F7FA]"
-                  }`}
+                className={`flex items-center rounded-[6px] py-[11px] px-[31px] cursor-pointer ${
+                  activeTab === "test" ? "bg-[#252525]" : "bg-[#F5F7FA]"
+                }`}
               >
                 <p
-                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${activeTab === "test" ? "text-white" : "text-[#535359]"
-                    }`}
+                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${
+                    activeTab === "test" ? "text-white" : "text-[#535359]"
+                  }`}
                 >
                   Test Analysis
                 </p>
@@ -424,21 +467,27 @@ export default function ClientDetails() {
 
               <div
                 onClick={() => handleTabChange("diet")}
-                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${!isDietAnalysisAvailable
+                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${
+                  !isDietAnalysisAvailable
                     ? "opacity-50 cursor-not-allowed bg-[#F5F7FA]"
                     : activeTab === "diet"
-                      ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
-                      : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
-                  }`}
-                title={!isDietAnalysisAvailable ? "No diet analysis data available for this client" : ""}
+                    ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+                    : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
+                }`}
+                title={
+                  !isDietAnalysisAvailable
+                    ? "No diet analysis data available for this client"
+                    : ""
+                }
               >
                 <p
-                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${!isDietAnalysisAvailable
+                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${
+                    !isDietAnalysisAvailable
                       ? "text-[#A1A1A1]"
                       : activeTab === "diet"
-                        ? "text-white"
-                        : "text-[#535359]"
-                    }`}
+                      ? "text-white"
+                      : "text-[#535359]"
+                  }`}
                 >
                   Diet Analysis
                 </p>
@@ -451,7 +500,6 @@ export default function ClientDetails() {
                   className={`${!isDietAnalysisAvailable ? "opacity-50" : ""}`}
                 />
               </div>
-
             </div>
           </div>
 
@@ -463,10 +511,11 @@ export default function ClientDetails() {
             <div className="flex gap-3 items-center w-full">
               <IoChevronBackOutline
                 onClick={handleBack}
-                className={`text-[#252525] w-6 h-6 cursor-pointer ${startIndex === 0 || currentData.length === 0
+                className={`text-[#252525] w-6 h-6 cursor-pointer ${
+                  startIndex === 0 || currentData.length === 0
                     ? "opacity-50 cursor-not-allowed"
                     : ""
-                  }`}
+                }`}
               />
 
               <div className="w-full flex gap-[5px] items-center overflow-x-auto no-scrollbar">
@@ -487,42 +536,47 @@ export default function ClientDetails() {
                             ? handleDateSelect(actualIndex)
                             : handleWeekSelect(actualIndex)
                         }
-                        className={`flex flex-col gap-[5px] rounded-[8px] pl-[15px] pt-[15px] pr-[15px] pb-[15px] cursor-pointer min-w-[160px] ${activeIndex === actualIndex ? "bg-[#308BF9]" : ""
-                          }`}
+                        className={`flex flex-col gap-[5px] rounded-[8px] pl-[15px] pt-[15px] pr-[15px] pb-[15px] cursor-pointer min-w-[160px] ${
+                          activeIndex === actualIndex ? "bg-[#308BF9]" : ""
+                        }`}
                       >
                         {activeTab === "test" ? (
                           <>
                             <p
-                              className={`${activeIndex === actualIndex
+                              className={`${
+                                activeIndex === actualIndex
                                   ? "text-white"
                                   : "text-[#535359]"
-                                } text-[12px] font-semibold`}
+                              } text-[12px] font-semibold`}
                             >
                               {item.date}
                             </p>
 
                             <div className="flex items-center">
                               <p
-                                className={`${activeIndex === actualIndex
+                                className={`${
+                                  activeIndex === actualIndex
                                     ? "text-white"
                                     : "text-[#535359]"
-                                  } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                                } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
                               >
                                 {item.score || "—"}
                               </p>
 
                               <div
-                                className={`mx-2.5 border-r h-[13px] ${activeIndex === actualIndex
+                                className={`mx-2.5 border-r h-[13px] ${
+                                  activeIndex === actualIndex
                                     ? "border-white"
                                     : "border-[#A1A1A1]"
-                                  }`}
+                                }`}
                               ></div>
 
                               <p
-                                className={`${activeIndex === actualIndex
+                                className={`${
+                                  activeIndex === actualIndex
                                     ? "text-white"
                                     : "text-[#535359]"
-                                  } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                                } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
                               >
                                 {item.status || "Pending"}
                               </p>
@@ -531,19 +585,21 @@ export default function ClientDetails() {
                         ) : (
                           <>
                             <p
-                              className={`${activeIndex === actualIndex
+                              className={`${
+                                activeIndex === actualIndex
                                   ? "text-white"
                                   : "text-[#535359]"
-                                } text-[12px] font-semibold`}
+                              } text-[12px] font-semibold`}
                             >
                               {item.week}
                             </p>
 
                             <p
-                              className={`${activeIndex === actualIndex
+                              className={`${
+                                activeIndex === actualIndex
                                   ? "text-white"
                                   : "text-[#535359]"
-                                } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                              } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
                             >
                               {item.range}
                             </p>
@@ -558,26 +614,29 @@ export default function ClientDetails() {
               <div className="flex justify-end">
                 <IoChevronForwardOutline
                   onClick={handleForward}
-                  className={`text-[#252525] w-6 h-6 cursor-pointer ${startIndex + ITEMS_TO_SHOW >= currentData.length ||
-                      currentData.length === 0
+                  className={`text-[#252525] w-6 h-6 cursor-pointer ${
+                    startIndex + ITEMS_TO_SHOW >= currentData.length ||
+                    currentData.length === 0
                       ? "opacity-50 cursor-not-allowed"
                       : ""
-                    }`}
+                  }`}
                 />
               </div>
             </div>
           </div>
 
           <div
-            className={`${activeTab === "test" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
-              }`}
+            className={`${
+              activeTab === "test" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+            }`}
           >
             <TestAnalysis />
           </div>
 
           <div
-            className={`${activeTab === "diet" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
-              }`}
+            className={`${
+              activeTab === "diet" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+            }`}
           >
             <DietAnalysis />
           </div>

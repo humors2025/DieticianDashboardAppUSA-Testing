@@ -4,7 +4,7 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <section className="min-h-screen bg-[#F8FAFC] flex items-center justify-center px-4">
+    <section className="flex items-center justify-center px-4">
       <div className="w-full max-w-[1200px]">
         <div className="mx-auto max-w-[620px] rounded-[24px] border border-[#E5E7EB] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.06)] px-6 py-12 sm:px-10 sm:py-14 text-center">
           <div className="mx-auto mb-6 flex h-[84px] w-[84px] items-center justify-center rounded-full bg-[#EEF4FF]">

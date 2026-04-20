@@ -8,7 +8,7 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import {
   selectDietAnalysisData,
@@ -91,6 +91,9 @@ const oneEndRoundedPlugin = {
 };
 
 export default function MacrosUpdate() {
+  const chartRef = useRef(null);
+  const [labels, setLabels] = useState([]);
+
   const dietAnalysisData = useSelector(selectDietAnalysisData);
   const dietAnalysisLoading = useSelector(selectDietAnalysisLoading);
   const dietAnalysisError = useSelector(selectDietAnalysisError);
@@ -173,39 +176,82 @@ export default function MacrosUpdate() {
       legend: { display: false },
       tooltip: { enabled: true },
     },
+    animation: {
+      onComplete: () => {
+        const chart = chartRef.current;
+        if (!chart || total <= 0) {
+          setLabels([]);
+          return;
+        }
+
+        const meta = chart.getDatasetMeta(0);
+        if (!meta?.data?.length) {
+          setLabels([]);
+          return;
+        }
+
+        const nextLabels = meta.data.map((arc, index) => {
+          const centerAngle = (arc.startAngle + arc.endAngle) / 2;
+          const labelRadius = arc.outerRadius + 14;
+
+          const x = arc.x + Math.cos(centerAngle) * labelRadius;
+          const y = arc.y + Math.sin(centerAngle) * labelRadius;
+
+          return {
+            ...macros[index],
+            percentage:
+              total > 0 ? Math.round((macros[index].value / total) * 100) : 0,
+            x,
+            y,
+          };
+        });
+
+        setLabels(nextLabels);
+      },
+    },
   };
 
-  const getLabelPositions = () => {
-    let cumulative = 0;
-    const rotation = (-45 * Math.PI) / 180;
-    const outerRadius = 100;
-    const innerRadius = 78;
-    const radius = (outerRadius + innerRadius) / 2;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const chart = chartRef.current;
 
-    return macros.map((item) => {
-      const sliceAngle =
-        total > 0 ? (item.value / total) * 2 * Math.PI : 0;
-      const centerAngle = cumulative + sliceAngle / 2 + rotation;
+      if (!chart || total <= 0) {
+        setLabels([]);
+        return;
+      }
 
-      const x = radius * Math.cos(centerAngle);
-      const y = radius * Math.sin(centerAngle);
+      const meta = chart.getDatasetMeta(0);
 
-      cumulative += sliceAngle;
+      if (!meta?.data?.length) {
+        setLabels([]);
+        return;
+      }
 
-      return {
-        ...item,
-        percentage: total > 0 ? Math.round((item.value / total) * 100) : 0,
-        x,
-        y,
-      };
-    });
-  };
+      const nextLabels = meta.data.map((arc, index) => {
+        const centerAngle = (arc.startAngle + arc.endAngle) / 2;
+        const labelRadius = arc.outerRadius + 14;
 
-  const labels = getLabelPositions();
+        const x = arc.x + Math.cos(centerAngle) * labelRadius;
+        const y = arc.y + Math.sin(centerAngle) * labelRadius;
+
+        return {
+          ...macros[index],
+          percentage:
+            total > 0 ? Math.round((macros[index].value / total) * 100) : 0,
+          x,
+          y,
+        };
+      });
+
+      setLabels(nextLabels);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [dietAnalysisData, total]);
 
   if (dietAnalysisLoading) {
     return (
-      <div className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
+      <div id="macros-update-container" className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
         <p className="pl-[18px] text-[#738298] text-[12px] font-semibold uppercase">
           Macros Update
         </p>
@@ -218,7 +264,7 @@ export default function MacrosUpdate() {
 
   if (dietAnalysisError) {
     return (
-      <div className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
+      <div id="macros-update-container" className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
         <p className="pl-[18px] text-[#738298] text-[12px] font-semibold uppercase">
           Macros Update
         </p>
@@ -232,14 +278,14 @@ export default function MacrosUpdate() {
   }
 
   return (
-    <div className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
+    <div id="macros-update-container" className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
       <p className="pl-[18px] text-[#738298] text-[12px] font-semibold uppercase">
         {title}
       </p>
 
       <div className="flex justify-center items-center py-5">
         <div className="relative w-[200px] h-[200px]">
-          <Doughnut data={donutData} options={donutOptions} />
+          <Doughnut ref={chartRef} data={donutData} options={donutOptions} />
 
           <div className="absolute inset-0 flex flex-col gap-[2px] items-center justify-center pointer-events-none">
             <p className="text-[#535359] text-[10px] font-semibold">
@@ -255,10 +301,10 @@ export default function MacrosUpdate() {
             labels.map((label, index) => (
               <div
                 key={index}
-                className="absolute min-w-[47px] h-[24px] p-2 rounded-full bg-white shadow-[0px_4px_10px_rgba(0,0,0,0.12)] flex items-center justify-center"
+                className="absolute min-w-[47px] h-[24px] px-2 rounded-full bg-white shadow-[0px_4px_10px_rgba(0,0,0,0.12)] flex items-center justify-center"
                 style={{
-                  left: `calc(50% + ${label.x}px)`,
-                  top: `calc(50% + ${label.y}px)`,
+                  left: `${label.x}px`,
+                  top: `${label.y}px`,
                   transform: "translate(-50%, -50%)",
                 }}
               >
@@ -316,10 +362,6 @@ export default function MacrosUpdate() {
     </div>
   );
 }
-
-
-
-
 
 
 

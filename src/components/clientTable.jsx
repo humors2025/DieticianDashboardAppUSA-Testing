@@ -295,8 +295,8 @@ const formatLastLoggedDate = (dateString) => {
       )} */}
 
       <div>
-        <div className="rounded-[15px] overflow-hidden h-[calc(100vh-220px)] ">
-          <div className="h-full overflow-y-auto scroll-hide">
+        <div className="rounded-[15px] overflow-hidden h-[calc(100vh-290px)] ">
+          <div className="h-full overflow-y-auto group-hover-scrollbar">
             <table className="w-full bg-[#FFFFFF] border-collapse relative">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-[#F0F0F0]">

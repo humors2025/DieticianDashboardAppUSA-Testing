@@ -41,7 +41,7 @@ export default function RightSidebar({ isOpen, onClose }) {
                             </p>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto">
+                        <div className="flex-1 overflow-y-auto group-hover-scrollbar">
                             <div className="flex flex-col">
                                 <div className="flex gap-5 rounded-[10px] py-7 pl-[15px] pr-14 mb-[30px] mx-[15px] bg-[#F5F7FA]">
                                     <div className="w-[80px] h-[80px] p-5 bg-white rounded-full">

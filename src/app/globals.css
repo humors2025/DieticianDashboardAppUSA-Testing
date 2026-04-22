@@ -275,8 +275,15 @@
    CUSTOM SCROLLBAR — .custom-scrollbar
    ============================================ */
 
+   
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
+  display: none;
+}
+
+.custom-scrollbar:hover::-webkit-scrollbar {
+  display: block;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -295,10 +302,13 @@
 
 /* Firefox */
 .custom-scrollbar {
+  scrollbar-width: none;
+}
+
+.custom-scrollbar:hover {
   scrollbar-width: thin;
   scrollbar-color: #DBDFE5 transparent;
 }
-
 
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
@@ -309,3 +319,43 @@
   animation: shimmer 1.2s linear infinite;
 }
 
+
+/* Hide scrollbar by default, show on hover of parent */
+.group-hover-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.group-hover-scrollbar:hover {
+  scrollbar-color: #DBDFE5 transparent;
+}
+
+/* For Webkit browsers (Chrome, Safari, Edge) */
+.group-hover-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  background: transparent;
+  cursor: pointer; /* Added */
+}
+
+.group-hover-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 999px;
+  cursor: pointer; /* Added */
+}
+
+.group-hover-scrollbar::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 999px;
+  transition: background-color 0.2s ease;
+  cursor: pointer; /* Added */
+}
+
+.group-hover-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: #DBDFE5;
+  cursor: pointer; /* Added */
+}
+
+.group-hover-scrollbar:hover::-webkit-scrollbar-thumb:hover {
+  background-color: #b0b7c3;
+  cursor: pointer; /* Added */
+}

@@ -8,13 +8,15 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useSelector } from "react-redux";
+import { IoIosArrowForward } from "react-icons/io";
 import {
   selectDietAnalysisData,
   selectDietAnalysisLoading,
   selectDietAnalysisError,
 } from "../store/dietAnalysisSlice";
+import CalculationPopup from "./pop-folder/calculation-popup";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -93,6 +95,8 @@ const oneEndRoundedPlugin = {
 export default function MacrosUpdate() {
   const chartRef = useRef(null);
   const [labels, setLabels] = useState([]);
+  const prevDataRef = useRef(null);
+  const [showCalculationPopup, setShowCalculationPopup] = useState(false);
 
   const dietAnalysisData = useSelector(selectDietAnalysisData);
   const dietAnalysisLoading = useSelector(selectDietAnalysisLoading);
@@ -149,7 +153,14 @@ export default function MacrosUpdate() {
     },
   ];
 
-  const total = macros.reduce((acc, item) => acc + item.value, 0);
+  const total = useMemo(() => {
+    return macros.reduce((acc, item) => acc + item.value, 0);
+  }, [
+    weeklyData?.carbs_g,
+    weeklyData?.fat_g,
+    weeklyData?.protein_g,
+    weeklyData?.fiber_g,
+  ]);
 
   const dataInOrder = macros.map((macro) => macro.value);
   const colorsInOrder = macros.map((macro) => macro.color);
@@ -176,42 +187,22 @@ export default function MacrosUpdate() {
       legend: { display: false },
       tooltip: { enabled: true },
     },
-    animation: {
-      onComplete: () => {
-        const chart = chartRef.current;
-        if (!chart || total <= 0) {
-          setLabels([]);
-          return;
-        }
-
-        const meta = chart.getDatasetMeta(0);
-        if (!meta?.data?.length) {
-          setLabels([]);
-          return;
-        }
-
-        const nextLabels = meta.data.map((arc, index) => {
-          const centerAngle = (arc.startAngle + arc.endAngle) / 2;
-          const labelRadius = arc.outerRadius + 14;
-
-          const x = arc.x + Math.cos(centerAngle) * labelRadius;
-          const y = arc.y + Math.sin(centerAngle) * labelRadius;
-
-          return {
-            ...macros[index],
-            percentage:
-              total > 0 ? Math.round((macros[index].value / total) * 100) : 0,
-            x,
-            y,
-          };
-        });
-
-        setLabels(nextLabels);
-      },
-    },
   };
 
   useEffect(() => {
+    const currentDataString = JSON.stringify({
+      carbs: weeklyData?.carbs_g,
+      fat: weeklyData?.fat_g,
+      protein: weeklyData?.protein_g,
+      fiber: weeklyData?.fiber_g,
+    });
+
+    if (prevDataRef.current === currentDataString) {
+      return;
+    }
+
+    prevDataRef.current = currentDataString;
+
     const timer = setTimeout(() => {
       const chart = chartRef.current;
 
@@ -244,128 +235,192 @@ export default function MacrosUpdate() {
       });
 
       setLabels(nextLabels);
-    }, 0);
+    }, 100);
 
     return () => clearTimeout(timer);
-  }, [dietAnalysisData, total]);
+  }, [
+    weeklyData?.carbs_g,
+    weeklyData?.fat_g,
+    weeklyData?.protein_g,
+    weeklyData?.fiber_g,
+    total,
+  ]);
+
+  const handleOpenCalculationPopup = () => {
+    setShowCalculationPopup(true);
+  };
+
+  const handleCloseCalculationPopup = () => {
+    setShowCalculationPopup(false);
+  };
+
+  const ViewCalculationButton = () => (
+    <button
+      type="button"
+      onClick={handleOpenCalculationPopup}
+      className="flex gap-[15px] items-center px-[11px] py-1 border border-[#E1E6ED] rounded-[4px] cursor-pointer"
+    >
+      <p className="text-[#308BF9] text-[12px] font-semibold leading-normal tracking-[-0.24px] whitespace-nowrap">
+        View Calculation
+      </p>
+      <IoIosArrowForward className="text-[#308BF9] w-5 h-5" />
+    </button>
+  );
 
   if (dietAnalysisLoading) {
     return (
-      <div id="macros-update-container" className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
-        <p className="pl-[18px] text-[#738298] text-[12px] font-semibold uppercase">
-          Macros Update
-        </p>
-        <div className="flex justify-center items-center py-10">
-          <p className="text-[#738298] text-[12px]">Loading...</p>
+      <>
+        <div
+          id="macros-update-container"
+          className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]"
+        >
+          <div className="flex items-center justify-between px-[18px] pr-[10px]">
+            <p className="text-[#738298] text-[12px] font-semibold uppercase">
+              {title}
+            </p>
+
+            <ViewCalculationButton />
+          </div>
+
+          <div className="flex justify-center items-center py-10">
+            <p className="text-[#738298] text-[12px]">Loading...</p>
+          </div>
         </div>
-      </div>
+
+        {showCalculationPopup && (
+          <CalculationPopup onClose={handleCloseCalculationPopup} />
+        )}
+      </>
     );
   }
 
   if (dietAnalysisError) {
     return (
-      <div id="macros-update-container" className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
-        <p className="pl-[18px] text-[#738298] text-[12px] font-semibold uppercase">
-          Macros Update
-        </p>
-        <div className="flex justify-center items-center py-10 px-4">
-          <p className="text-red-500 text-[12px] text-center">
-            {dietAnalysisError}
-          </p>
+      <>
+        <div
+          id="macros-update-container"
+          className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]"
+        >
+          <div className="flex items-center justify-between px-[18px] pr-[10px]">
+            <p className="text-[#738298] text-[12px] font-semibold uppercase">
+              Macros Update
+            </p>
+
+            <ViewCalculationButton />
+          </div>
+
+          <div className="flex justify-center items-center py-10 px-4">
+            <p className="text-red-500 text-[12px] text-center">
+              {dietAnalysisError}
+            </p>
+          </div>
         </div>
-      </div>
+
+        {showCalculationPopup && (
+          <CalculationPopup onClose={handleCloseCalculationPopup} />
+        )}
+      </>
     );
   }
 
   return (
-    <div id="macros-update-container" className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]">
-      <p className="pl-[18px] text-[#738298] text-[12px] font-semibold uppercase">
-        {title}
-      </p>
+    <>
+      <div
+        id="macros-update-container"
+        className="w-[356px] pt-5 pr-1 pb-5 bg-[#F5F7FA] rounded-[15px]"
+      >
+        <div className="flex items-center justify-between px-[18px] pr-[10px]">
+          <p className="text-[#738298] text-[12px] font-semibold uppercase">
+            {title}
+          </p>
 
-      <div className="flex justify-center items-center py-5">
-        <div className="relative w-[200px] h-[200px]">
-          <Doughnut ref={chartRef} data={donutData} options={donutOptions} />
-
-          <div className="absolute inset-0 flex flex-col gap-[2px] items-center justify-center pointer-events-none">
-            <p className="text-[#535359] text-[10px] font-semibold">
-              Calories
-            </p>
-            <p className="text-[#252525] text-[40px]">
-              {totalCalories.toFixed(2)}
-            </p>
-            <p className="text-[#535359] text-[10px]">{unit}</p>
-          </div>
-
-          {total > 0 &&
-            labels.map((label, index) => (
-              <div
-                key={index}
-                className="absolute min-w-[47px] h-[24px] px-2 rounded-full bg-white shadow-[0px_4px_10px_rgba(0,0,0,0.12)] flex items-center justify-center"
-                style={{
-                  left: `${label.x}px`,
-                  top: `${label.y}px`,
-                  transform: "translate(-50%, -50%)",
-                }}
-              >
-                <p className="text-[#252525] text-[12px] font-semibold">
-                  {label.percentage}%
-                </p>
-              </div>
-            ))}
+          <ViewCalculationButton />
         </div>
-      </div>
 
-      <div className="flex flex-col gap-2.5">
-        <div className="flex">
-          {macros.map((macro, index) => (
-            <div
-              key={index}
-              className="flex flex-col gap-2.5 w-[87px] items-center"
-            >
-              <div className="flex gap-[5px] items-center">
+        <div className="flex justify-center items-center py-5">
+          <div className="relative w-[200px] h-[200px]">
+            <Doughnut ref={chartRef} data={donutData} options={donutOptions} />
+
+            <div className="absolute inset-0 flex flex-col gap-[2px] items-center justify-center pointer-events-none">
+              <p className="text-[#535359] text-[10px] font-semibold">
+                Calories
+              </p>
+              <p className="text-[#252525] text-[40px]">
+                {totalCalories.toFixed(2)}
+              </p>
+              <p className="text-[#535359] text-[10px]">{unit}</p>
+            </div>
+
+            {total > 0 &&
+              labels.map((label, index) => (
                 <div
-                  className="w-[6px] h-[6px] rounded-full"
-                  style={{ background: macro.color }}
-                ></div>
-                <p className="text-[#252525] text-[10px] font-semibold capitalize">
-                  {macro.name}
-                </p>
-              </div>
-
-              <div className="flex flex-col justify-center">
-                <p className="text-[#252525] text-[15px] font-semibold">
-                  {macro.grams}
-                </p>
-                <div className="flex items-center">
-                  <Image
-                    src={macro.icon}
-                    alt="arrow"
-                    width={20}
-                    height={20}
-                  />
-                  <p className="text-[#252525] text-[10px] font-semibold py-[2.5px]">
-                    {macro.change}
+                  key={index}
+                  className="absolute min-w-[47px] h-[24px] px-2 rounded-full bg-white shadow-[0px_4px_10px_rgba(0,0,0,0.12)] flex items-center justify-center"
+                  style={{
+                    left: `${label.x}px`,
+                    top: `${label.y}px`,
+                    transform: "translate(-50%, -50%)",
+                  }}
+                >
+                  <p className="text-[#252525] text-[12px] font-semibold">
+                    {label.percentage}%
                   </p>
                 </div>
-              </div>
-            </div>
-          ))}
+              ))}
+          </div>
         </div>
 
-        <div className="pl-[18px] pr-[10px]">
-          <p className="text-[#738298] text-[12px] leading-[130%]">
-            {description}
-          </p>
+        <div className="flex flex-col gap-2.5">
+          <div className="flex">
+            {macros.map((macro, index) => (
+              <div
+                key={index}
+                className="flex flex-col gap-2.5 w-[87px] items-center"
+              >
+                <div className="flex gap-[5px] items-center">
+                  <div
+                    className="w-[6px] h-[6px] rounded-full"
+                    style={{ background: macro.color }}
+                  ></div>
+                  <p className="text-[#252525] text-[10px] font-semibold capitalize">
+                    {macro.name}
+                  </p>
+                </div>
+
+                <div className="flex flex-col justify-center">
+                  <p className="text-[#252525] text-[15px] font-semibold">
+                    {macro.grams}
+                  </p>
+                  <div className="flex items-center">
+                    <Image
+                      src={macro.icon}
+                      alt="arrow"
+                      width={20}
+                      height={20}
+                    />
+                    <p className="text-[#252525] text-[10px] font-semibold py-[2.5px]">
+                      {macro.change}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="pl-[18px] pr-[10px]">
+            <p className="text-[#738298] text-[12px] leading-[130%]">
+              {description}
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+
+      {showCalculationPopup && (
+        <CalculationPopup onClose={handleCloseCalculationPopup} />
+      )}
+    </>
   );
 }
-
-
-
-
 
 
 

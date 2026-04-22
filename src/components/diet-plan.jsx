@@ -65,11 +65,17 @@ export default function DietPlan() {
   const currentMealKey = mealKeyMap[activeMeal];
   const currentMealFoods = selectedDayData?.[currentMealKey]?.foods || [];
 
-  const getMealIcon = (mealName) => {
-    if (mealName === "Breakfast" || mealName === "Snacks") {
-      return "/icons/hugeicons_bubble-tea-02.svg";
-    }
-    return "/icons/hugeicons_plant-045.svg";
+  const categoryIcons = {
+    Meals: "/icons/hugeicons__dish-02.svg",
+    Beverage: "/icons/hugeicons__tea.svg",
+    "Fruits/vegetables": "/icons/hugeicons__vegetarian-food.svg",
+    Snack: "/icons/hugeicons__french-fries-01.svg",
+    Dessert: "/icons/hugeicons__cheese-cake-02.svg",
+    Drink: "/icons/hugeicons_bubble-tea-02.svg",
+  };
+
+  const getMealIcon = (category) => {
+    return categoryIcons[category] || "/icons/hugeicons__dish-02.svg";
   };
 
   const formatValue = (value, suffix = "") => {
@@ -87,7 +93,10 @@ export default function DietPlan() {
 
   return (
     <>
-      <div id="diet-plan-container" className="w-full border border-[#E1E6ED] rounded-[15px] pt-[15px] pb-2.5 px-2.5 bg-white">
+      <div
+        id="diet-plan-container"
+        className="w-full border border-[#E1E6ED] rounded-[15px] pt-[15px] pb-2.5 px-2.5 bg-white"
+      >
         <div className="flex items-center justify-between gap-4 flex-wrap px-2.5">
           <div className="flex flex-col gap-1">
             <p className="text-[#252525] py-[5px] text-[15px] font-semibold leading-normal tracking-[-0.3px]">
@@ -181,7 +190,7 @@ export default function DietPlan() {
                   <div key={`${food.food_name}-${index}`} className="flex gap-[5px]">
                     <div className="flex my-[3px] items-start shrink-0">
                       <Image
-                        src={getMealIcon(activeMeal)}
+                        src={getMealIcon(food.category)}
                         alt="food-icon"
                         width={24}
                         height={24}

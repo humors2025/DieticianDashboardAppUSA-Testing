@@ -254,18 +254,18 @@ export default function MacrosUpdate() {
     setShowCalculationPopup(false);
   };
 
-  const ViewCalculationButton = () => (
-    <button
-      type="button"
-      onClick={handleOpenCalculationPopup}
-      className="flex gap-[15px] items-center px-[11px] py-1 border border-[#E1E6ED] rounded-[4px] cursor-pointer"
-    >
-      <p className="text-[#308BF9] text-[12px] font-semibold leading-normal tracking-[-0.24px] whitespace-nowrap">
-        View Calculation
-      </p>
-      <IoIosArrowForward className="text-[#308BF9] w-5 h-5" />
-    </button>
-  );
+  // const ViewCalculationButton = () => (
+  //   <button
+  //     type="button"
+  //     onClick={handleOpenCalculationPopup}
+  //     className="flex gap-[15px] items-center px-[11px] py-1 border border-[#E1E6ED] rounded-[4px] cursor-pointer"
+  //   >
+  //     <p className="text-[#308BF9] text-[12px] font-semibold leading-normal tracking-[-0.24px] whitespace-nowrap">
+  //       View Calculation
+  //     </p>
+  //     <IoIosArrowForward className="text-[#308BF9] w-5 h-5" />
+  //   </button>
+  // );
 
   if (dietAnalysisLoading) {
     return (
@@ -279,7 +279,7 @@ export default function MacrosUpdate() {
               {title}
             </p>
 
-            <ViewCalculationButton />
+            {/* <ViewCalculationButton /> */}
           </div>
 
           <div className="flex justify-center items-center py-10">
@@ -306,7 +306,7 @@ export default function MacrosUpdate() {
               Macros Update
             </p>
 
-            <ViewCalculationButton />
+            {/* <ViewCalculationButton /> */}
           </div>
 
           <div className="flex justify-center items-center py-10 px-4">
@@ -334,7 +334,7 @@ export default function MacrosUpdate() {
             {title}
           </p>
 
-          <ViewCalculationButton />
+          {/* <ViewCalculationButton /> */}
         </div>
 
         <div className="flex justify-center items-center py-5">

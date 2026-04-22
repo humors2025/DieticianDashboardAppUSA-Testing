@@ -91,7 +91,7 @@ export default function DietPlan() {
     return match?.[1]?.trim() || "";
   };
 
-  return (
+  return ( 
     <>
       <div
         id="diet-plan-container"

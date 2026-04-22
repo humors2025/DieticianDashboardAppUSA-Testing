@@ -7,6 +7,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useSearchParams } from "next/navigation";
 import TestAnalysis from "./test-analysis";
 import DietAnalysis from "./diet-analysis";
+import MacrosAnalysis from "./macros-analysis";
 import RightSidebar from "./rightSidebar";
 import PDFLoadingModal from "./PDFLoadingModal";
 import { exportDietAnalysisPDF } from "../lib/pdfExport";
@@ -61,6 +62,7 @@ export default function ClientDetails() {
         ? `${dateObj.fat_loss_metabolism_score}%`
         : "NA",
       status: dateObj.zone || "NA",
+      kcal: "1850 Kcal", // temporary hardcoded for macros tab
     }));
   };
 
@@ -91,12 +93,12 @@ export default function ClientDetails() {
 
   const handleExportPDF = async () => {
     if (activeTab !== "diet") {
-    toast.warning("PDF export is only available for Diet Analysis tab");
+      toast.warning("PDF export is only available for Diet Analysis tab");
       return;
     }
 
     if (!dietAnalysisData?.data?.food_json) {
-     toast.error("Diet analysis data is not available yet.");
+      toast.error("Diet analysis data is not available yet.");
       return;
     }
 
@@ -235,7 +237,8 @@ export default function ClientDetails() {
   };
 
   const ITEMS_TO_SHOW = 4;
-  const currentData = activeTab === "test" ? testDateData : weekData;
+  const currentData =
+    activeTab === "diet" ? weekData : testDateData;
 
   const handleBack = () => {
     if (startIndex > 0) {
@@ -320,7 +323,7 @@ export default function ClientDetails() {
   }
 
   if (
-    (datesLoading && activeTab === "test") ||
+    (datesLoading && (activeTab === "test" || activeTab === "macros")) ||
     (weeklyDatesLoading && activeTab === "diet")
   ) {
     return (
@@ -328,7 +331,7 @@ export default function ClientDetails() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
           <p className="mt-4 text-gray-600">
-            {activeTab === "test" ? "Loading dates..." : "Loading weeks..."}
+            {activeTab === "diet" ? "Loading weeks..." : "Loading dates..."}
           </p>
         </div>
       </div>
@@ -336,7 +339,7 @@ export default function ClientDetails() {
   }
 
   if (
-    (datesError && activeTab === "test") ||
+    (datesError && (activeTab === "test" || activeTab === "macros")) ||
     (weeklyDatesError && activeTab === "diet")
   ) {
     return (
@@ -344,9 +347,9 @@ export default function ClientDetails() {
         <div className="text-center">
           <div className="text-red-500 text-4xl mb-4">⚠️</div>
           <p className="text-red-600 mb-2">
-            {activeTab === "test"
-              ? "Failed to load dates"
-              : "Failed to load weeks"}
+            {activeTab === "diet"
+              ? "Failed to load weeks"
+              : "Failed to load dates"}
           </p>
           <button
             onClick={() => window.location.reload()}
@@ -400,13 +403,13 @@ export default function ClientDetails() {
 
               <div className="flex flex-col gap-3">
                 <div className="flex gap-3 items-center">
-                  <p className="text-[#252525] text-[20px] font-semibold">
+                  <p className="text-[#252525] text-[20px] font-semibold tracking-[-0.4px] leading-[110%]">
                     {profileDetails?.profile_name || "NA"}
                   </p>
                 </div>
 
                 <div className="flex gap-1.5 items-center">
-                  <p className="text-[#535359] text-[12px]">
+                  <p className="text-[#535359] text-[12px] font-normal leading-normal tracking-[-0.24px]">
                     {profileDetails?.age || "NA"} years,{" "}
                     {profileDetails?.gender || "NA"}
                   </p>
@@ -420,7 +423,7 @@ export default function ClientDetails() {
                     />
                   </div>
 
-                  <p className="text-[#535359] text-[12px]">
+                  <p className="text-[#535359] text-[12px] font-normal leading-normal tracking-[-0.24px]">
                     Joined on {formatJoinedDate(profileDetails?.joined_dttm)}
                   </p>
                 </div>
@@ -453,7 +456,9 @@ export default function ClientDetails() {
               <div
                 onClick={() => handleTabChange("test")}
                 className={`flex items-center rounded-[6px] py-[11px] px-[31px] cursor-pointer ${
-                  activeTab === "test" ? "bg-[#252525]" : "bg-[#F5F7FA]"
+                  activeTab === "test"
+                    ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+                    : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
                 }`}
               >
                 <p
@@ -462,6 +467,23 @@ export default function ClientDetails() {
                   }`}
                 >
                   Test Analysis
+                </p>
+              </div>
+
+              <div
+                onClick={() => handleTabChange("macros")}
+                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${
+                  activeTab === "macros"
+                    ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+                    : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
+                }`}
+              >
+                <p
+                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${
+                    activeTab === "macros" ? "text-white" : "text-[#535359]"
+                  }`}
+                >
+                  Macros Analysis
                 </p>
               </div>
 
@@ -489,7 +511,7 @@ export default function ClientDetails() {
                       : "text-[#535359]"
                   }`}
                 >
-                  Diet Analysis
+                  Weekly Diet Analysis
                 </p>
 
                 <Image
@@ -505,7 +527,7 @@ export default function ClientDetails() {
 
           <div className="flex items-center gap-[26px] border-t border-b border-[#E1E6ED] pl-[38px] py-[5px]">
             <p className="text-[#535359] text-[15px] font-semibold whitespace-nowrap">
-              {activeTab === "test" ? "Select a date" : "Select a week"}
+              {activeTab === "diet" ? "Select a week" : "Select a date"}
             </p>
 
             <div className="flex gap-3 items-center w-full">
@@ -521,9 +543,9 @@ export default function ClientDetails() {
               <div className="w-full flex gap-[5px] items-center overflow-x-auto no-scrollbar">
                 {currentData.length === 0 ? (
                   <div className="text-center py-4 text-gray-500 w-full">
-                    {activeTab === "test"
-                      ? "No test dates available"
-                      : "No weeks available"}
+                    {activeTab === "diet"
+                      ? "No weeks available"
+                      : "No test dates available"}
                   </div>
                 ) : (
                   visibleItems.map((item, index) => {
@@ -532,15 +554,61 @@ export default function ClientDetails() {
                       <div
                         key={actualIndex}
                         onClick={() =>
-                          activeTab === "test"
-                            ? handleDateSelect(actualIndex)
-                            : handleWeekSelect(actualIndex)
+                          activeTab === "diet"
+                            ? handleWeekSelect(actualIndex)
+                            : handleDateSelect(actualIndex)
                         }
                         className={`flex flex-col gap-[5px] rounded-[8px] pl-[15px] pt-[15px] pr-[15px] pb-[15px] cursor-pointer min-w-[160px] ${
                           activeIndex === actualIndex ? "bg-[#308BF9]" : ""
                         }`}
                       >
-                        {activeTab === "test" ? (
+                        {activeTab === "diet" ? (
+                          <>
+                            <p
+                              className={`${
+                                activeIndex === actualIndex
+                                  ? "text-white"
+                                  : "text-[#535359]"
+                              } text-[12px] font-semibold`}
+                            >
+                              {item.week}
+                            </p>
+
+                            <p
+                              className={`${
+                                activeIndex === actualIndex
+                                  ? "text-white"
+                                  : "text-[#535359]"
+                              } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                            >
+                              {item.range}
+                            </p>
+                          </>
+                        ) : activeTab === "macros" ? (
+                          <>
+                            <p
+                              className={`${
+                                activeIndex === actualIndex
+                                  ? "text-white"
+                                  : "text-[#535359]"
+                              } text-[12px] font-semibold`}
+                            >
+                              {item.date}
+                            </p>
+
+                            <div className="flex items-center">
+                              <p
+                                className={`${
+                                  activeIndex === actualIndex
+                                    ? "text-white"
+                                    : "text-[#535359]"
+                                } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                              >
+                                {item.kcal}
+                              </p>
+                            </div>
+                          </>
+                        ) : (
                           <>
                             <p
                               className={`${
@@ -582,28 +650,6 @@ export default function ClientDetails() {
                               </p>
                             </div>
                           </>
-                        ) : (
-                          <>
-                            <p
-                              className={`${
-                                activeIndex === actualIndex
-                                  ? "text-white"
-                                  : "text-[#535359]"
-                              } text-[12px] font-semibold`}
-                            >
-                              {item.week}
-                            </p>
-
-                            <p
-                              className={`${
-                                activeIndex === actualIndex
-                                  ? "text-white"
-                                  : "text-[#535359]"
-                              } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
-                            >
-                              {item.range}
-                            </p>
-                          </>
                         )}
                       </div>
                     );
@@ -631,6 +677,14 @@ export default function ClientDetails() {
             }`}
           >
             <TestAnalysis />
+          </div>
+
+          <div
+            className={`${
+              activeTab === "macros" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+            }`}
+          >
+            <MacrosAnalysis />
           </div>
 
           <div

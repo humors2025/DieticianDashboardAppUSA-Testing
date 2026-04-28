@@ -62,6 +62,9 @@ CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
   DIETANALYSIS:{
     DIETANALYSISPLAN:"/dietitian/api/web/get_weekly_food_json_suggestions_weeks.php"
   },
+  MACROSANALYSIS:{
+    GETMACROSUMMARY:"/dietitian/api/app/get_macro_summary_by_date.php"
+  }
 
  
   

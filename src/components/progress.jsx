@@ -31,7 +31,7 @@ ChartJS.register(
   Legend
 );
 
-export default function Progress() {
+export default function Progress({ title = "Progress", showDetails = true, showContainer = true }) {
   const dispatch = useDispatch();
   const searchParams = useSearchParams();
   const profileId = searchParams.get("profile_id");
@@ -248,12 +248,17 @@ export default function Progress() {
     );
   }
 
+
+   const containerClasses = showContainer 
+    ? "w-[410px] flex flex-col border border-[#E1E6ED] px-5 pt-[18px] pb-5 rounded-[15px] bg-white"
+    : "w-[350px] flex flex-col px-5 pt-[18px] pb-5";
+
   return (
-    <div className="w-[410px] flex flex-col border border-[#E1E6ED] px-5 pt-[18px] pb-5 rounded-[15px] bg-white">
+    <div className={containerClasses}>
       <div className="flex justify-between items-center">
         <div className="flex gap-[5px] items-center">
           <p className="text-[#252525] text-[15px] font-semibold leading-normal tracking-[-0.3px] whitespace-nowrap">
-            Progress
+             {title}
           </p>
         </div>
 
@@ -294,6 +299,7 @@ export default function Progress() {
         </div>
       </div>
 
+ {showDetails && (
       <div className="flex flex-col gap-[5px] mt-3">
         <p className="text-[#252525] text-[25px] font-semibold leading-normal tracking-[-0.5px]">
           {overallFatLossData?.title || "Overall Fat Loss Score"}
@@ -318,6 +324,7 @@ export default function Progress() {
           </p>
         </div>
       </div>
+        )}
 
       <div className="mt-4 w-full h-[170px]">
         {chartData && chartData.values.length > 0 ? (

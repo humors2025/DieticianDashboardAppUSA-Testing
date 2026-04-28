@@ -522,6 +522,22 @@ export const fetchClientWeeklyDates = async (profileId, dietitianId) => {
 
 
 
+export const fetchMacroSummaryByDate = async (profileId, date) => {
+  return apiFetcher(API_ENDPOINTS.MACROSANALYSIS.GETMACROSUMMARY, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      profile_id: "profile257",
+      date: "2026-04-27",
+    }),
+  });
+};
+
+
+
+
 
 // // services/authService.js
 

@@ -1,13 +1,3 @@
-// "use client"
-// export default function MacrosCalculation(){
-//     return(
-//         <>
-//         <p>MacrosCalculation</p>
-//         </>
-//     )
-// }
-
-
 
 "use client";
 import { useState, useRef, useEffect } from "react";

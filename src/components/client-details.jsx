@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import TestAnalysis from "./test-analysis";
 import DietAnalysis from "./diet-analysis";
 import MacrosAnalysis from "./macros-analysis";
+import HabitsAnalysis from "./habits-analysis";
 import RightSidebar from "./rightSidebar";
 import PDFLoadingModal from "./PDFLoadingModal";
 import { exportDietAnalysisPDF } from "../lib/pdfExport";
@@ -19,10 +20,14 @@ import {
   getDietAnalysisPlan,
   selectDietAnalysisData,
 } from "../store/dietAnalysisSlice";
+import { 
+  getMacroSummary, 
+  selectMacroSummaryData } from "../store/macroSummarySlice";
 import {
   fetchClientProfileDatesList,
   fetchClientWeeklyDates,
 } from "../services/authService";
+
 import { cookieManager } from "../lib/cookies";
 
 export default function ClientDetails() {
@@ -279,20 +284,45 @@ export default function ClientDetails() {
     setStartIndex(0);
   };
 
-  const handleDateSelect = (actualIndex) => {
-    setActiveIndex(actualIndex);
-    const selectedDate = testDateData[actualIndex];
+ const handleDateSelect = (actualIndex) => {
+  setActiveIndex(actualIndex);
+  const selectedDate = testDateData[actualIndex];
 
-    if (selectedDate?.rawDate) {
+  if (selectedDate?.rawDate) {
+    dispatch(
+      getClientIndividualProfile({
+        profileId,
+        date: selectedDate.rawDate,
+        dietitianId: dietitianId,
+      })
+    );
+    
+    // Fetch macro summary for the selected date
+    dispatch(
+      getMacroSummary({
+        profileId,
+        date: selectedDate.rawDate,
+      })
+    );
+  }
+};
+
+
+
+useEffect(() => {
+  if (activeTab === "macros" && profileDates.length > 0) {
+    const selectedDate = profileDates[activeIndex] || profileDates[0];
+    if (selectedDate?.date) {
       dispatch(
-        getClientIndividualProfile({
+        getMacroSummary({
           profileId,
-          date: selectedDate.rawDate,
-          dietitianId: dietitianId,
+          date: selectedDate.date,
         })
       );
     }
-  };
+  }
+}, [activeTab, profileDates, activeIndex, profileId, dispatch]);
+
 
   const handleWeekSelect = (actualIndex) => {
     setActiveIndex(actualIndex);
@@ -310,6 +340,8 @@ export default function ClientDetails() {
   };
 
   const visibleItems = currentData.slice(startIndex, startIndex + ITEMS_TO_SHOW);
+  console.log("visibleItems314:-", visibleItems);
+
 
   if (isLoadingWeeklyData) {
     return (
@@ -375,15 +407,14 @@ export default function ClientDetails() {
         )}
 
         <div
-          className={`w-full bg-white px-[15px] pt-[23px] pb-5 rounded-[15px] flex flex-col h-[calc(88vh-24px)] overflow-hidden transition-all duration-300 relative ${
-            isSidebarOpen ? "opacity-90" : "opacity-100"
-          }`}
+          className={`w-full bg-white px-[15px] pt-[23px] pb-5 rounded-[15px] flex flex-col h-[calc(88vh-24px)] overflow-hidden transition-all duration-300 relative ${isSidebarOpen ? "opacity-90" : "opacity-100"
+            }`}
         >
           <div className="flex justify-between items-center pb-[22px] border-b border-[#E1E6ED]">
             <div className="flex gap-[15px]">
               <div className="rounded-full w-12 h-12 flex items-center justify-center overflow-hidden">
                 {profileDetails?.profile_image &&
-                profileDetails?.profile_image !== "NA" ? (
+                  profileDetails?.profile_image !== "NA" ? (
                   <Image
                     src={profileDetails.profile_image}
                     alt={profileDetails?.profile_name || "user"}
@@ -455,16 +486,14 @@ export default function ClientDetails() {
             <div className="flex bg-[#F5F7FA] rounded-[6px]">
               <div
                 onClick={() => handleTabChange("test")}
-                className={`flex items-center rounded-[6px] py-[11px] px-[31px] cursor-pointer ${
-                  activeTab === "test"
+                className={`flex items-center rounded-[6px] py-[11px] px-[31px] cursor-pointer ${activeTab === "test"
                     ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
                     : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
-                }`}
+                  }`}
               >
                 <p
-                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${
-                    activeTab === "test" ? "text-white" : "text-[#535359]"
-                  }`}
+                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${activeTab === "test" ? "text-white" : "text-[#535359]"
+                    }`}
                 >
                   Test Analysis
                 </p>
@@ -472,16 +501,14 @@ export default function ClientDetails() {
 
               <div
                 onClick={() => handleTabChange("macros")}
-                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${
-                  activeTab === "macros"
+                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${activeTab === "macros"
                     ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
                     : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
-                }`}
+                  }`}
               >
                 <p
-                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${
-                    activeTab === "macros" ? "text-white" : "text-[#535359]"
-                  }`}
+                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${activeTab === "macros" ? "text-white" : "text-[#535359]"
+                    }`}
                 >
                   Macros Analysis
                 </p>
@@ -489,13 +516,12 @@ export default function ClientDetails() {
 
               <div
                 onClick={() => handleTabChange("diet")}
-                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${
-                  !isDietAnalysisAvailable
+                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${!isDietAnalysisAvailable
                     ? "opacity-50 cursor-not-allowed bg-[#F5F7FA]"
                     : activeTab === "diet"
-                    ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
-                    : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
-                }`}
+                      ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+                      : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
+                  }`}
                 title={
                   !isDietAnalysisAvailable
                     ? "No diet analysis data available for this client"
@@ -503,13 +529,12 @@ export default function ClientDetails() {
                 }
               >
                 <p
-                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${
-                    !isDietAnalysisAvailable
+                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${!isDietAnalysisAvailable
                       ? "text-[#A1A1A1]"
                       : activeTab === "diet"
-                      ? "text-white"
-                      : "text-[#535359]"
-                  }`}
+                        ? "text-white"
+                        : "text-[#535359]"
+                    }`}
                 >
                   Weekly Diet Analysis
                 </p>
@@ -522,177 +547,198 @@ export default function ClientDetails() {
                   className={`${!isDietAnalysisAvailable ? "opacity-50" : ""}`}
                 />
               </div>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-[26px] border-t border-b border-[#E1E6ED] pl-[38px] py-[5px]">
-            <p className="text-[#535359] text-[15px] font-semibold whitespace-nowrap">
-              {activeTab === "diet" ? "Select a week" : "Select a date"}
-            </p>
-
-            <div className="flex gap-3 items-center w-full">
-              <IoChevronBackOutline
-                onClick={handleBack}
-                className={`text-[#252525] w-6 h-6 cursor-pointer ${
-                  startIndex === 0 || currentData.length === 0
-                    ? "opacity-50 cursor-not-allowed"
-                    : ""
-                }`}
-              />
-
-              <div className="w-full flex gap-[5px] items-center overflow-x-auto no-scrollbar">
-                {currentData.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500 w-full">
-                    {activeTab === "diet"
-                      ? "No weeks available"
-                      : "No test dates available"}
-                  </div>
-                ) : (
-                  visibleItems.map((item, index) => {
-                    const actualIndex = startIndex + index;
-                    return (
-                      <div
-                        key={actualIndex}
-                        onClick={() =>
-                          activeTab === "diet"
-                            ? handleWeekSelect(actualIndex)
-                            : handleDateSelect(actualIndex)
-                        }
-                        className={`flex flex-col gap-[5px] rounded-[8px] pl-[15px] pt-[15px] pr-[15px] pb-[15px] cursor-pointer min-w-[160px] ${
-                          activeIndex === actualIndex ? "bg-[#308BF9]" : ""
-                        }`}
-                      >
-                        {activeTab === "diet" ? (
-                          <>
-                            <p
-                              className={`${
-                                activeIndex === actualIndex
-                                  ? "text-white"
-                                  : "text-[#535359]"
-                              } text-[12px] font-semibold`}
-                            >
-                              {item.week}
-                            </p>
-
-                            <p
-                              className={`${
-                                activeIndex === actualIndex
-                                  ? "text-white"
-                                  : "text-[#535359]"
-                              } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
-                            >
-                              {item.range}
-                            </p>
-                          </>
-                        ) : activeTab === "macros" ? (
-                          <>
-                            <p
-                              className={`${
-                                activeIndex === actualIndex
-                                  ? "text-white"
-                                  : "text-[#535359]"
-                              } text-[12px] font-semibold`}
-                            >
-                              {item.date}
-                            </p>
-
-                            <div className="flex items-center">
-                              <p
-                                className={`${
-                                  activeIndex === actualIndex
-                                    ? "text-white"
-                                    : "text-[#535359]"
-                                } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
-                              >
-                                {item.kcal}
-                              </p>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <p
-                              className={`${
-                                activeIndex === actualIndex
-                                  ? "text-white"
-                                  : "text-[#535359]"
-                              } text-[12px] font-semibold`}
-                            >
-                              {item.date}
-                            </p>
-
-                            <div className="flex items-center">
-                              <p
-                                className={`${
-                                  activeIndex === actualIndex
-                                    ? "text-white"
-                                    : "text-[#535359]"
-                                } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
-                              >
-                                {item.score || "—"}
-                              </p>
-
-                              <div
-                                className={`mx-2.5 border-r h-[13px] ${
-                                  activeIndex === actualIndex
-                                    ? "border-white"
-                                    : "border-[#A1A1A1]"
-                                }`}
-                              ></div>
-
-                              <p
-                                className={`${
-                                  activeIndex === actualIndex
-                                    ? "text-white"
-                                    : "text-[#535359]"
-                                } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
-                              >
-                                {item.status || "Pending"}
-                              </p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              <div className="flex justify-end">
-                <IoChevronForwardOutline
-                  onClick={handleForward}
-                  className={`text-[#252525] w-6 h-6 cursor-pointer ${
-                    startIndex + ITEMS_TO_SHOW >= currentData.length ||
-                    currentData.length === 0
-                      ? "opacity-50 cursor-not-allowed"
-                      : ""
+              <div
+                onClick={() => handleTabChange("habits")}
+                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${activeTab === "habits"
+                    ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+                    : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
                   }`}
+              >
+                <p
+                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${activeTab === "habits" ? "text-white" : "text-[#535359]"
+                    }`}
+                >
+                  Habits Analysis
+                </p>
+
+                <Image
+                  src="/icons/hugeicons_information-circle1.svg"
+                  alt="info"
+                  width={20}
+                  height={20}
+                  className=""
                 />
               </div>
             </div>
           </div>
 
+          {activeTab === "habits" ? (
+            <div className="border-b border-[#E1E6ED]"></div>
+          ) : (
+            <div className="flex items-center gap-[26px] border-t border-b border-[#E1E6ED] pl-[38px] py-[5px]">
+              <p className="text-[#535359] text-[15px] font-semibold whitespace-nowrap">
+                {activeTab === "diet" ? "Select a week" : "Select a date"}
+              </p>
+
+              <div className="flex gap-3 items-center w-full">
+                <IoChevronBackOutline
+                  onClick={handleBack}
+                  className={`text-[#252525] w-6 h-6 cursor-pointer ${startIndex === 0 || currentData.length === 0
+                      ? "opacity-50 cursor-not-allowed"
+                      : ""
+                    }`}
+                />
+
+                <div className="w-full flex gap-[5px] items-center overflow-x-auto no-scrollbar">
+                  {currentData.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500 w-full">
+                      {activeTab === "diet"
+                        ? "No weeks available"
+                        : "No test dates available"}
+                    </div>
+                  ) : (
+                    visibleItems.map((item, index) => {
+                      const actualIndex = startIndex + index;
+                      return (
+                        <div
+                          key={actualIndex}
+                          onClick={() =>
+                            activeTab === "diet"
+                              ? handleWeekSelect(actualIndex)
+                              : handleDateSelect(actualIndex)
+                          }
+                          className={`flex flex-col gap-[5px] rounded-[8px] pl-[15px] pt-[15px] pr-[15px] pb-[15px] cursor-pointer min-w-[160px] ${activeIndex === actualIndex ? "bg-[#308BF9]" : ""
+                            }`}
+                        >
+                          {activeTab === "diet" ? (
+                            <>
+                              <p
+                                className={`${activeIndex === actualIndex
+                                    ? "text-white"
+                                    : "text-[#535359]"
+                                  } text-[12px] font-semibold`}
+                              >
+                                {item.week}
+                              </p>
+
+                              <p
+                                className={`${activeIndex === actualIndex
+                                    ? "text-white"
+                                    : "text-[#535359]"
+                                  } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                              >
+                                {item.range}
+                              </p>
+                            </>
+                          ) : activeTab === "macros" ? (
+                            <>
+                              <p
+                                className={`${activeIndex === actualIndex
+                                    ? "text-white"
+                                    : "text-[#535359]"
+                                  } text-[12px] font-semibold`}
+                              >
+                                {item.date}
+                              </p>
+
+                              <div className="flex items-center">
+                                <p
+                                  className={`${activeIndex === actualIndex
+                                      ? "text-white"
+                                      : "text-[#535359]"
+                                    } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                                >
+                                  {item.kcal}
+                                </p>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <p
+                                className={`${activeIndex === actualIndex
+                                    ? "text-white"
+                                    : "text-[#535359]"
+                                  } text-[12px] font-semibold`}
+                              >
+                                {item.date}
+                              </p>
+
+                              <div className="flex items-center">
+                                <p
+                                  className={`${activeIndex === actualIndex
+                                      ? "text-white"
+                                      : "text-[#535359]"
+                                    } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                                >
+                                  {item.score || "—"}
+                                </p>
+
+                                <div
+                                  className={`mx-2.5 border-r h-[13px] ${activeIndex === actualIndex
+                                      ? "border-white"
+                                      : "border-[#A1A1A1]"
+                                    }`}
+                                ></div>
+
+                                <p
+                                  className={`${activeIndex === actualIndex
+                                      ? "text-white"
+                                      : "text-[#535359]"
+                                    } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
+                                >
+                                  {item.status || "Pending"}
+                                </p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="flex justify-end">
+                  <IoChevronForwardOutline
+                    onClick={handleForward}
+                    className={`text-[#252525] w-6 h-6 cursor-pointer ${startIndex + ITEMS_TO_SHOW >= currentData.length ||
+                        currentData.length === 0
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                      }`}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div
-            className={`${
-              activeTab === "test" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
-            }`}
+            className={`${activeTab === "test" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+              }`}
           >
             <TestAnalysis />
           </div>
 
           <div
-            className={`${
-              activeTab === "macros" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
-            }`}
+            className={`${activeTab === "macros" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+              }`}
           >
-            <MacrosAnalysis />
+            <MacrosAnalysis  activeTab={activeTab}/>
           </div>
 
           <div
-            className={`${
-              activeTab === "diet" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
-            }`}
+            className={`${activeTab === "diet" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+              }`}
           >
             <DietAnalysis />
+          </div>
+
+          <div
+            className={`${activeTab === "habits" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+              }`}
+          >
+
+            <HabitsAnalysis />
           </div>
         </div>
 

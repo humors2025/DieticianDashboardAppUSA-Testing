@@ -11,6 +11,7 @@ import clientsDashboardReducer from "./clientsDashboardSlice";
 import clientIndividualProfileReducer from "./clientIndividualProfileSlice";
 import progressReducer from "./progressSlice";
 import dietAnalysisReducer from "./dietAnalysisSlice";
+import macroSummaryReducer from "./macroSummarySlice";
 
 export const store = configureStore({
   reducer: {
@@ -25,6 +26,7 @@ export const store = configureStore({
       clientIndividualProfile: clientIndividualProfileReducer,
        progress: progressReducer,
         dietAnalysis: dietAnalysisReducer,
+        macroSummary: macroSummaryReducer,
   },
 
   middleware: (getDefaultMiddleware) =>

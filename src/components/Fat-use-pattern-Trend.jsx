@@ -100,15 +100,31 @@ export default function FatUsePatternTrend() {
   const clientIndividualProfile = useSelector(
     (state) => state.clientIndividualProfile.data
   );
-  const fatUsePatternData =
-    clientIndividualProfile?.data?.fat_use_pattern_trend || {};
 
-  const value = fatUsePatternData.score || "NA";
-  const status = fatUsePatternData.zone || "NA";
-  const scoreText = fatUsePatternData.score_text || "NA";
+  const rawJson = clientIndividualProfile?.data?.raw_json || {};
 
-  const scientificTitle = fatUsePatternData.scientific_title || "NA";
-  const scientificText = fatUsePatternData.scientific_text || "NA";
+  const trendData =
+    rawJson?.Muscle_Gain_Trend ||
+    rawJson?.Fat_Use_Pattern_trend ||
+    {};
+
+  const value = trendData?.score ?? "NA";
+  const status =
+    trendData?.zone && trendData?.zone !== ""
+      ? trendData.zone
+      : "NA";
+
+  const scientificTitle =
+    trendData?.scientific_interpretation?.title || "NA";
+
+  const scientificText =
+    trendData?.scientific_interpretation?.text || "NA";
+
+  const title = rawJson?.Muscle_Gain_Trend
+    ? "Muscle Gain Trend"
+    : rawJson?.Fat_Use_Pattern_trend
+    ? "Fat-use Pattern Trend"
+    : "Trend";
 
   const statusColorMap = {
     Moderate: "#FFBF2D",
@@ -123,8 +139,9 @@ export default function FatUsePatternTrend() {
       <div className="flex justify-between items-center">
         <div className="flex gap-[5px] items-center">
           <p className="text-[#252525] text-[15px] font-semibold leading-normal tracking-[-0.3px] whitespace-nowrap">
-            Fat-use pattern Trend
+            {title}
           </p>
+
           <Image
             src="/icons/hugeicons_information-circle1.svg"
             alt="info"
@@ -154,11 +171,11 @@ export default function FatUsePatternTrend() {
 
         <div className="flex items-baseline">
           <div className="flex items-baseline gap-[4px]">
-          <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
-  {value !== "NA" && !isNaN(Number(value))
-    ? Math.round(Number(value))
-    : value}
-</p>
+            <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
+              {value !== "NA" && !isNaN(Number(value))
+                ? Math.round(Number(value))
+                : value}
+            </p>
 
             <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
               %

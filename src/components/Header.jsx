@@ -369,7 +369,7 @@ const isPartnerUser = dieticianId !== "" && dieticianId !== "Qua";
   <Link href={isPartnerUser ? partnerRouteMap.Dashboard : "/dashboard"}>
     <div className="flex flex-col items-center">
       <img src="/icons/logorespyr.png" alt="logo" width={50} height={50} />
-      <p className="text-[#252525] text-[12px] font-normal">Beta 1.0</p>
+      {/* <p className="text-[#252525] text-[12px] font-normal">Beta 1.0</p> */}
     </div>
   </Link>
 </div>

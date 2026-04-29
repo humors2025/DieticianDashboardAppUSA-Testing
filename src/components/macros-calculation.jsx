@@ -14,8 +14,15 @@ export default function MacrosCalculation() {
     (state) => state.clientIndividualProfile.data
   );
 
-  const trainerMacroRationale =
-    clientIndividualProfile?.data?.raw_json?.trainer_macro_rationale || [];
+  const rawTrainerMacroRationale =
+    clientIndividualProfile?.data?.raw_json?.trainer_macro_rationale;
+
+  const trainerMacroRationale = Array.isArray(rawTrainerMacroRationale)
+    ? rawTrainerMacroRationale
+    : [];
+
+  const isNoMacroData =
+    rawTrainerMacroRationale === "NA" || trainerMacroRationale.length === 0;
 
   const profileDetails = clientIndividualProfile?.data?.profile_details || {};
   const profileName = profileDetails?.profile_name || "User";
@@ -27,30 +34,10 @@ export default function MacrosCalculation() {
     return "FINAL CALCULATION";
   };
 
-  const calculationSteps =
-    trainerMacroRationale.length > 0
-      ? trainerMacroRationale.map((item) => ({
-          title: getStepTitle(item.stage),
-          description: item.title || "",
-        }))
-      : [
-          {
-            title: "1st CALCULATION",
-            description: "Macro Calculation Based On BMI",
-          },
-          {
-            title: "2nd CALCULATION",
-            description: "Macro Adjustment Based On Fitness Goal",
-          },
-          {
-            title: "3Rd CALCULATION",
-            description: "Macro Adjustment Based On Metabolism Score",
-          },
-          {
-            title: "FINAL CALCULATION",
-            description: "Macro Adjustment Based On Focus",
-          },
-        ];
+  const calculationSteps = trainerMacroRationale.map((item) => ({
+    title: getStepTitle(item.stage),
+    description: item.title || "",
+  }));
 
   const getStepInfo = (stepTitle) => {
     const current = trainerMacroRationale.find(
@@ -176,7 +163,7 @@ export default function MacrosCalculation() {
 
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container) return;
+    if (!container || isNoMacroData) return;
 
     const handleScroll = () => {
       const containerTop = container.getBoundingClientRect().top;
@@ -204,7 +191,7 @@ export default function MacrosCalculation() {
     return () => {
       container.removeEventListener("scroll", handleScroll);
     };
-  }, [calculationSteps]);
+  }, [calculationSteps, isNoMacroData]);
 
   const handleStepClick = (title, index) => {
     setActiveCalculation(title);
@@ -224,6 +211,26 @@ export default function MacrosCalculation() {
       });
     }
   };
+
+  if (isNoMacroData) {
+    return (
+      <div className="relative bg-white rounded-[20px] w-full overflow-hidden">
+        <div className="border border-[#E1E6ED] rounded-[15px] px-4 py-6">
+          <div className="pl-2.5 pb-5">
+            <p className="text-[#252525] text-[25px] font-semibold leading-normal tracking-[-1px]">
+              Macro Calculation
+            </p>
+          </div>
+
+          <div className="h-[250px] flex items-center justify-center rounded-[15px] bg-[#F5F7FA] border border-[#E1E6ED]">
+            <p className="text-[#738298] text-[14px] font-medium">
+              No data found
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative bg-white rounded-[20px] w-full overflow-hidden">
@@ -331,7 +338,7 @@ export default function MacrosCalculation() {
                           </div>
 
                           <div className="flex flex-col gap-2.5">
-                            <div className="flex flex-1 justify-between ">
+                            <div className="flex flex-1 justify-between">
                               {stepData?.macros.map((macro) => (
                                 <div
                                   key={macro.name}
@@ -348,16 +355,16 @@ export default function MacrosCalculation() {
                                   </div>
 
                                   <div className="flex flex-col justify-center items-center">
-                                    {/* <p className="text-[#252525] text-[15px] font-semibold tracking-[-0.3px] whitespace-nowrap">
-                                      {macro.value}
-                                    </p> */}
-
                                     <p className="text-[#252525] text-[15px] font-semibold tracking-[-0.3px] whitespace-nowrap">
-  {String(macro.value).replace(/[a-zA-Z]+|kcal/g, "").trim()}
-  <span className="text-[#252525] text-[10px] font-normal">
-    {String(macro.value).includes("kcal") ? "kcal" : "g"}
-  </span>
-</p>
+                                      {String(macro.value)
+                                        .replace(/[a-zA-Z]+|kcal/g, "")
+                                        .trim()}
+                                      <span className="text-[#252525] text-[10px] font-normal">
+                                        {String(macro.value).includes("kcal")
+                                          ? "kcal"
+                                          : "g"}
+                                      </span>
+                                    </p>
 
                                     {!isFirstCalculation &&
                                       macro.name !== "Calories" && (

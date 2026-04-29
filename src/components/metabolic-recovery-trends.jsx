@@ -122,7 +122,6 @@ const getZoneConfig = (zone) => {
 };
 
 export default function MetabolicRecoveryTrends({ data }) {
-    console.log("MetabolicRecoveryTrends data:", data);
 
     // Extract the two items from the data
     const metabolicLoad = data?.items?.find(

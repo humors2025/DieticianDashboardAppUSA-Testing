@@ -12,6 +12,8 @@ import clientIndividualProfileReducer from "./clientIndividualProfileSlice";
 import progressReducer from "./progressSlice";
 import dietAnalysisReducer from "./dietAnalysisSlice";
 import macroSummaryReducer from "./macroSummarySlice";
+import habitMonitoringReducer from "./habitMonitoringSlice";
+
 
 export const store = configureStore({
   reducer: {
@@ -27,6 +29,7 @@ export const store = configureStore({
        progress: progressReducer,
         dietAnalysis: dietAnalysisReducer,
         macroSummary: macroSummaryReducer,
+      habitMonitoring: habitMonitoringReducer,
   },
 
   middleware: (getDefaultMiddleware) =>

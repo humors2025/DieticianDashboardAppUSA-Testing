@@ -529,13 +529,40 @@ export const fetchMacroSummaryByDate = async (profileId, date) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      profile_id: "profile257",
-      date: "2026-04-27",
+      profile_id: profileId,
+      date: date,
     }),
   });
 };
 
 
+export const fetchHabitsMonitoringData = async (profileId, dietitianId) => {
+  return apiFetcher(API_ENDPOINTS.HABITMONITORING.GETHABITSDATA, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      profile_id: profileId,
+      dietitian_id: dietitianId,
+    }),
+  });
+};
+
+
+export const updatePerformanceLevel = async (dietitianId, profileId, levelType) => {
+  return apiFetcher(API_ENDPOINTS.LEVELUPDATE.LEVEL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      dietitian_id: dietitianId,
+      profile_id: profileId,
+      level_type: levelType,
+    }),
+  });
+};
 
 
 

@@ -64,9 +64,14 @@ CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
   },
   MACROSANALYSIS:{
     GETMACROSUMMARY:"/dietitian/api/app/get_macro_summary_by_date.php"
+  },
+  HABITMONITORING:{
+    GETHABITSDATA:"/dietitian/api/web/habits-tracking-users-choice.php"
+  },
+  LEVELUPDATE:{
+LEVEL:"/dietitian/api/web/level-type-update-change.php"
   }
 
- 
   
   
 };

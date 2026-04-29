@@ -340,7 +340,6 @@ useEffect(() => {
   };
 
   const visibleItems = currentData.slice(startIndex, startIndex + ITEMS_TO_SHOW);
-  console.log("visibleItems314:-", visibleItems);
 
 
   if (isLoadingWeeklyData) {
@@ -745,6 +744,8 @@ useEffect(() => {
         <RightSidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
+           profileId={profileId}
+  dietitianId={dietitianId}
         />
       </div>
     </>

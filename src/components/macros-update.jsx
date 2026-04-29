@@ -608,51 +608,77 @@ export default function MacrosUpdate({ title = "Macros Update", activeTab }) {
   const unit = "Kcal";
 
   // Helper function to format change display
-  const formatChange = (changeData) => {
-    if (!changeData) return { icon: "/icons/hugeicons_arrow-down-020.svg", change: "0%" };
+  // const formatChange = (changeData) => {
+  //   if (!changeData) return { icon: "/icons/hugeicons_arrow-down-0210278.svg", change: "0%" };
     
-    const { change_percent, change_type } = changeData;
-    const icon = change_type === "increase" 
-      ? "/icons/hugeicons_arrow-up-02.svg"
-      : "/icons/hugeicons_arrow-down-020.svg";
+  //   const { change_percent, change_type } = changeData;
+  //   const icon = change_type === "increase" 
+  //     ? "/icons/hugeicons_arrow-down-0210278.svg"
+  //     : "/icons/hugeicons_arrow-down-020.svg";
     
-    return {
-      icon,
-      change: `${change_percent}%`,
-      isPositive: change_type === "increase"
-    };
-  };
+  //   return {
+  //     icon,
+  //     change: `${change_percent}%`,
+  //     isPositive: change_type === "increase"
+  //   };
+  // };
 
-  const macros = [
-    {
-      name: "Carbs",
-      color: "#F4A261",
-      grams: `${Number(weeklyData?.carbs_g || 0).toFixed(2)}g`,
-      value: Number(weeklyData?.carbs_g || 0),
-      ...formatChange(macroChanges?.carbs_g),
-    },
-    {
-      name: "Fats",
-      color: "#3A86FF",
-      grams: `${Number(weeklyData?.fat_g || 0).toFixed(2)}g`,
-      value: Number(weeklyData?.fat_g || 0),
-      ...formatChange(macroChanges?.fat_g),
-    },
-    {
-      name: "Protein",
-      color: "#E76F51",
-      grams: `${Number(weeklyData?.protein_g || 0).toFixed(2)}g`,
-      value: Number(weeklyData?.protein_g || 0),
-      ...formatChange(macroChanges?.protein_g),
-    },
-    {
-      name: "Fibre",
-      color: "#2A9D8F",
-      grams: `${Number(weeklyData?.fiber_g || 0).toFixed(2)}g`,
-      value: Number(weeklyData?.fiber_g || 0),
-      ...formatChange(macroChanges?.fiber_g),
-    },
-  ];
+
+const formatChange = (changeData) => {
+  if (!changeData) return { icon: null, change: null, showChange: false };
+  
+  const { change_percent, change_type } = changeData;
+  
+  if (change_type === "increase") {
+    return {
+      icon: "/icons/hugeicons_arrow-up-03652.svg",
+      change: `${change_percent}%`,
+      showChange: true
+    };
+  } else if (change_type === "decrease") {
+    return {
+      icon: "/icons/hugeicons_arrow-down-0210278.svg",
+      change: `${change_percent}%`,
+      showChange: true
+    };
+  }
+  
+  // For any other change_type or if null
+  return { icon: null, change: null, showChange: false };
+};
+
+
+const macros = [
+  {
+    name: "Carbs",
+    color: "#F4A261",
+    grams: `${Number(weeklyData?.carbs_g || 0).toFixed(2)}g`,
+    value: Number(weeklyData?.carbs_g || 0),
+    ...formatChange(macroChanges?.carbs_g),
+  },
+  {
+    name: "Fats",
+    color: "#3A86FF",
+    grams: `${Number(weeklyData?.fat_g || 0).toFixed(2)}g`,
+    value: Number(weeklyData?.fat_g || 0),
+    ...formatChange(macroChanges?.fat_g),
+  },
+  {
+    name: "Protein",
+    color: "#E76F51",
+    grams: `${Number(weeklyData?.protein_g || 0).toFixed(2)}g`,
+    value: Number(weeklyData?.protein_g || 0),
+    ...formatChange(macroChanges?.protein_g),
+  },
+  {
+    name: "Fibre",
+    color: "#2A9D8F",
+    grams: `${Number(weeklyData?.fiber_g || 0).toFixed(2)}g`,
+    value: Number(weeklyData?.fiber_g || 0),
+    ...formatChange(macroChanges?.fiber_g),
+  },
+];
+
 
   const total = useMemo(() => {
     return macros.reduce((acc, item) => acc + item.value, 0);
@@ -861,7 +887,7 @@ export default function MacrosUpdate({ title = "Macros Update", activeTab }) {
                   <p className="text-[#535359] text-[10px] font-normal leading-[110%] tracking-[-0.2px] capitalize">{unit}</p>
                 </div>
 
-                {total > 0 &&
+                {/* {total > 0 &&
                   labels.map((label, index) => (
                     <div
                       key={index}
@@ -876,7 +902,7 @@ export default function MacrosUpdate({ title = "Macros Update", activeTab }) {
                         {label.percentage}%
                       </p>
                     </div>
-                  ))}
+                  ))} */}
               </div>
             </div>
 
@@ -898,21 +924,23 @@ export default function MacrosUpdate({ title = "Macros Update", activeTab }) {
                     </div>
 
                     <div className="flex flex-col justify-center">
-                      <p className="text-[#252525] text-[15px] font-semibold">
-                        {macro.grams}
-                      </p>
-                      <div className="flex items-center">
-                        <Image
-                          src={macro.icon}
-                          alt="arrow"
-                          width={20}
-                          height={20}
-                        />
-                        <p className="text-[#252525] text-[10px] font-semibold py-[2.5px]">
-                          {macro.change}
-                        </p>
-                      </div>
-                    </div>
+  <p className="text-[#252525] text-[15px] font-semibold">
+    {macro.grams}
+  </p>
+  {macro.showChange && (
+    <div className="flex items-center">
+      <Image
+        src={macro.icon}
+        alt="arrow"
+        width={20}
+        height={20}
+      />
+      <p className="text-[#252525] text-[10px] font-semibold py-[2.5px]">
+        {macro.change}
+      </p>
+    </div>
+  )}
+</div>
                   </div>
                 ))}
               </div>

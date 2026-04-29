@@ -251,7 +251,7 @@ export default function Progress({ title = "Progress", showDetails = true, showC
 
    const containerClasses = showContainer 
     ? "w-[410px] flex flex-col border border-[#E1E6ED] px-5 pt-[18px] pb-5 rounded-[15px] bg-white"
-    : "w-[350px] flex flex-col px-5 pt-[18px] pb-5";
+    : " flex flex-col px-5 pt-[18px] pb-5";
 
   return (
     <div className={containerClasses}>

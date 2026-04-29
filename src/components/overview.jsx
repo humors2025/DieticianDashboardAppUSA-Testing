@@ -1,8 +1,24 @@
 "use client";
-
+import { useEffect } from "react";
 import Progress from "./progress";
+import { useDispatch, useSelector } from "react-redux";
+import { getHabitMonitoringData } from "../store/habitMonitoringSlice"; 
 
-export default function Overview() {
+export default function Overview({ profileId, dietitianId }) {
+    const dispatch = useDispatch();
+  const { loading, response, data, habitList, error } = useSelector(
+    (state) => state.habitMonitoring
+  );
+
+
+     useEffect(() => {
+        if (profileId && dietitianId) {
+            dispatch(getHabitMonitoringData({ profileId, dietitianId }));
+        }
+    }, [dispatch, profileId, dietitianId]);
+
+const habitData = response?.data;
+
     return (
         <>
             <div className="flex flex-col gap-[15px] bg-[#F5F7FA] rounded-[15px] pt-5 pl-[18px] pr-[18px] pb-[18px]">
@@ -20,7 +36,7 @@ export default function Overview() {
 
                                 <p className="text-[#252525]">
                                     <span className="text-[40px] font-normal leading-normal tracking-[-0.8px]">
-                                        150
+                                        {habitData?.days_tracked || "N/A"}
                                     </span>
                                     <span className="text-[10px] font-normal leading-[110%] tracking-[-0.2px] ml-1">
                                         Days
@@ -35,7 +51,7 @@ export default function Overview() {
 
                                 <p className="text-[#252525]">
                                     <span className="text-[40px] font-normal leading-normal tracking-[-0.8px]">
-                                        76
+                                       {habitData?.tracking_rate || "N/A"}
                                     </span>
                                     <span className="text-[10px] font-normal leading-[110%] tracking-[-0.2px] ml-1">
                                         %
@@ -50,7 +66,7 @@ export default function Overview() {
 
                                 <p className="text-[#252525]">
                                     <span className="text-[40px] font-normal leading-normal tracking-[-0.8px]">
-                                        76
+                                        {habitData?.completion_rate || "N/A"}
                                     </span>
                                     <span className="text-[10px] font-normal leading-[110%] tracking-[-0.2px] ml-1">
                                         %
@@ -65,7 +81,7 @@ export default function Overview() {
 
                                 <p className="text-[#252525]">
                                     <span className="text-[40px] font-normal leading-normal tracking-[-0.8px]">
-                                        76
+                                        {habitData?.total_perfect_days || "N/A"}
                                     </span>
                                     <span className="text-[10px] font-normal leading-[110%] tracking-[-0.2px] ml-1">
                                         Days

@@ -1146,7 +1146,7 @@ export default function DietPlanCreated() {
           profile_id,
           diet_plan_id
         );
-console.log("response132:-", response);
+
 
         // ---------- CASE 1: API SUCCESS ----------
         if (response?.success && response?.data?.record?.diet_json) {

@@ -19,22 +19,31 @@ export default function ClientLists() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [selectedLevel, setSelectedLevel] = useState("all");
 
   const isSearching = search.trim().length >= 3;
 
   const displayedClients = useMemo(() => {
+    let list = [];
+
     if (isSearching) {
-      return searchResults || [];
+      list = searchResults || [];
+    } else {
+      list = clientsData?.clients || [];
     }
-    return clientsData?.clients || [];
-  }, [isSearching, searchResults, clientsData]);
+
+    if (selectedLevel === "all") {
+      return list;
+    }
+
+    return list.filter(
+      (client) => String(client.level_type) === String(selectedLevel)
+    );
+  }, [isSearching, searchResults, clientsData, selectedLevel]);
 
   const displayCount = useMemo(() => {
-    if (isSearching) {
-      return searchResults?.length || 0;
-    }
-    return clientsData?.summary?.all_total || 0;
-  }, [isSearching, searchResults, clientsData]);
+    return displayedClients?.length || 0;
+  }, [displayedClients]);
 
   const loadClients = async (pageNumber = 1) => {
     try {
@@ -107,7 +116,7 @@ export default function ClientLists() {
 
   useEffect(() => {
     setActiveIndex(null);
-  }, [search]);
+  }, [search, selectedLevel]);
 
   const handleClientClick = (index, profileId) => {
     setActiveIndex(index);
@@ -163,7 +172,7 @@ export default function ClientLists() {
               width={32}
               height={32}
               className="cursor-pointer"
-               onClick={() => router.push('/dashboard')}
+              onClick={() => router.push("/dashboard")}
             />
             <p className="text-[#252525] text-[12px] font-semibold leading-[126%] tracking-[-0.24px]">
               Go to Dashboard
@@ -183,26 +192,78 @@ export default function ClientLists() {
         />
 
         <div className="flex gap-2.5 ml-[15px] my-[15px]">
-          <div className="bg-[#252525] rounded-[20px] py-[11px] px-[30px] cursor-pointer">
-            <p className="text-[#FFFFFF] text-[12px] font-normal leading-normal tracking-[-0.24px] whitespace-nowrap">
+          <div
+            onClick={() => setSelectedLevel("all")}
+            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${
+              selectedLevel === "all"
+                ? "bg-[#252525]"
+                : "bg-[#FFFFFF] border border-[#E1E6ED]"
+            }`}
+          >
+            <p
+              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] whitespace-nowrap ${
+                selectedLevel === "all"
+                  ? "text-[#FFFFFF]"
+                  : "text-[#A1A1A1]"
+              }`}
+            >
               All ({displayCount})
             </p>
           </div>
 
-          <div className="bg-[#FFFFFF] border border-[#E1E6ED] rounded-[20px] py-[11px] px-[30px] cursor-pointer">
-            <p className="text-[#A1A1A1] text-[12px] font-normal leading-normal tracking-[-0.24px]">
+          <div
+            onClick={() => setSelectedLevel("1")}
+            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${
+              selectedLevel === "1"
+                ? "bg-[#252525]"
+                : "bg-[#FFFFFF] border border-[#E1E6ED]"
+            }`}
+          >
+            <p
+              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] ${
+                selectedLevel === "1"
+                  ? "text-[#FFFFFF]"
+                  : "text-[#A1A1A1]"
+              }`}
+            >
               L1
             </p>
           </div>
 
-            <div className="bg-[#FFFFFF] border border-[#E1E6ED] rounded-[20px] py-[11px] px-[30px] cursor-pointer">
-            <p className="text-[#A1A1A1] text-[12px] font-normal leading-normal tracking-[-0.24px]">
+          <div
+            onClick={() => setSelectedLevel("2")}
+            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${
+              selectedLevel === "2"
+                ? "bg-[#252525]"
+                : "bg-[#FFFFFF] border border-[#E1E6ED]"
+            }`}
+          >
+            <p
+              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] ${
+                selectedLevel === "2"
+                  ? "text-[#FFFFFF]"
+                  : "text-[#A1A1A1]"
+              }`}
+            >
               L2
             </p>
           </div>
 
-            <div className="bg-[#FFFFFF] border border-[#E1E6ED] rounded-[20px] py-[11px] px-[30px] cursor-pointer">
-            <p className="text-[#A1A1A1] text-[12px] font-normal leading-normal tracking-[-0.24px]">
+          <div
+            onClick={() => setSelectedLevel("3")}
+            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${
+              selectedLevel === "3"
+                ? "bg-[#252525]"
+                : "bg-[#FFFFFF] border border-[#E1E6ED]"
+            }`}
+          >
+            <p
+              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] ${
+                selectedLevel === "3"
+                  ? "text-[#FFFFFF]"
+                  : "text-[#A1A1A1]"
+              }`}
+            >
               L3
             </p>
           </div>
@@ -243,7 +304,7 @@ export default function ClientLists() {
                       src={client.p_image || "/icons/Ellipse 668.svg"}
                       width={40}
                       height={40}
-                      alt="Ellipse 668.svg"
+                      alt="profile"
                       className="w-10 h-10 rounded-full"
                     />
                   </div>
@@ -274,7 +335,7 @@ export default function ClientLists() {
                           src="/icons/Ellipse 765.svg"
                           width={3}
                           height={3}
-                          alt="Ellipse 765.svg"
+                          alt="dot"
                         />
                       </div>
 

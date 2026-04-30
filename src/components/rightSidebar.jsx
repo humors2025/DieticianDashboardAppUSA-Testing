@@ -3,39 +3,67 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import EditRightSideBar from "./edit-rightsidebar";
-import { fetchClientsDashboard } from "@/services/authService"; // Adjust the import path
+import { getClientProfileDetails } from "../services/authService"; // Import the new service function
+import { cookieManager } from "../lib/cookies"; // Import cookie manager
+import { usePathname } from "next/navigation"; // For getting profile_id from URL
 
 export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }) {
-  console.log("profileId09:-", profileId);
-  console.log("dietitianId10:-", dietitianId);
-
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [currentLevel, setCurrentLevel] = useState(1);
   const [clientData, setClientData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const pathname = usePathname();
+
+  // Get dietitian_id from cookies
+  const getDietitianId = () => {
+    const dieticianCookie = cookieManager.get("dietician");
+    if (dieticianCookie) {
+      try {
+        const parsedData = JSON.parse(decodeURIComponent(dieticianCookie));
+        return parsedData.dietician_id;
+      } catch (error) {
+        console.error("Error parsing dietician cookie:", error);
+        return null;
+      }
+    }
+    return null;
+  };
+
+  // Get profile_id from URL
+  const getProfileIdFromUrl = () => {
+    const pathSegments = pathname.split("/");
+    const profileIndex = pathSegments.findIndex(segment => segment === "profile");
+    if (profileIndex !== -1 && pathSegments[profileIndex + 1]) {
+      return pathSegments[profileIndex + 1];
+    }
+    return null;
+  };
 
   // Fetch client data when sidebar opens
   useEffect(() => {
-    if (isOpen && dietitianId && profileId) {
-      fetchClientData();
+    if (isOpen) {
+      const dietitianIdFromCookie = getDietitianId();
+      const profileIdFromUrl = getProfileIdFromUrl();
+      
+      // Use provided IDs or fall back to cookie/URL
+      const finalDietitianId = dietitianId || dietitianIdFromCookie;
+      const finalProfileId = profileId || profileIdFromUrl;
+      
+      if (finalDietitianId && finalProfileId) {
+        fetchClientData(finalProfileId, finalDietitianId);
+      }
     }
-  }, [isOpen, dietitianId, profileId]);
+  }, [isOpen, dietitianId, profileId, pathname]);
 
-  const fetchClientData = async () => {
+  const fetchClientData = async (profileId, dietitianId) => {
     setIsLoading(true);
     try {
-      const dashboardResponse = await fetchClientsDashboard(dietitianId);
-      
-      if (dashboardResponse.status && dashboardResponse.clients) {
-        // Find the specific client by profileId
-        const matchedClient = dashboardResponse.clients.find(
-          (client) => client.profile_id === profileId
-        );
-        
-        if (matchedClient) {
-          setClientData(matchedClient);
-          setCurrentLevel(parseInt(matchedClient.level_type) || 1);
-        }
+   
+      const response = await getClientProfileDetails(profileId, dietitianId);
+   
+      if (response.status && response.data) {
+        setClientData(response.data);
+        setCurrentLevel(parseInt(response.data.level_type) || 1);
       }
     } catch (error) {
       console.error("Error fetching client data:", error);
@@ -54,16 +82,62 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
     onClose(); // Then close main sidebar
   };
 
-  // Format display values
-  const getFitnessGoalDisplay = (fitnessGoal) => {
-    const fitnessGoalMap = {
-      'weight_loss': 'Weight Loss',
-      'muscle_gain': 'Muscle Gain',
-      'fat_loss': 'Fat Loss',
-      'maintenance': 'Maintenance'
-    };
-    return fitnessGoalMap[fitnessGoal] || fitnessGoal || 'Not specified';
-  };
+  // Format activity level display
+  // const getActivityLevelDisplay = (activityLevel) => {
+  //   const activityLevelMap = {
+  //     'sedentary': 'Sedentary',
+  //     'light': 'Lightly Active',
+  //     'moderate': 'Moderately Active',
+  //     'active': 'Active',
+  //     'very_active': 'Very Active'
+  //   };
+  //   return activityLevelMap[activityLevel] || activityLevel || 'Sedentary';
+  // };
+
+  // Format activity level description
+  // const getActivityLevelDescription = (activityLevel) => {
+  //   const descriptions = {
+  //     'sedentary': 'Little to no exercise. Mostly sitting during the day.',
+  //     'light': 'Light exercise 1-3 times a week.',
+  //     'moderate': 'Moderate exercise 3-5 times a week.',
+  //     'active': 'Active exercise 5-7 times a week.',
+  //     'very_active': 'Very active. Intense exercise daily.'
+  //   };
+  //   return descriptions[activityLevel] || 'Little to no exercise. Mostly sitting during the day.';
+  // };
+
+  // Format dietary preferences display
+  // const getDietaryPreferencesDisplay = (dietaryPrefs) => {
+  //   if (!dietaryPrefs || typeof dietaryPrefs !== 'object') {
+  //     return 'No Dietary Preferences';
+  //   }
+    
+  //   const preferences = [];
+  //   if (dietaryPrefs.diet_type) {
+  //     const dietTypeMap = {
+  //       'veg': 'Vegetarian',
+  //       'nonveg': 'Non-Vegetarian',
+  //       'vegan': 'Vegan',
+  //       'eggetarian': 'Eggetarian'
+  //     };
+  //     preferences.push(dietTypeMap[dietaryPrefs.diet_type] || dietaryPrefs.diet_type);
+  //   }
+    
+  //   if (dietaryPrefs.primary_cuisine) {
+  //     const cuisineMap = {
+  //       'american': 'American',
+  //       'indian': 'Indian',
+  //       'italian': 'Italian',
+  //       'chinese': 'Chinese',
+  //       'japanese': 'Japanese',
+  //       'mexican': 'Mexican',
+  //       'mediterranean': 'Mediterranean'
+  //     };
+  //     preferences.push(cuisineMap[dietaryPrefs.primary_cuisine] || dietaryPrefs.primary_cuisine);
+  //   }
+    
+  //   return preferences.length > 0 ? preferences.join(' • ') : 'No Dietary Preferences';
+  // };
 
   return (
     <>
@@ -101,13 +175,13 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
                 <div className="flex flex-col">
                   {/* Client Profile Section */}
                   <div className="flex gap-5 rounded-[10px] py-7 pl-[15px] pr-14 mb-[30px] mx-[15px] bg-[#F5F7FA]">
-                    <div className="w-[80px] h-[80px] p-5 bg-white rounded-full">
+                    <div className="w-[80px] h-[80px] bg-white rounded-full flex items-center justify-center">
                       <Image
                         src={clientData.p_image || "/icons/hugeicons_user-circle-02.svg"}
                         alt="Profile"
-                        width={40}
-                        height={40}
-                        className="cursor-pointer rounded-full object-cover"
+                        width={64}
+                        height={64}
+                        className="cursor-pointer rounded-full object-cover w-full h-full"
                         onError={(imageError) => {
                           imageError.target.src = "/icons/hugeicons_user-circle-02.svg";
                         }}
@@ -131,15 +205,6 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
                           />
                           <p className="text-[#535359] text-[12px] font-normal leading-normal tracking-[-0.24px]">
                             {clientData.email !== "NA" ? clientData.email : "Email not available"}
-                          </p>
-                        </div>
-
-                        <div className="flex gap-2.5 items-center">
-                          <p className="text-[#252525] text-[12px] font-semibold leading-[110%] tracking-[-0.24px]">
-                            Reference ID
-                          </p>
-                          <p className="text-[#535359] text-[12px] font-normal leading-normal tracking-[-0.24px]">
-                            {clientData.profile_id}
                           </p>
                         </div>
                       </div>
@@ -189,12 +254,12 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
                           Fitness Goal
                         </p>
                         <p className="text-[#252525] text-[15px] font-semibold leading-[110%] tracking-[-0.3px]">
-                          {clientData.fitness_goal_display || getFitnessGoalDisplay(clientData.fitness_goal)}
+                          {clientData.fitness_goal_display || clientData.fitness_goal}
                         </p>
                       </div>
                     </div>
 
-                    {/* Activity Level - You might want to add this to the API or set a default */}
+                    {/* Activity Level */}
                     <div className="flex justify-between px-5 pt-6 pb-9 border-t border-b border-[#E1E6ED]">
                       <div className="flex flex-col gap-[15px]">
                         <p className="text-[#535359] text-[12px] font-normal leading-[110%] tracking-[-0.24px]">
@@ -202,11 +267,11 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
                         </p>
                         <div className="flex flex-col gap-2.5">
                           <p className="text-[#252525] text-[15px] font-semibold leading-[110%] tracking-[-0.3px]">
-                            Sedentary
+                            {clientData?.activity_level}
                           </p>
-                          <p className="text-[#252525] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
-                            Little to no exercise. Mostly sitting during the day.
-                          </p>
+                          {/* <p className="text-[#252525] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
+                            {getActivityLevelDescription(clientData.activity_level)}
+                          </p> */}
                         </div>
                       </div>
                     </div>
@@ -217,13 +282,27 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
                         <p className="text-[#252525] text-[12px] font-normal leading-normal tracking-[-0.24px]">
                           Dietary Preferences
                         </p>
-                        <p className="text-[#252525] text-[15px] font-semibold leading-[110%] tracking-[-0.3px]">
-                          No Dietary Preferences
-                        </p>
+                       <p className="text-[#252525] text-[15px] font-semibold leading-[110%] tracking-[-0.3px]">
+                            {clientData?.diet_type}
+                          </p>
                       </div>
                     </div>
 
-                    {/* Location/Region instead of Cuisine Preferences */}
+
+                  <div className="flex justify-between px-5 pt-6 pb-9 border-t border-b border-[#E1E6ED]">
+  <div className="flex flex-col gap-[15px]">
+    <p className="text-[#252525] text-[12px] font-normal leading-normal tracking-[-0.24px]">
+      Cuisine Preferences
+    </p>
+    <p className="text-[#252525] text-[15px] font-semibold leading-[110%] tracking-[-0.3px]">
+      {clientData.primary_cuisine}, {clientData.secondary_cuisine}
+    </p>
+  </div>
+</div>
+
+
+
+                    {/* Location/Region */}
                     <div className="flex justify-between px-5 pt-6 pb-9 border-t border-b border-[#E1E6ED]">
                       <div className="flex flex-col gap-[15px]">
                         <p className="text-[#252525] text-[12px] font-normal leading-normal tracking-[-0.24px]">
@@ -239,30 +318,6 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
                         </div>
                       </div>
                     </div>
-
-                    {/* Additional Info - Metabolism Score */}
-                    {clientData.metabolism_score && (
-                      <div className="flex justify-between px-5 pt-6 pb-9 border-t border-b border-[#E1E6ED]">
-                        <div className="flex flex-col gap-[15px]">
-                          <p className="text-[#252525] text-[12px] font-normal leading-normal tracking-[-0.24px]">
-                            Metabolism Score
-                          </p>
-                          <div className="flex items-center gap-2.5">
-                            <p className="text-[#252525] text-[15px] font-semibold leading-[110%] tracking-[-0.3px]">
-                              {clientData.metabolism_score}
-                            </p>
-                            {clientData.zone && (
-                              <>
-                                <div className="border-r border-[#252525] h-[13px]"></div>
-                                <p className="text-[#252525] text-[15px] font-semibold leading-[110%] tracking-[-0.3px]">
-                                  {clientData.zone}
-                                </p>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               ) : (
@@ -281,9 +336,9 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
             onClose={() => setIsEditOpen(false)}
             currentLevel={currentLevel}  
             onLevelUpdate={handleLevelUpdate}  
-            profileId={profileId}
-            dietitianId={dietitianId}
-            clientData={clientData} // Pass client data to edit sidebar if needed
+            profileId={profileId || getProfileIdFromUrl()}
+            dietitianId={dietitianId || getDietitianId()}
+            clientData={clientData}
           />
         </div>
       )}

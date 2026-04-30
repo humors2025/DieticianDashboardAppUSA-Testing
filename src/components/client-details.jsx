@@ -20,9 +20,10 @@ import {
   getDietAnalysisPlan,
   selectDietAnalysisData,
 } from "../store/dietAnalysisSlice";
-import { 
-  getMacroSummary, 
-  selectMacroSummaryData } from "../store/macroSummarySlice";
+import {
+  getMacroSummary,
+  selectMacroSummaryData
+} from "../store/macroSummarySlice";
 import {
   fetchClientProfileDatesList,
   fetchClientWeeklyDates,
@@ -35,6 +36,7 @@ export default function ClientDetails() {
   const searchParams = useSearchParams();
 
   const individualProfileData = useSelector(selectClientIndividualProfileData);
+  console.log("individualProfileData39:-", individualProfileData);
   const dietAnalysisData = useSelector(selectDietAnalysisData);
 
   const [profileDates, setProfileDates] = useState([]);
@@ -67,7 +69,9 @@ export default function ClientDetails() {
         ? `${dateObj.fat_loss_metabolism_score}%`
         : "NA",
       status: dateObj.zone || "NA",
-      kcal: "1850 Kcal", // temporary hardcoded for macros tab
+      kcal: individualProfileData?.data?.raw_json?.final_macro_summary?.calories 
+      ? `${Math.round(individualProfileData.data.raw_json.final_macro_summary.calories)} Kcal`
+      : "NA",
     }));
   };
 
@@ -284,44 +288,44 @@ export default function ClientDetails() {
     setStartIndex(0);
   };
 
- const handleDateSelect = (actualIndex) => {
-  setActiveIndex(actualIndex);
-  const selectedDate = testDateData[actualIndex];
+  const handleDateSelect = (actualIndex) => {
+    setActiveIndex(actualIndex);
+    const selectedDate = testDateData[actualIndex];
 
-  if (selectedDate?.rawDate) {
-    dispatch(
-      getClientIndividualProfile({
-        profileId,
-        date: selectedDate.rawDate,
-        dietitianId: dietitianId,
-      })
-    );
-    
-    // Fetch macro summary for the selected date
-    dispatch(
-      getMacroSummary({
-        profileId,
-        date: selectedDate.rawDate,
-      })
-    );
-  }
-};
+    if (selectedDate?.rawDate) {
+      dispatch(
+        getClientIndividualProfile({
+          profileId,
+          date: selectedDate.rawDate,
+          dietitianId: dietitianId,
+        })
+      );
 
-
-
-useEffect(() => {
-  if (activeTab === "macros" && profileDates.length > 0) {
-    const selectedDate = profileDates[activeIndex] || profileDates[0];
-    if (selectedDate?.date) {
+      // Fetch macro summary for the selected date
       dispatch(
         getMacroSummary({
           profileId,
-          date: selectedDate.date,
+          date: selectedDate.rawDate,
         })
       );
     }
-  }
-}, [activeTab, profileDates, activeIndex, profileId, dispatch]);
+  };
+
+
+
+  useEffect(() => {
+    if (activeTab === "macros" && profileDates.length > 0) {
+      const selectedDate = profileDates[activeIndex] || profileDates[0];
+      if (selectedDate?.date) {
+        dispatch(
+          getMacroSummary({
+            profileId,
+            date: selectedDate.date,
+          })
+        );
+      }
+    }
+  }, [activeTab, profileDates, activeIndex, profileId, dispatch]);
 
 
   const handleWeekSelect = (actualIndex) => {
@@ -436,6 +440,10 @@ useEffect(() => {
                   <p className="text-[#252525] text-[20px] font-semibold tracking-[-0.4px] leading-[110%]">
                     {profileDetails?.profile_name || "NA"}
                   </p>
+
+                  <p className="text-[#252525] text-[20px] font-semibold tracking-[-0.4px] leading-[110%]">
+                    {profileDetails?.fitness_goal_display || "NA"}
+                  </p>
                 </div>
 
                 <div className="flex gap-1.5 items-center">
@@ -486,8 +494,8 @@ useEffect(() => {
               <div
                 onClick={() => handleTabChange("test")}
                 className={`flex items-center rounded-[6px] py-[11px] px-[31px] cursor-pointer ${activeTab === "test"
-                    ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
-                    : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
+                  ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+                  : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
                   }`}
               >
                 <p
@@ -501,8 +509,8 @@ useEffect(() => {
               <div
                 onClick={() => handleTabChange("macros")}
                 className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${activeTab === "macros"
-                    ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
-                    : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
+                  ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+                  : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
                   }`}
               >
                 <p
@@ -516,10 +524,10 @@ useEffect(() => {
               <div
                 onClick={() => handleTabChange("diet")}
                 className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${!isDietAnalysisAvailable
-                    ? "opacity-50 cursor-not-allowed bg-[#F5F7FA]"
-                    : activeTab === "diet"
-                      ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
-                      : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
+                  ? "opacity-50 cursor-not-allowed bg-[#F5F7FA]"
+                  : activeTab === "diet"
+                    ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+                    : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
                   }`}
                 title={
                   !isDietAnalysisAvailable
@@ -529,10 +537,10 @@ useEffect(() => {
               >
                 <p
                   className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${!isDietAnalysisAvailable
-                      ? "text-[#A1A1A1]"
-                      : activeTab === "diet"
-                        ? "text-white"
-                        : "text-[#535359]"
+                    ? "text-[#A1A1A1]"
+                    : activeTab === "diet"
+                      ? "text-white"
+                      : "text-[#535359]"
                     }`}
                 >
                   Weekly Diet Analysis
@@ -550,8 +558,8 @@ useEffect(() => {
               <div
                 onClick={() => handleTabChange("habits")}
                 className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${activeTab === "habits"
-                    ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
-                    : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
+                  ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+                  : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
                   }`}
               >
                 <p
@@ -584,8 +592,8 @@ useEffect(() => {
                 <IoChevronBackOutline
                   onClick={handleBack}
                   className={`text-[#252525] w-6 h-6 cursor-pointer ${startIndex === 0 || currentData.length === 0
-                      ? "opacity-50 cursor-not-allowed"
-                      : ""
+                    ? "opacity-50 cursor-not-allowed"
+                    : ""
                     }`}
                 />
 
@@ -614,8 +622,8 @@ useEffect(() => {
                             <>
                               <p
                                 className={`${activeIndex === actualIndex
-                                    ? "text-white"
-                                    : "text-[#535359]"
+                                  ? "text-white"
+                                  : "text-[#535359]"
                                   } text-[12px] font-semibold`}
                               >
                                 {item.week}
@@ -623,8 +631,8 @@ useEffect(() => {
 
                               <p
                                 className={`${activeIndex === actualIndex
-                                    ? "text-white"
-                                    : "text-[#535359]"
+                                  ? "text-white"
+                                  : "text-[#535359]"
                                   } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
                               >
                                 {item.range}
@@ -634,8 +642,8 @@ useEffect(() => {
                             <>
                               <p
                                 className={`${activeIndex === actualIndex
-                                    ? "text-white"
-                                    : "text-[#535359]"
+                                  ? "text-white"
+                                  : "text-[#535359]"
                                   } text-[12px] font-semibold`}
                               >
                                 {item.date}
@@ -644,8 +652,8 @@ useEffect(() => {
                               <div className="flex items-center">
                                 <p
                                   className={`${activeIndex === actualIndex
-                                      ? "text-white"
-                                      : "text-[#535359]"
+                                    ? "text-white"
+                                    : "text-[#535359]"
                                     } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
                                 >
                                   {item.kcal}
@@ -656,8 +664,8 @@ useEffect(() => {
                             <>
                               <p
                                 className={`${activeIndex === actualIndex
-                                    ? "text-white"
-                                    : "text-[#535359]"
+                                  ? "text-white"
+                                  : "text-[#535359]"
                                   } text-[12px] font-semibold`}
                               >
                                 {item.date}
@@ -666,8 +674,8 @@ useEffect(() => {
                               <div className="flex items-center">
                                 <p
                                   className={`${activeIndex === actualIndex
-                                      ? "text-white"
-                                      : "text-[#535359]"
+                                    ? "text-white"
+                                    : "text-[#535359]"
                                     } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
                                 >
                                   {item.score || "—"}
@@ -675,15 +683,15 @@ useEffect(() => {
 
                                 <div
                                   className={`mx-2.5 border-r h-[13px] ${activeIndex === actualIndex
-                                      ? "border-white"
-                                      : "border-[#A1A1A1]"
+                                    ? "border-white"
+                                    : "border-[#A1A1A1]"
                                     }`}
                                 ></div>
 
                                 <p
                                   className={`${activeIndex === actualIndex
-                                      ? "text-white"
-                                      : "text-[#535359]"
+                                    ? "text-white"
+                                    : "text-[#535359]"
                                     } text-[10px] font-normal leading-[126%] tracking-[-0.2px]`}
                                 >
                                   {item.status || "Pending"}
@@ -701,9 +709,9 @@ useEffect(() => {
                   <IoChevronForwardOutline
                     onClick={handleForward}
                     className={`text-[#252525] w-6 h-6 cursor-pointer ${startIndex + ITEMS_TO_SHOW >= currentData.length ||
-                        currentData.length === 0
-                        ? "opacity-50 cursor-not-allowed"
-                        : ""
+                      currentData.length === 0
+                      ? "opacity-50 cursor-not-allowed"
+                      : ""
                       }`}
                   />
                 </div>
@@ -722,7 +730,7 @@ useEffect(() => {
             className={`${activeTab === "macros" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
               }`}
           >
-            <MacrosAnalysis  activeTab={activeTab}/>
+            <MacrosAnalysis activeTab={activeTab} />
           </div>
 
           <div
@@ -744,8 +752,8 @@ useEffect(() => {
         <RightSidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
-           profileId={profileId}
-  dietitianId={dietitianId}
+          profileId={profileId}
+          dietitianId={dietitianId}
         />
       </div>
     </>

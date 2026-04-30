@@ -11,17 +11,17 @@ export default function TestAnalysis() {
         <>
 
 
-            <div className="flex flex-col gap-5 mt-[17px] mb-[22px] mx-[5px]">
-                <div className="flex gap-5">
-                    <FatUsePatternTrend />
-                    <TrendBreakdown />
-                </div>
-
-                <div className="flex gap-5">
-                    <Progress />
-                    <TrainerNote />
-                </div>
+             <div className="group flex flex-col gap-5 mt-[17px] mb-[22px] mx-[5px] overflow-y-auto group-hover-scrollbar h-full">
+            <div className="flex gap-5">
+                <FatUsePatternTrend />
+                <TrendBreakdown />
             </div>
+
+            <div className="flex gap-5">
+                <Progress />
+                <TrainerNote />
+            </div>
+        </div>
         </>
     )
 }

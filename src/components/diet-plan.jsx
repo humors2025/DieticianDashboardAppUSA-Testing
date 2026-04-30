@@ -85,11 +85,7 @@ export default function DietPlan() {
     return `${parseFloat(num.toFixed(2))}${suffix}`;
   };
 
-  const getMetricOnly = (portion) => {
-    if (!portion) return "";
-    const match = portion.match(/\(([^|]+)/);
-    return match?.[1]?.trim() || "";
-  };
+
 
   return ( 
     <>
@@ -214,7 +210,8 @@ export default function DietPlan() {
 
                             {food.portion_with_metric && (
                               <p className="text-[#252525] text-[10px] font-normal leading-normal tracking-[-0.2px]">
-                              {getMetricOnly(food.portion_with_metric)} 
+                            
+                              {food.portion_with_metric} 
                               </p>
                             )}
 

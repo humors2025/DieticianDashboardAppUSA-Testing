@@ -116,7 +116,7 @@ const { loading, response, data, habitList, error } = useSelector(
 
     return (
         <>
-            <div className="relative border rounded-[15px] px-3 pt-5 pb-[15px] overflow-hidden">
+            <div className="w-full relative border rounded-[15px] px-3 pt-5 pb-[15px] overflow-hidden">
                 <div className="flex flex-col gap-[30px]">
                     <div className="flex justify-between items-center pl-2">
                         <p className="text-[#252525] text-[15px] font-semibold leading-normal tracking-[-0.3px]">

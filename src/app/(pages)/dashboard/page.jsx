@@ -180,7 +180,7 @@ const Dashboard = () => {
             />
           </div>
 
-          <div className="flex-1">
+          <div className="flex-1 ">
             {/* Pass selectedDate to ClientMonitor which contains ClientsSection */}
             <ClientMonitor selectedDate={selectedDate} />
           </div>

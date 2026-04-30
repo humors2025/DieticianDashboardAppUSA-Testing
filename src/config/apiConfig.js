@@ -35,7 +35,8 @@ CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
     CLIENTPROFILEDETAILS:"/dietitian/api/web/get-graph-all-seven-trends-graph.php",
     CLIENTINDIVIDUALPROFILE:"/dietitian/api/web/get-data-points-score-all-ranges-coach.php",
     CLIENTPROFILEDATESLIST:"/dietitian/api/web/get-profile-details-dates-taken.php",
-    CLIENTWEEKLYDATES:"/dietitian/api/web/get-weekly-tab-list.php"
+    CLIENTWEEKLYDATES:"/dietitian/api/web/get-weekly-tab-list.php",
+    GETCLIENTPROFILEDETAILS:"/dietitian/api/web/get_client_profile_details.php"
 
   },
   MEALANALYSIS:{
@@ -70,7 +71,7 @@ CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
   },
   LEVELUPDATE:{
 LEVEL:"/dietitian/api/web/level-type-update-change.php"
-  }
+  },
 
   
   

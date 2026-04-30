@@ -501,7 +501,6 @@
 
 
 
-
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
@@ -1025,7 +1024,7 @@ export default function TrendPopUp({ closePopup, profileId }) {
       onClick={closePopup}
     >
       <div
-        className="bg-white rounded-[12px] shadow-lg relative max-w-[90vw] max-h-[90vh] overflow-auto"
+        className="bg-white rounded-[12px] shadow-lg relative max-w-[90vw] max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -1035,13 +1034,17 @@ export default function TrendPopUp({ closePopup, profileId }) {
           ✕
         </button>
 
-        <div className="px-[15px] py-6">
+        {/* Fixed Header */}
+        <div className="px-[15px] pt-6 pb-0 flex-shrink-0">
           <div className="pl-2.5 pb-[25px] border-b border-[#E1E6ED]">
             <p className="text-[#252525] text-[25px] font-semibold leading-normal tracking-[-1px]">
               Trend Breakdown
             </p>
           </div>
+        </div>
 
+        {/* Scrollable Content */}
+        <div className="px-[15px] pb-6 flex-1 overflow-auto">
           {clientIndividualProfileStatus === "loading" && (
             <p className="pt-5 text-[14px] text-[#738298]">Loading...</p>
           )}
@@ -1055,7 +1058,7 @@ export default function TrendPopUp({ closePopup, profileId }) {
           {clientIndividualProfileStatus !== "loading" &&
             clientIndividualProfileStatus !== "failed" && (
               <div className="flex gap-10 pt-5">
-                <div>
+                <div className="flex-shrink-0">
                   {tabs.map((tab, index) => {
                     const isActive = activeTab === tab.id;
 
@@ -1085,7 +1088,7 @@ export default function TrendPopUp({ closePopup, profileId }) {
                   })}
                 </div>
 
-                <div className="flex gap-5 overflow-x-auto">
+                <div className="flex gap-5 overflow-x-auto flex-1">
                   {activeTabData?.cards?.map((card) => (
                     <div key={card.id} className="w-[410px] shrink-0">
                       <TrendCard

@@ -565,6 +565,20 @@ export const updatePerformanceLevel = async (dietitianId, profileId, levelType) 
 };
 
 
+export const getClientProfileDetails = async (profileId, dietitianId) => {
+  return apiFetcher(API_ENDPOINTS.CLIENTPROFILE.GETCLIENTPROFILEDETAILS, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      profile_id: profileId,
+      dietitian_id: dietitianId,
+    }),
+  });
+};
+
+
 
 // // services/authService.js
 

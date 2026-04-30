@@ -16,6 +16,7 @@ export default function ClientLists() {
   const [searchResults, setSearchResults] = useState(null);
   const [activeIndex, setActiveIndex] = useState(null);
   const [clientsData, setClientsData] = useState(null);
+  console.log("clientsData19:-", clientsData);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -41,9 +42,17 @@ export default function ClientLists() {
     );
   }, [isSearching, searchResults, clientsData, selectedLevel]);
 
-  const displayCount = useMemo(() => {
-    return displayedClients?.length || 0;
-  }, [displayedClients]);
+const displayCount = useMemo(() => {
+  if (!clientsData?.summary) return 0;
+
+  if (selectedLevel === "all") {
+    return clientsData.summary.all_total || 0;
+  }
+
+  
+  return displayedClients?.length || 0;
+}, [clientsData, selectedLevel, displayedClients]);
+
 
   const loadClients = async (pageNumber = 1) => {
     try {
@@ -347,17 +356,26 @@ export default function ClientLists() {
                 </div>
 
                 <div className="flex gap-3 items-center">
-                  <div
-                    className="px-2.5 py-2 rounded-[5px]"
-                    style={{ backgroundColor: client.goalBg }}
-                  >
-                    <p
-                      className="text-[10px] font-semibold"
-                      style={{ color: client.goalText }}
-                    >
-                      {client.fitness_goal_display || "--"}
-                    </p>
-                  </div>
+                   <div
+    className="px-2.5 py-2 rounded-[5px]"
+    style={{ 
+      backgroundColor: client.level_type === "1" ? "#E9F3FF" : 
+                       client.level_type === "2" ? "#FFFAF0" : 
+                       client.level_type === "3" ? "#EAFFEF" : "#F5F5F5"
+    }}
+  >
+    <p
+      className="text-[10px] font-semibold leading-[126%] tracking-[-0.2px]"
+      style={{ 
+        color: client.level_type === "1" ? "#006FFF" : 
+               client.level_type === "2" ? "#F6AD0B" : 
+               client.level_type === "3" ? "#3FAF58" : "#757575"
+      }}
+    >
+      {client.level_type ? `LEVEL ${client.level_type}` : "--"}
+    </p>
+  </div>
+
 
                   <p className="text-[#535359] text-[10px]">
                     {client.test_taken_count ?? 0} tests taken

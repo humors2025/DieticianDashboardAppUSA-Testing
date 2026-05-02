@@ -36,7 +36,7 @@ export default function ClientDetails() {
   const searchParams = useSearchParams();
 
   const individualProfileData = useSelector(selectClientIndividualProfileData);
-  console.log("individualProfileData39:-", individualProfileData);
+
   const dietAnalysisData = useSelector(selectDietAnalysisData);
 
   const [profileDates, setProfileDates] = useState([]);
@@ -59,21 +59,30 @@ export default function ClientDetails() {
   const dietitianData = cookieManager.getJSON("dietician");
   const dietitianId = dietitianData?.dietician_id || null;
 
-  const transformDatesToDisplay = () => {
-    if (!profileDates || profileDates.length === 0) return [];
-
-    return profileDates.map((dateObj) => ({
-      date: dateObj.display_date,
-      rawDate: dateObj.date,
-      score: dateObj.fat_loss_metabolism_score
-        ? `${dateObj.fat_loss_metabolism_score}%`
-        : "NA",
-      status: dateObj.zone || "NA",
-      kcal: individualProfileData?.data?.raw_json?.final_macro_summary?.calories 
-      ? `${Math.round(individualProfileData.data.raw_json.final_macro_summary.calories)} Kcal`
-      : "NA",
-    }));
+  const formatGoal = (goal) => {
+    if (!goal || goal === "NA") return "NA";
+    return goal
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
+
+const transformDatesToDisplay = () => {
+  if (!profileDates || profileDates.length === 0) return [];
+
+  return profileDates.map((dateObj) => ({
+    date: dateObj.display_date,
+    rawDate: dateObj.date,
+    score: dateObj.fat_loss_metabolism_score
+      ? `${dateObj.fat_loss_metabolism_score}%`
+      : "NA",
+    status: dateObj.zone || "NA",
+    kcal: dateObj.final_macro_summary?.calories
+      ? `${dateObj.final_macro_summary.calories} Kcal`
+      : "NA",
+  }));
+};
+
 
   const transformWeeklyDatesToDisplay = () => {
     if (!weeklyDates || weeklyDates.length === 0) return [];
@@ -99,6 +108,7 @@ export default function ClientDetails() {
   };
 
   const profileDetails = individualProfileData?.data?.profile_details || {};
+  const userHabits = individualProfileData?.data?.user_habits;
 
   const handleExportPDF = async () => {
     if (activeTab !== "diet") {
@@ -440,9 +450,41 @@ export default function ClientDetails() {
                   <p className="text-[#252525] text-[20px] font-semibold tracking-[-0.4px] leading-[110%]">
                     {profileDetails?.profile_name || "NA"}
                   </p>
+                  {profileDetails?.level_type && profileDetails?.level_type !== "NA" && (
+                    <div
+                      className="flex items-center px-2.5 py-2 rounded-[5px]"
+                      style={{
+                        backgroundColor:
+                          profileDetails.level_type === "1" ? "#E9F3FF" :
+                            profileDetails.level_type === "2" ? "#FFFAF0" :
+                              profileDetails.level_type === "3" ? "#EAFFEF" : "#E9F3FF",
+                        color:
+                          profileDetails.level_type === "1" ? "#006FFF" :
+                            profileDetails.level_type === "2" ? "#F6AD0B" :
+                              profileDetails.level_type === "3" ? "#3FAF58" : "#006FFF"
+                      }}
+                    >
+                      <p
+                        className="text-[10px] font-semibold tracking-[-0.4px] leading-[126%] capitalize"
+                        style={{
+                          color:
+                            profileDetails.level_type === "1" ? "#006FFF" :
+                              profileDetails.level_type === "2" ? "#F6AD0B" :
+                                profileDetails.level_type === "3" ? "#3FAF58" : "#006FFF"
+                        }}
+                      >
+                        LEVEL {profileDetails.level_type}
+                      </p>
+                    </div>
+                  )}
 
-                  <p className="text-[#252525] text-[20px] font-semibold tracking-[-0.4px] leading-[110%]">
-                    {profileDetails?.fitness_goal_display || "NA"}
+                  <p className="text-[#535359] text-[12px] font-semibold tracking-[-0.4px] leading-[110%]">
+                    {formatGoal(userHabits?.goal)}
+                  </p>
+
+
+                  <p className="text-[#535359] text-[12px] font-normal tracking-[-0.24px] leading-normal">
+                    {individualProfileData?.data?.total_test_taken ?? "—"} tests taken
                   </p>
                 </div>
 

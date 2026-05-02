@@ -114,6 +114,7 @@ export default function FatUsePatternTrend() {
       ? trendData.zone
       : "NA";
 
+
   const scientificTitle =
     trendData?.scientific_interpretation?.title || "NA";
 

@@ -14,6 +14,25 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
   const [isLoading, setIsLoading] = useState(false);
   const pathname = usePathname();
 
+  // Level styles mapping
+  const levelStyles = {
+    1: {
+      textColor: '#006FFF',
+      bgColor: '#E9F3FF'
+    },
+    2: {
+      textColor: '#F6AD0B',
+      bgColor: '#FFFAF0'
+    },
+    3: {
+      textColor: '#3FAF58',
+      bgColor: '#EAFFEF'
+    }
+  };
+
+  // Get current level styles (with fallback to level 1)
+  const currentLevelStyles = levelStyles[currentLevel] || levelStyles[1];
+
   // Get dietitian_id from cookies
   const getDietitianId = () => {
     const dieticianCookie = cookieManager.get("dietician");
@@ -81,63 +100,6 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
     setIsEditOpen(false); // Close edit sidebar first
     onClose(); // Then close main sidebar
   };
-
-  // Format activity level display
-  // const getActivityLevelDisplay = (activityLevel) => {
-  //   const activityLevelMap = {
-  //     'sedentary': 'Sedentary',
-  //     'light': 'Lightly Active',
-  //     'moderate': 'Moderately Active',
-  //     'active': 'Active',
-  //     'very_active': 'Very Active'
-  //   };
-  //   return activityLevelMap[activityLevel] || activityLevel || 'Sedentary';
-  // };
-
-  // Format activity level description
-  // const getActivityLevelDescription = (activityLevel) => {
-  //   const descriptions = {
-  //     'sedentary': 'Little to no exercise. Mostly sitting during the day.',
-  //     'light': 'Light exercise 1-3 times a week.',
-  //     'moderate': 'Moderate exercise 3-5 times a week.',
-  //     'active': 'Active exercise 5-7 times a week.',
-  //     'very_active': 'Very active. Intense exercise daily.'
-  //   };
-  //   return descriptions[activityLevel] || 'Little to no exercise. Mostly sitting during the day.';
-  // };
-
-  // Format dietary preferences display
-  // const getDietaryPreferencesDisplay = (dietaryPrefs) => {
-  //   if (!dietaryPrefs || typeof dietaryPrefs !== 'object') {
-  //     return 'No Dietary Preferences';
-  //   }
-    
-  //   const preferences = [];
-  //   if (dietaryPrefs.diet_type) {
-  //     const dietTypeMap = {
-  //       'veg': 'Vegetarian',
-  //       'nonveg': 'Non-Vegetarian',
-  //       'vegan': 'Vegan',
-  //       'eggetarian': 'Eggetarian'
-  //     };
-  //     preferences.push(dietTypeMap[dietaryPrefs.diet_type] || dietaryPrefs.diet_type);
-  //   }
-    
-  //   if (dietaryPrefs.primary_cuisine) {
-  //     const cuisineMap = {
-  //       'american': 'American',
-  //       'indian': 'Indian',
-  //       'italian': 'Italian',
-  //       'chinese': 'Chinese',
-  //       'japanese': 'Japanese',
-  //       'mexican': 'Mexican',
-  //       'mediterranean': 'Mediterranean'
-  //     };
-  //     preferences.push(cuisineMap[dietaryPrefs.primary_cuisine] || dietaryPrefs.primary_cuisine);
-  //   }
-    
-  //   return preferences.length > 0 ? preferences.join(' • ') : 'No Dietary Preferences';
-  // };
 
   return (
     <>
@@ -222,7 +184,7 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
                           {`${clientData.gender}, ${clientData.age} years, ${clientData.height} cm, ${clientData.weight} kg`}
                         </p>
                       </div>
-                    </div>
+                    </div> 
 
                     {/* Performance Level */}
                     <div className="flex justify-between px-5 pt-6 pb-9 border-t border-b border-[#E1E6ED]">
@@ -230,8 +192,17 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
                         <p className="text-[#252525] text-[12px] font-normal leading-normal tracking-[-0.24px]">
                           Performance Level
                         </p>
-                        <div className="w-[68px] bg-[#E9F3FF] rounded-[5px] px-2.5 py-2">
-                          <p className="text-[#006FFF] text-[15px] font-semibold leading-[126%] tracking-[-0.3px] whitespace-nowrap">
+                        <div 
+                          className="rounded-[5px] px-2.5 py-2"
+                          style={{ 
+                            width: '68px',
+                            backgroundColor: currentLevelStyles.bgColor 
+                          }}
+                        >
+                          <p 
+                            className="text-[15px] font-semibold leading-[126%] tracking-[-0.3px] whitespace-nowrap"
+                            style={{ color: currentLevelStyles.textColor }}
+                          >
                             LEVEL {currentLevel}
                           </p>
                         </div>
@@ -269,9 +240,6 @@ export default function RightSidebar({ isOpen, onClose, profileId, dietitianId }
                           <p className="text-[#252525] text-[15px] font-semibold leading-[110%] tracking-[-0.3px]">
                             {clientData?.activity_level}
                           </p>
-                          {/* <p className="text-[#252525] text-[12px] font-normal leading-[110%] tracking-[-0.24px] whitespace-nowrap">
-                            {getActivityLevelDescription(clientData.activity_level)}
-                          </p> */}
                         </div>
                       </div>
                     </div>

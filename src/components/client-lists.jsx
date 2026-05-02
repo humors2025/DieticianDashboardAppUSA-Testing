@@ -16,7 +16,6 @@ export default function ClientLists() {
   const [searchResults, setSearchResults] = useState(null);
   const [activeIndex, setActiveIndex] = useState(null);
   const [clientsData, setClientsData] = useState(null);
-  console.log("clientsData19:-", clientsData);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -42,16 +41,24 @@ export default function ClientLists() {
     );
   }, [isSearching, searchResults, clientsData, selectedLevel]);
 
-const displayCount = useMemo(() => {
-  if (!clientsData?.summary) return 0;
 
-  if (selectedLevel === "all") {
+  const totalCount = useMemo(() => {
+    if (!clientsData?.summary) return 0;
     return clientsData.summary.all_total || 0;
-  }
+  }, [clientsData]);
 
-  
-  return displayedClients?.length || 0;
-}, [clientsData, selectedLevel, displayedClients]);
+
+
+  const displayCount = useMemo(() => {
+    if (!clientsData?.summary) return 0;
+
+    if (selectedLevel === "all") {
+      return clientsData.summary.all_total || 0;
+    }
+
+
+    return displayedClients?.length || 0;
+  }, [clientsData, selectedLevel, displayedClients]);
 
 
   const loadClients = async (pageNumber = 1) => {
@@ -80,10 +87,23 @@ const displayCount = useMemo(() => {
             return res;
           }
 
-          return {
-            ...res,
-            clients: [...(prev.clients || []), ...(res.clients || [])],
-          };
+          // return {
+          //   ...res,
+          //   clients: [...(prev.clients || []), ...(res.clients || [])],
+          // };
+
+          const mergedClients = [...(prev.clients || []), ...(res.clients || [])];
+
+const uniqueClients = mergedClients.filter(
+  (client, index, self) =>
+    index === self.findIndex((c) => c.profile_id === client.profile_id)
+);
+
+return {
+  ...res,
+  clients: uniqueClients,
+};
+
         });
 
         if (pageNumber >= res?.pagination?.total_pages) {
@@ -189,7 +209,7 @@ const displayCount = useMemo(() => {
           </div>
 
           <p className="pl-5 text-[#252525] text-[25px] font-semibold leading-normal tracking-[-1px]">
-            Clients ({displayCount})
+            Clients ({totalCount})
           </p>
         </div>
 
@@ -203,37 +223,33 @@ const displayCount = useMemo(() => {
         <div className="flex gap-2.5 ml-[15px] my-[15px]">
           <div
             onClick={() => setSelectedLevel("all")}
-            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${
-              selectedLevel === "all"
-                ? "bg-[#252525]"
-                : "bg-[#FFFFFF] border border-[#E1E6ED]"
-            }`}
+            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${selectedLevel === "all"
+              ? "bg-[#252525]"
+              : "bg-[#FFFFFF] border border-[#E1E6ED]"
+              }`}
           >
             <p
-              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] whitespace-nowrap ${
-                selectedLevel === "all"
-                  ? "text-[#FFFFFF]"
-                  : "text-[#A1A1A1]"
-              }`}
+              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] whitespace-nowrap ${selectedLevel === "all"
+                ? "text-[#FFFFFF]"
+                : "text-[#A1A1A1]"
+                }`}
             >
-              All ({displayCount})
+              All ({totalCount})
             </p>
           </div>
 
           <div
             onClick={() => setSelectedLevel("1")}
-            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${
-              selectedLevel === "1"
-                ? "bg-[#252525]"
-                : "bg-[#FFFFFF] border border-[#E1E6ED]"
-            }`}
+            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${selectedLevel === "1"
+              ? "bg-[#252525]"
+              : "bg-[#FFFFFF] border border-[#E1E6ED]"
+              }`}
           >
             <p
-              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] ${
-                selectedLevel === "1"
-                  ? "text-[#FFFFFF]"
-                  : "text-[#A1A1A1]"
-              }`}
+              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] ${selectedLevel === "1"
+                ? "text-[#FFFFFF]"
+                : "text-[#A1A1A1]"
+                }`}
             >
               L1
             </p>
@@ -241,18 +257,16 @@ const displayCount = useMemo(() => {
 
           <div
             onClick={() => setSelectedLevel("2")}
-            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${
-              selectedLevel === "2"
-                ? "bg-[#252525]"
-                : "bg-[#FFFFFF] border border-[#E1E6ED]"
-            }`}
+            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${selectedLevel === "2"
+              ? "bg-[#252525]"
+              : "bg-[#FFFFFF] border border-[#E1E6ED]"
+              }`}
           >
             <p
-              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] ${
-                selectedLevel === "2"
-                  ? "text-[#FFFFFF]"
-                  : "text-[#A1A1A1]"
-              }`}
+              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] ${selectedLevel === "2"
+                ? "text-[#FFFFFF]"
+                : "text-[#A1A1A1]"
+                }`}
             >
               L2
             </p>
@@ -260,18 +274,16 @@ const displayCount = useMemo(() => {
 
           <div
             onClick={() => setSelectedLevel("3")}
-            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${
-              selectedLevel === "3"
-                ? "bg-[#252525]"
-                : "bg-[#FFFFFF] border border-[#E1E6ED]"
-            }`}
+            className={`rounded-[20px] py-[11px] px-[30px] cursor-pointer ${selectedLevel === "3"
+              ? "bg-[#252525]"
+              : "bg-[#FFFFFF] border border-[#E1E6ED]"
+              }`}
           >
             <p
-              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] ${
-                selectedLevel === "3"
-                  ? "text-[#FFFFFF]"
-                  : "text-[#A1A1A1]"
-              }`}
+              className={`text-[12px] font-normal leading-normal tracking-[-0.24px] ${selectedLevel === "3"
+                ? "text-[#FFFFFF]"
+                : "text-[#A1A1A1]"
+                }`}
             >
               L3
             </p>
@@ -356,25 +368,25 @@ const displayCount = useMemo(() => {
                 </div>
 
                 <div className="flex gap-3 items-center">
-                   <div
-    className="px-2.5 py-2 rounded-[5px]"
-    style={{ 
-      backgroundColor: client.level_type === "1" ? "#E9F3FF" : 
-                       client.level_type === "2" ? "#FFFAF0" : 
-                       client.level_type === "3" ? "#EAFFEF" : "#F5F5F5"
-    }}
-  >
-    <p
-      className="text-[10px] font-semibold leading-[126%] tracking-[-0.2px]"
-      style={{ 
-        color: client.level_type === "1" ? "#006FFF" : 
-               client.level_type === "2" ? "#F6AD0B" : 
-               client.level_type === "3" ? "#3FAF58" : "#757575"
-      }}
-    >
-      {client.level_type ? `LEVEL ${client.level_type}` : "--"}
-    </p>
-  </div>
+                  <div
+                    className="px-2.5 py-2 rounded-[5px]"
+                    style={{
+                      backgroundColor: client.level_type === "1" ? "#E9F3FF" :
+                        client.level_type === "2" ? "#FFFAF0" :
+                          client.level_type === "3" ? "#EAFFEF" : "#F5F5F5"
+                    }}
+                  >
+                    <p
+                      className="text-[10px] font-semibold leading-[126%] tracking-[-0.2px]"
+                      style={{
+                        color: client.level_type === "1" ? "#006FFF" :
+                          client.level_type === "2" ? "#F6AD0B" :
+                            client.level_type === "3" ? "#3FAF58" : "#757575"
+                      }}
+                    >
+                      {client.level_type ? `LEVEL ${client.level_type}` : "--"}
+                    </p>
+                  </div>
 
 
                   <p className="text-[#535359] text-[10px]">

@@ -201,7 +201,7 @@ return {
               width={32}
               height={32}
               className="cursor-pointer"
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push("/trainer/dashboard")}
             />
             <p className="text-[#252525] text-[12px] font-semibold leading-[126%] tracking-[-0.24px]">
               Go to Dashboard

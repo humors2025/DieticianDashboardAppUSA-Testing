@@ -407,12 +407,10 @@ export const UserProfile = ({
   const pathname = usePathname();
 
   const isClientPage =
-    pathname?.startsWith("/client") ||
-    pathname?.startsWith("/clients") ||
-    pathname?.startsWith("/partners/client") ||
-    pathname?.startsWith("/partners/clients");
+    pathname?.startsWith("/trainer/client") ||
+    pathname?.startsWith("/trainer/clients");
 
-  const isMessagesPage = pathname?.startsWith("/messages");
+  const isMessagesPage = pathname?.startsWith("/trainer/messages");
 
   const [dieticianName, setDieticianName] = useState("Dietician");
   const [currentDate, setCurrentDate] = useState("-");

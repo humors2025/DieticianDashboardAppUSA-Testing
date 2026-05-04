@@ -134,10 +134,10 @@ import {
   selectClientsCount,
   selectClientsStatus,
   selectClientsError,
-} from "../../../store/clientSlice";
+} from "@/store/clientSlice";
 
 import { useDispatch, useSelector } from "react-redux";
-import { fetchClientsForDietician } from "../../../store/clientSlice"
+import { fetchClientsForDietician } from "@/store/clientSlice"
 import Cookies from "js-cookie";
 
 export default function Client() {

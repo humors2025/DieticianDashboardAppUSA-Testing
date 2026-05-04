@@ -100,7 +100,7 @@ import Calender from "@/components/calender";
 import ClientMonitor from "@/components/client-monitor";
 import { UserProfile } from '@/components/user-profile';
 import { Notification } from '@/components/notification';
-import ClientRisk from "../../../components/client-risk"
+import ClientRisk from "@/components/client-risk"
 import DashboardSidebar from '@/components/dashboard-sidebar';
 import GoalTracker from '@/components/goal-tracker';
 import {
@@ -109,12 +109,12 @@ import {
   selectClientsCount,
   selectClientsStatus,
   selectClientsError,
-} from "../../../store/clientSlice";
+} from "@/store/clientSlice";
 import Cookies from "js-cookie";
 import { useDispatch, useSelector } from "react-redux";
 import { useState, useMemo, useEffect } from "react";
-import ProtectedRoute from "../../../components/ProtectedRoute";
-import ClientsSection from '../../../components/client-monitor'; // Import ClientsSection
+import ProtectedRoute from "@/components/ProtectedRoute";
+import ClientsSection from '@/components/client-monitor'; // Import ClientsSection
 
 const Dashboard = () => {
   const dispatch = useDispatch();

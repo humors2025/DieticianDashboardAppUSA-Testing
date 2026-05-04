@@ -238,44 +238,12 @@ const MonoIcon = ({ src, size = 20, color = "#A1A1A1", alt = "" }) => (
   />
 );
 
-// ✅ SAFE cookie reader
-function getCookieValue(name) {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith(`${name}=`));
-  if (!match) return null;
-  return match.split(`${name}=`)[1] ?? null;
-}
-
-// ✅ Safe dietician cookie parser
-function readDieticianFromCookie() {
-  try {
-    const raw = getCookieValue("dietician");
-    if (!raw) return null;
-
-    const decoded = decodeURIComponent(raw);
-
-    // avoid crash if truncated / invalid JSON
-    if (!decoded.startsWith("{") || !decoded.endsWith("}")) {
-      console.error("Invalid dietician cookie (not full JSON):", decoded);
-      return null;
-    }
-
-    return JSON.parse(decoded);
-  } catch (e) {
-    console.error("Failed to parse dietician cookie:", e);
-    return null;
-  }
-}
-
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
 
 const hideHeaderPaths = [
-    "/updatepassword",
-    "/partners/updatepassword",
+    "/trainer/updatepassword",
   ];
 
   if (hideHeaderPaths.includes(pathname)) {
@@ -287,44 +255,15 @@ const hideHeaderPaths = [
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [dietician, setDietician] = useState(null);
-
   useEffect(() => {
     setActive(pathname);
   }, [pathname]);
 
-  useEffect(() => {
-    const d = readDieticianFromCookie();
-    setDietician(d);
-  }, []);
-
   const menu = [
-    { name: "Dashboard", icon: "/icons/hugeicons_home-05.svg", path: "/dashboard" },
-    // { name: "Client", icon: "/icons/hugeicons_user-group.png", path: "/client" },
-    // { name: "Messages", icon: "/icons/hugeicons_message-02.svg", path: "/messages" },
-    { name: "Settings", icon: "/icons/hugeicons_settings-03.svg", path: "/settings" },
+    { name: "Dashboard", icon: "/icons/hugeicons_home-05.svg", path: "/trainer/dashboard" },
+    { name: "Earnings", icon: "/icons/hugeicons_award-01.svg", path: "/trainer/earnings" },
+    { name: "Settings", icon: "/icons/hugeicons_settings-03.svg", path: "/trainer/settings" },
   ];
-
-  const clientRelatedPaths = ["/client", "/planhistory", "/profile"];
-  const partnerClientRelatedPaths = ["/partners/client", "/partners/planhistory", "/partners/profile"];
-
-  // const isPartnerUser = dietician?.dietician_id === "RespyrD01";
-  const dieticianId = dietician?.dietician_id || "";
-const isPartnerUser = dieticianId !== "" && dieticianId !== "Qua";
-
-  // ✅ central mapping for partner routes
-  const partnerRouteMap = {
-    Dashboard: "/partners/dashboard",
-    // Client: "/partners/client",
-    // Messages: "/partners/messages",
-    Settings: "/partners/settings",
-  };
-
-  // ✅ decide final path for any menu item
-  const getFinalPath = (menuItem) => {
-    if (!isPartnerUser) return menuItem.path;
-    return partnerRouteMap[menuItem.name] || menuItem.path;
-  };
 
   const handleLogout = () => {
     try {
@@ -338,22 +277,10 @@ const isPartnerUser = dieticianId !== "" && dieticianId !== "Qua";
   };
 
   const handleMenuClick = (menuItem, e) => {
-    // ✅ for these 4, we route based on cookie (no "coming soon")
-    if (
-      menuItem.name === "Dashboard" ||
-      menuItem.name === "Client" ||
-      // menuItem.name === "Messages" ||
-      menuItem.name === "Settings"
-    ) {
-      e.preventDefault();
-      const target = getFinalPath(menuItem);
-      setActive(target);
-      router.push(target);
-      return false;
-    }
-
+    e.preventDefault();
     setActive(menuItem.path);
-    return true;
+    router.push(menuItem.path);
+    return false;
   };
 
   const handleNotificationClick = () => {
@@ -366,7 +293,7 @@ const isPartnerUser = dieticianId !== "" && dieticianId !== "Qua";
     <>
       <div className="flex justify-between bg-[#F5F7FA] p-4">
       <div className="flex">
-  <Link href={isPartnerUser ? partnerRouteMap.Dashboard : "/dashboard"}>
+  <Link href="/trainer/dashboard">
     <div className="flex flex-col items-center">
       <img src="/icons/logorespyr.png" alt="logo" width={50} height={50} />
       {/* <p className="text-[#252525] text-[12px] font-normal">Beta 1.0</p> */}
@@ -377,18 +304,12 @@ const isPartnerUser = dieticianId !== "" && dieticianId !== "Qua";
 
         <div className="flex gap-[15px]">
           {menu.map((m) => {
-            const href = getFinalPath(m);
-
-            // ✅ active highlight handling for both normal and partners
             const isActive =
-              m.name === "Client"
-                ? clientRelatedPaths.includes(pathname) || partnerClientRelatedPaths.includes(pathname)
-                : pathname === m.path || pathname === partnerRouteMap[m.name] || active === href;
-
+              pathname === m.path || pathname?.startsWith(m.path + "/") || active === m.path;
             const color = isActive ? "#308BF9" : "#A1A1A1";
 
             return (
-              <Link href={href} key={m.name}>
+              <Link href={m.path} key={m.name}>
                 <button
                   className="flex items-center gap-1.5 cursor-pointer rounded-[15px] px-[20px] py-[15px] bg-white"
                   onClick={(e) => handleMenuClick(m, e)}

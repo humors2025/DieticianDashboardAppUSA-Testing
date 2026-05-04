@@ -23,7 +23,7 @@ export default function NotFound() {
          
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              href="/dashboard"
+              href="/trainer/dashboard"
               className="inline-flex min-w-[220px] items-center justify-center rounded-[12px] bg-[#2874F0] px-6 py-3 text-[15px] font-semibold text-white transition-all duration-200 hover:bg-[#1D68D8]"
             >
               Go to Dashboard

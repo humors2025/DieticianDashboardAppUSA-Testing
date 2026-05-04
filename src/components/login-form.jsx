@@ -6,12 +6,27 @@ import Link from "next/link";
 import React, { useState } from "react";
 import { loginService, updateDietPlanStatusService } from "@/services/authService";
 import { cookieManager } from "@/lib/cookies";
+import { persistLoginResponse, landingPathForUser, getCurrentUser } from "@/lib/user";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+
+// Map ?role= query param → headline copy. Invite emails include the param so
+// the recipient lands on a heading that matches their role. Default (no param)
+// is the generic "Welcome!".
+const ROLE_HEADINGS = {
+  super_admin:   "Welcome Super-Admin!",
+  trainer_admin: "Welcome Trainer-Admin!",
+  trainer:       "Welcome Trainer!",
+  client:        "Welcome!",
+};
 
 export function LoginForm({ className, ...props }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const roleParam = searchParams.get("role");
+  const heading = ROLE_HEADINGS[roleParam] || "Welcome!";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -74,50 +89,58 @@ const handleSubmit = async (e) => {
   try {
     const res = await loginService(email, password);
 
-    // Check if the password is reset (is_reset_password is 0)
-    if (res?.dietician?.is_reset_password === 0) {
-      // Don't log in the user and show an error message
-      // setInputError("Please update your password before logging in.");
-      toast.error("Please update your password before logging in.");
+    // Pull is_reset_password from whichever shape the backend returned.
+    // New shape: res.user.is_reset_password. Legacy: res.dietician.is_reset_password.
+    const isResetPassword =
+      res?.user?.is_reset_password ?? res?.dietician?.is_reset_password;
 
-      cookieManager.set("dietician", JSON.stringify(res.dietician));
-      
-      // Redirect to the password update page immediately
-      router.push("/updatepassword");
-      
-      setLoading(false); // Make sure to stop loading
+    // First-login password update gate: don't issue access_token yet.
+    if (isResetPassword === 0) {
+      toast.error("Please update your password before logging in.");
+      // Persist user info (without access_token) so the update-password page
+      // can identify who's resetting. Mirrors prior behavior.
+      if (res?.dietician) {
+        cookieManager.set("dietician", JSON.stringify(res.dietician));
+      }
+      if (res?.user) {
+        cookieManager.set("user", JSON.stringify(res.user));
+      }
+      router.push("/trainer/updatepassword");
+      setLoading(false);
       return;
     }
 
-    // Proceed with login only if is_reset_password is not 0
-    cookieManager.set("access_token", res.access_token);
-    cookieManager.set("dietician", JSON.stringify(res.dietician));
+    // Persist access_token + both cookie shapes (new + legacy mirror).
+    persistLoginResponse(res);
 
+    // Best-effort: existing diet-plan-status side effect. Use whichever id
+    // the response provides (falls back through legacy).
+    const userIdForSideEffect =
+      res?.user?.partner_code ||
+      res?.user?.user_id ||
+      res?.dietician?.dietician_id;
     try {
-      await updateDietPlanStatusService(res?.dietician?.dietician_id);
+      if (userIdForSideEffect) {
+        await updateDietPlanStatusService(userIdForSideEffect);
+      }
     } catch (dietPlanError) {
       console.error("Diet plan status update failed:", dietPlanError);
     }
 
-    toast.success(`Welcome ${res?.dietician?.name || ""}`, {
+    // Welcome toast — prefer first_name when the new shape is available.
+    const greetingName =
+      res?.user?.first_name ||
+      res?.dietician?.name ||
+      "";
+    toast.success(`Welcome ${greetingName}`, {
       description: "You have logged in successfully",
     });
 
-    const dieticianId = res?.dietician?.dietician_id || "";
-
-    // Default routing based on dietician type
-    // if (B2B2C.includes(dieticianId)) {
-    //   router.push("/partners/dashboard");
-    // } else {
-    //   router.push("/dashboard");
-    // }
-
-    if (dieticianId === "Qua") {
-  router.push("/dashboard");
-} else {
-  router.push("/partners/dashboard");
-}
-
+    // Role-aware routing. landingPathForUser returns the right path for
+    // the user's role; for trainers (the only role that exists today) it
+    // preserves the historic Qua-vs-partners split so behavior is unchanged.
+    const user = getCurrentUser();
+    router.push(landingPathForUser(user));
 
   } catch (error) {
     let errorMessage = "Invalid credentials";
@@ -148,7 +171,7 @@ const handleSubmit = async (e) => {
     <div className="flex items-center justify-start">
       <div className="w-full max-w-md bg-white shadow-lg px-[62px] pt-[60px] pb-[54px]">
         <h2 className="text-[34px] font-normal leading-normal tracking-[-2.04] text-[#252525] text-center whitespace-nowrap">
-          Welcome Dietician!
+          {heading}
         </h2>
 
         <form onSubmit={handleSubmit} className="mt-[73px] space-y-4">

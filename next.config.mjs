@@ -34,7 +34,11 @@ const nextConfig = {
 
     return [
       ...moved,
-      // Partners track removed in Phase 1.
+      // Partners track removed in Phase 1, but the partners-only client
+      // profile page lives under /trainer/clients-profile now. Specific
+      // redirect must come BEFORE the catch-all below so query params (e.g.,
+      // ?profile_id=...) are preserved.
+      { source: '/partners/clients-profile', destination: '/trainer/clients-profile', permanent: true },
       { source: '/partners',        destination: '/trainer/dashboard', permanent: true },
       { source: '/partners/:path*', destination: '/trainer/dashboard', permanent: true },
     ];

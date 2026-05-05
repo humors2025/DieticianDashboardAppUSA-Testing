@@ -149,7 +149,7 @@ export default function ClientLists() {
 
   const handleClientClick = (index, profileId) => {
     setActiveIndex(index);
-    router.push(`/partners/clients-profile?profile_id=${profileId}`);
+    router.push(`/trainer/clients-profile?profile_id=${profileId}`);
   };
 
   const handleSearchResults = (results) => {

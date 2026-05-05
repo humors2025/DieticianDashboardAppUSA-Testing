@@ -17,6 +17,8 @@ import CoachsBrief from "./CoachsBrief";
 import TodaysSession from "./TodaysSession";
 import CoachsPlaybook from "./CoachsPlaybook";
 import WhyTodaysPlan from "./WhyTodaysPlan";
+import FoodDirection from "./FoodDirection";
+import WatchAndPlan from "./WatchAndPlan";
 
 export default function TrainerDirection() {
   const [activeTab, setActiveTab] = useState("glance");
@@ -59,11 +61,13 @@ export default function TrainerDirection() {
     <div className="flex flex-col gap-4 p-5">
       <TrainerDirectionTabs activeTab={activeTab} onChange={setActiveTab} />
 
-      {activeTab === "glance"   && <AtAGlance     data={td} />}
-      {activeTab === "brief"    && <CoachsBrief   data={td} />}
-      {activeTab === "session"  && <TodaysSession data={td} />}
+      {activeTab === "glance"   && <AtAGlance      data={td} />}
+      {activeTab === "brief"    && <CoachsBrief    data={td} />}
+      {activeTab === "session"  && <TodaysSession  data={td} />}
       {activeTab === "playbook" && <CoachsPlaybook data={td} />}
-      {activeTab === "why"      && <WhyTodaysPlan data={td} />}
+      {activeTab === "why"      && <WhyTodaysPlan  data={td} />}
+      {activeTab === "food"     && <FoodDirection  data={td} />}
+      {activeTab === "watch"    && <WatchAndPlan   data={td} />}
     </div>
   );
 }

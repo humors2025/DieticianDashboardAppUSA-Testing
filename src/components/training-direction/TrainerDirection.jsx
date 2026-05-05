@@ -13,6 +13,9 @@ import { useSelector } from "react-redux";
 
 import TrainerDirectionTabs from "./TrainerDirectionTabs";
 import AtAGlance from "./AtAGlance";
+import CoachsBrief from "./CoachsBrief";
+import TodaysSession from "./TodaysSession";
+import CoachsPlaybook from "./CoachsPlaybook";
 import WhyTodaysPlan from "./WhyTodaysPlan";
 
 export default function TrainerDirection() {
@@ -56,8 +59,11 @@ export default function TrainerDirection() {
     <div className="flex flex-col gap-4 p-5">
       <TrainerDirectionTabs activeTab={activeTab} onChange={setActiveTab} />
 
-      {activeTab === "glance" && <AtAGlance data={td} />}
-      {activeTab === "why" && <WhyTodaysPlan data={td} />}
+      {activeTab === "glance"   && <AtAGlance     data={td} />}
+      {activeTab === "brief"    && <CoachsBrief   data={td} />}
+      {activeTab === "session"  && <TodaysSession data={td} />}
+      {activeTab === "playbook" && <CoachsPlaybook data={td} />}
+      {activeTab === "why"      && <WhyTodaysPlan data={td} />}
     </div>
   );
 }

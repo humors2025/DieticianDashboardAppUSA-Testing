@@ -1,14 +1,16 @@
 "use client";
 
-// Local persistence for demo-mode admin actions — suspensions and audit log
-// entries. Stored in localStorage so they survive page navigations (the
-// synthetic data in demo-data.js is a frozen module and can't be mutated cleanly).
+// Local persistence for demo-mode state — suspensions and audit log entries.
+// Stored in localStorage so they survive page navigations (the synthetic data
+// in demo-data.js is a frozen module and can't be mutated cleanly).
 //
 // When backend ships, replace these helpers with real API calls. The shape of
-// each entry mirrors the eventual DB rows (see migrations/ for the schemas).
+// SuspensionEntry and AuditEntry mirrors the eventual DB rows.
 
 const SUSPENSIONS_KEY = "respyr_demo_suspensions";
 const AUDIT_KEY = "respyr_demo_audit_log";
+const ROLE_OVERRIDES_KEY = "respyr_demo_role_overrides";
+const ATTRIBUTION_OVERRIDES_KEY = "respyr_demo_attribution_overrides";
 
 const isClient = () => typeof window !== "undefined";
 
@@ -89,8 +91,68 @@ export function appendAuditLog(entry) {
   writeJSON(AUDIT_KEY, log);
 }
 
+// ---------- Role overrides (Edit Role) ----------
+
+export function getRoleOverrides() {
+  return readJSON(ROLE_OVERRIDES_KEY, {});
+}
+
+export function getRoleOverride(userId) {
+  return getRoleOverrides()[userId] || null;
+}
+
+export function setRoleOverride({ userId, fromRole, toRole, actorUserId, actorName, reason, targetName }) {
+  const overrides = getRoleOverrides();
+  overrides[userId] = { role: toRole, changed_at: new Date().toISOString(), changed_by: actorUserId };
+  writeJSON(ROLE_OVERRIDES_KEY, overrides);
+  appendAuditLog({
+    actor_user_id: actorUserId,
+    actor_name: actorName,
+    action: "user.role_changed",
+    target_user_id: userId,
+    target_name: targetName,
+    reason,
+    before_role: fromRole,
+    after_role: toRole,
+  });
+}
+
+// ---------- Attribution overrides (Reattribute Subscription) ----------
+
+export function getAttributionOverrides() {
+  return readJSON(ATTRIBUTION_OVERRIDES_KEY, {});
+}
+
+export function getAttributionOverride(clientId) {
+  return getAttributionOverrides()[clientId] || null;
+}
+
+export function setAttributionOverride({ clientId, fromTrainerId, toTrainerId, actorUserId, actorName, reason, clientName, fromTrainerName, toTrainerName }) {
+  const overrides = getAttributionOverrides();
+  overrides[clientId] = {
+    trainer_id: toTrainerId,
+    changed_at: new Date().toISOString(),
+    changed_by: actorUserId,
+  };
+  writeJSON(ATTRIBUTION_OVERRIDES_KEY, overrides);
+  appendAuditLog({
+    actor_user_id: actorUserId,
+    actor_name: actorName,
+    action: "subscription.reattributed",
+    target_user_id: clientId,
+    target_name: clientName,
+    reason,
+    before_trainer: fromTrainerName || fromTrainerId,
+    after_trainer: toTrainerName || toTrainerId,
+  });
+}
+
+// ---------- Reset ----------
+
 export function clearDemoState() {
   if (!isClient()) return;
   localStorage.removeItem(SUSPENSIONS_KEY);
   localStorage.removeItem(AUDIT_KEY);
+  localStorage.removeItem(ROLE_OVERRIDES_KEY);
+  localStorage.removeItem(ATTRIBUTION_OVERRIDES_KEY);
 }

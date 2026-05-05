@@ -33,6 +33,7 @@ const MENU = [
   { name: "Trainers",       icon: "/icons/hugeicons_award-01.svg",        path: "/super-admin/trainers" },
   { name: "Clients",        icon: "/icons/hugeicons_user.svg",            path: "/super-admin/clients" },
   { name: "Payouts",        icon: "/icons/hugeicons_file-export.svg",     path: "/super-admin/payouts" },
+  { name: "Audit log",      icon: "/icons/hugeicons_note-01.svg",         path: "/super-admin/audit-logs" },
   { name: "Settings",       icon: "/icons/hugeicons_settings-03.svg",     path: "/super-admin/settings" },
 ];
 

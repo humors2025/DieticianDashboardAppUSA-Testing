@@ -9,6 +9,7 @@ import TestAnalysis from "./test-analysis";
 import DietAnalysis from "./diet-analysis";
 import MacrosAnalysis from "./macros-analysis";
 import HabitsAnalysis from "./habits-analysis";
+import TrainerDirection from "./trainer-direction";
 import RightSidebar from "./rightSidebar";
 import PDFLoadingModal from "./PDFLoadingModal";
 import { exportDietAnalysisPDF } from "../lib/pdfExport";
@@ -24,6 +25,7 @@ import {
   getMacroSummary,
   selectMacroSummaryData
 } from "../store/macroSummarySlice";
+import { getTrainerDirection } from "../store/trainerDirectionSlice";
 import {
   fetchClientProfileDatesList,
   fetchClientWeeklyDates,
@@ -56,6 +58,7 @@ export default function ClientDetails() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const profileId = searchParams.get("profile_id");
+  console.log("profileId:-",profileId);
   const dietitianData = cookieManager.getJSON("dietician");
   const dietitianId = dietitianData?.dietician_id || null;
 
@@ -244,6 +247,24 @@ const transformDatesToDisplay = () => {
 
     loadWeeklyDates();
   }, [profileId, dispatch, activeTab, dietitianId]);
+
+
+  useEffect(() => {
+  if (activeTab === "trainer" && profileDates.length > 0 && dietitianId) {
+    const selectedDate = profileDates[activeIndex] || profileDates[0];
+    if (selectedDate?.date) {
+      dispatch(
+        getTrainerDirection({
+          profileId,
+          dietitianId,
+          date: selectedDate.date,
+        })
+      );
+    }
+  }
+}, [activeTab, profileDates, activeIndex, profileId, dietitianId, dispatch]);
+
+
 
   const formatJoinedDate = (dateString) => {
     if (!dateString || dateString === "NA") return "NA";
@@ -619,6 +640,23 @@ const transformDatesToDisplay = () => {
                   className=""
                 /> */}
               </div>
+
+              <div
+  onClick={() => handleTabChange("trainer")}
+  className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${
+    activeTab === "trainer"
+      ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+      : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
+  }`}
+>
+  <p
+    className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${
+      activeTab === "trainer" ? "text-white" : "text-[#535359]"
+    }`}
+  >
+    Trainer Direction
+  </p>
+</div>
             </div>
           </div>
 
@@ -788,6 +826,14 @@ const transformDatesToDisplay = () => {
           >
 
             <HabitsAnalysis />
+          </div>
+
+           <div
+            className={`${activeTab === "trainer" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+              }`}
+          >
+
+            <TrainerDirection />
           </div>
         </div>
 

@@ -5,6 +5,8 @@ export default function InfoPopUp({ onClose, children }) {
     const clientIndividualProfile = useSelector(
         (state) => state.clientIndividualProfile.data
       );
+
+      console.log("clientIndividualProfile09:-", clientIndividualProfile);
     
   const handleOverlayClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -44,11 +46,13 @@ export default function InfoPopUp({ onClose, children }) {
         </button>
 
         <div>
+          <div className="flex pb-[25px] pl-2.5 pt-[25px] border-b border-[#E1E6ED]">
           <p className="text-[#252525] font-semibold text-[25px] leading-[100%] tracking-[-4%]">
             Fat-use Pattern Trend Breakdown
           </p>
+          </div>
 
-          <div className="flex gap-[19px]">
+          <div className="flex gap-[19px] mt-5">
             {/* Acetone Column - Fuel & Energy Trends */}
             <div className="px-[15px] py-[15px] bg-[#F5F7FA] rounded-[15px] border border-[#E1E6ED]">
               <div className="flex flex-col gap-1 justify-start pt-[15px] pl-[5px] pr-[13px]">

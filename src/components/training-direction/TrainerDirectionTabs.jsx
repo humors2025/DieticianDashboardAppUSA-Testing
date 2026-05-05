@@ -4,9 +4,11 @@
 // (the originals from the engineer's design); five more come in later phases.
 
 const TABS = [
-  { id: "glance", label: "At a Glance" },
-  { id: "why",    label: "Why Today's Plan" },
-  // Phase 2: brief, session, playbook
+  { id: "glance",   label: "At a Glance" },
+  { id: "brief",    label: "Coach's Brief" },
+  { id: "session",  label: "Today's Session" },
+  { id: "playbook", label: "Coach's Playbook" },
+  { id: "why",      label: "Why Today's Plan" },
   // Phase 3: food, watch
 ];
 

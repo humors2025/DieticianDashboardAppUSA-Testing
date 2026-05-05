@@ -9,7 +9,8 @@ const TABS = [
   { id: "brief",    label: "Coach's Brief" },
   { id: "session",  label: "Today's Session" },
   { id: "playbook", label: "Coach's Playbook" },
-  // Phase 3: food, watch
+  { id: "food",     label: "Food Direction" },
+  { id: "watch",    label: "Watch & Plan" },
 ];
 
 export default function TrainerDirectionTabs({ activeTab, onChange }) {

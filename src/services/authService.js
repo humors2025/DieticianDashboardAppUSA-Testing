@@ -580,6 +580,22 @@ export const getClientProfileDetails = async (profileId, dietitianId) => {
 
 
 
+export const fetchTrainerDirection = async (profileId, dietitianId, date) => {
+  return apiFetcher(API_ENDPOINTS.TRAINER.TRAINERDIRECTION, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      profile_id: profileId,
+      dietitian_id: dietitianId,
+      date: date,
+    }),
+  });
+};
+
+
+
 // // services/authService.js
 
 // import { apiFetcher } from "../config/fetcher";

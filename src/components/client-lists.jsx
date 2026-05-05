@@ -94,15 +94,15 @@ export default function ClientLists() {
 
           const mergedClients = [...(prev.clients || []), ...(res.clients || [])];
 
-const uniqueClients = mergedClients.filter(
-  (client, index, self) =>
-    index === self.findIndex((c) => c.profile_id === client.profile_id)
-);
+          const uniqueClients = mergedClients.filter(
+            (client, index, self) =>
+              index === self.findIndex((c) => c.profile_id === client.profile_id)
+          );
 
-return {
-  ...res,
-  clients: uniqueClients,
-};
+          return {
+            ...res,
+            clients: uniqueClients,
+          };
 
         });
 

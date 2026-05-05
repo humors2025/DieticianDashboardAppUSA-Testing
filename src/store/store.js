@@ -13,6 +13,7 @@ import progressReducer from "./progressSlice";
 import dietAnalysisReducer from "./dietAnalysisSlice";
 import macroSummaryReducer from "./macroSummarySlice";
 import habitMonitoringReducer from "./habitMonitoringSlice";
+import trainerDirectionReducer from "./trainerDirectionSlice";
 
 
 export const store = configureStore({
@@ -30,6 +31,7 @@ export const store = configureStore({
         dietAnalysis: dietAnalysisReducer,
         macroSummary: macroSummaryReducer,
       habitMonitoring: habitMonitoringReducer,
+      trainerDirection: trainerDirectionReducer,
   },
 
   middleware: (getDefaultMiddleware) =>

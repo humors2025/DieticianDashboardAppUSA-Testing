@@ -2,10 +2,14 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import {
+  TRAINER_ADMINS,
+  trainersOf,
+  clientsUnderTA,
+  taOverrideThisMonth,
+  fmtUSDCents,
+} from "@/lib/demo-data";
 
-// Stub for the future backend call. When backend ships:
-//   POST /api/invites with { role: 'trainer_admin', first_name, last_name, email, phone }
-//   → backend creates pending_invites row, sends Resend email with verification link.
 async function inviteTrainerAdmin({ firstName, lastName, email, phone }) {
   await new Promise((r) => setTimeout(r, 400));
   return {
@@ -45,10 +49,7 @@ function InviteForm({ onSent }) {
 
     setSubmitting(true);
     try {
-      const res = await inviteTrainerAdmin({
-        firstName: firstName.trim(), lastName: lastName.trim(),
-        email: email.trim(), phone: phone.trim(),
-      });
+      const res = await inviteTrainerAdmin({ firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), phone: phone.trim() });
       if (!res.ok) throw new Error("Failed");
       onSent(res.invite);
       toast.success(`Invite sent to ${res.invite.first_name} ${res.invite.last_name}`);
@@ -68,7 +69,7 @@ function InviteForm({ onSent }) {
       <div>
         <h3 className="text-[#252525] text-[14px] font-bold">Invite a Trainer Admin</h3>
         <p className="text-[#535359] text-[12px] mt-1">
-          They'll receive an email with a verification link to complete signup. Their role is locked at <span className="font-semibold">Trainer Admin</span>.
+          They'll receive an email with a verification link to complete signup.
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -84,6 +85,44 @@ function InviteForm({ onSent }) {
         <span className="text-[#A1A1A1] text-[11px]">Backend wiring (Resend email + verification flow) is pending.</span>
       </div>
     </form>
+  );
+}
+
+function ExistingTAsTable() {
+  return (
+    <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className="bg-[#F5F7FA] text-[#535359] text-left">
+            <th className="py-2.5 px-4 font-semibold">Name</th>
+            <th className="py-2.5 px-4 font-semibold">Partner code</th>
+            <th className="py-2.5 px-4 font-semibold text-right">Trainers</th>
+            <th className="py-2.5 px-4 font-semibold text-right">Clients</th>
+            <th className="py-2.5 px-4 font-semibold text-right">Override / mo</th>
+            <th className="py-2.5 px-4 font-semibold">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {TRAINER_ADMINS.map((ta) => (
+            <tr key={ta.id} className="border-t border-[#F5F7FA]">
+              <td className="py-2.5 px-4">
+                <div className="text-[#252525] font-semibold">{ta.first_name} {ta.last_name}</div>
+                <div className="text-[#A1A1A1] text-[11px]">{ta.email}</div>
+              </td>
+              <td className="py-2.5 px-4 text-[#535359] font-mono">{ta.partner_code}</td>
+              <td className="py-2.5 px-4 text-right text-[#252525]">{trainersOf(ta.id).length}</td>
+              <td className="py-2.5 px-4 text-right text-[#252525]">{clientsUnderTA(ta.id).length}</td>
+              <td className="py-2.5 px-4 text-right text-[#252525] font-semibold">{fmtUSDCents(taOverrideThisMonth(ta.id))}</td>
+              <td className="py-2.5 px-4">
+                <span className={`inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${ta.status === "active" ? "bg-[#E5F6EE] text-[#1F7A4A]" : "bg-[#FCEAEB] text-[#B5363A]"}`}>
+                  {ta.status}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -128,16 +167,24 @@ export default function TrainerAdminsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
-          Trainer Admins
-        </h1>
-        <p className="text-[#535359] text-[13px] mt-1">
-          Invite and manage Trainer Admins. They onboard their own trainers and earn 20% override commission on their network's subscriptions.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
+            Trainer Admins
+          </h1>
+          <p className="text-[#535359] text-[13px] mt-1">
+            Invite and manage Trainer Admins. They onboard their own trainers and earn 20% override commission on their network.
+          </p>
+        </div>
+        <span className="rounded-full bg-[#FFF4E0] text-[#A66B00] text-[11px] font-semibold px-3 py-1">Demo data</span>
       </div>
 
       <InviteForm onSent={(inv) => setInvites((list) => [inv, ...list])} />
+
+      <div>
+        <h3 className="text-[#252525] text-[14px] font-bold mb-3">Existing Trainer Admins</h3>
+        <ExistingTAsTable />
+      </div>
 
       <div>
         <h3 className="text-[#252525] text-[14px] font-bold mb-3">Pending invites</h3>

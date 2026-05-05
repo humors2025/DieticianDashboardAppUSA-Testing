@@ -272,7 +272,9 @@ export default function MacrosCalculation() {
                       </p>
 
                       <p className="text-[10px] font-normal leading-normal tracking-[-0.2px] text-[#738298]">
-                        {step.description}
+                       {step.description === "BMI Based Baseline" 
+    ? "BMR Based Baseline" 
+    : step.description}
                       </p>
                     </div>
                   );

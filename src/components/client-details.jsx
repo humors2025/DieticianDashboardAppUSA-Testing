@@ -10,6 +10,7 @@ import DietAnalysis from "./diet-analysis";
 import MacrosAnalysis from "./macros-analysis";
 import HabitsAnalysis from "./habits-analysis";
 import TrainerDirection from "./trainer-direction";
+import TrainerDirection from "./training-direction/TrainerDirection";
 import RightSidebar from "./rightSidebar";
 import PDFLoadingModal from "./PDFLoadingModal";
 import { exportDietAnalysisPDF } from "../lib/pdfExport";
@@ -679,6 +680,20 @@ const transformDatesToDisplay = () => {
     Trainer Direction
   </p>
 </div> */}
+              <div
+                onClick={() => handleTabChange("trainer-direction")}
+                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${activeTab === "trainer-direction"
+                  ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
+                  : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
+                  }`}
+              >
+                <p
+                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${activeTab === "trainer-direction" ? "text-white" : "text-[#535359]"
+                    }`}
+                >
+                  Trainer Direction
+                </p>
+              </div>
             </div>
           </div>
 
@@ -855,9 +870,14 @@ const transformDatesToDisplay = () => {
               }`}
           >
 
+          <div
+            className={`${activeTab === "trainer-direction" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+              }`}
+          >
             <TrainerDirection />
           </div>
         </div>
+         </div>
 
         <RightSidebar
           isOpen={isSidebarOpen}

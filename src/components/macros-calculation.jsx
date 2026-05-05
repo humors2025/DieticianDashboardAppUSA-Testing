@@ -14,6 +14,8 @@ export default function MacrosCalculation() {
     (state) => state.clientIndividualProfile.data
   );
 
+
+
   const rawTrainerMacroRationale =
     clientIndividualProfile?.data?.raw_json?.trainer_macro_rationale;
 
@@ -324,8 +326,10 @@ export default function MacrosCalculation() {
                             </p>
 
                             <p className="text-[#252525] text-[15px] font-semibold leading-normal tracking-[-0.3px]">
-                              {step.description}
-                            </p>
+  {step.description === "BMI Based Baseline" 
+    ? "BMR Based Baseline" 
+    : step.description}
+</p>
 
                             <div className="flex gap-[5px] bg-[#F5F7FA] rounded-[5px] px-[15px] py-1.5">
                               <p className="text-[#535359] text-[12px] font-normal leading-normal tracking-[-0.24px]">

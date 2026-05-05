@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
+import SomeInfoPopup from "./pop-folder/some-info-popup";
 
 function SegmentedProgressBar({
   value = 85,
@@ -122,6 +124,9 @@ const getZoneDisplay = (zone) => {
 };
 
 export default function DigestiveBalanceTrends({ data }) {
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupType, setPopupType] = useState(null);
+
   const nutrientUtilization = data?.items?.find(
     (item) => item.title === "Nutrient Utilization Trend"
   );
@@ -129,6 +134,7 @@ export default function DigestiveBalanceTrends({ data }) {
   const digestiveActivity = data?.items?.find(
     (item) => item.title === "Digestive Activity Trend"
   );
+  
 
   const nutrientScore = nutrientUtilization ? Math.round(nutrientUtilization.score) : "NA";
   const digestiveScore = digestiveActivity ? Math.round(digestiveActivity.score) : "NA";
@@ -153,6 +159,11 @@ export default function DigestiveBalanceTrends({ data }) {
                 alt="info"
                 width={20}
                 height={20}
+               onClick={() => {
+    setPopupType("nutrient");
+    setShowPopup(true);
+  }}
+                className="cursor-pointer"
               />
             </div>
 
@@ -185,16 +196,42 @@ export default function DigestiveBalanceTrends({ data }) {
               </p>
             </div>
 
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-                {(nutrientUtilization?.intervention || "").split(":")[0]}:
-              </b>{" "}
-              {(nutrientUtilization?.intervention || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
+        
+
+<div className="flex flex-col gap-2.5 items-center">
+
+
+
+<p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
+  <b className="font-semibold">
+  intervention:{" "}
+    
+  </b>
+  {(digestiveActivity?.intervention || "").split(":")[0]}
+  {" "}
+  {(digestiveActivity?.intervention || "")
+    .split(":")
+    .slice(1)
+    .join(":")
+    .trim()}
+</p>
+
+
+<p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
+  <b className="font-semibold">
+  interpretation:{" "}
+    
+  </b>
+  {(digestiveActivity?.interpretation || "").split(":")[0]}
+  {" "}
+  {(digestiveActivity?.interpretation || "")
+    .split(":")
+    .slice(1)
+    .join(":")
+    .trim()}
+</p>
+
+</div>
           </div>
         </div>
 
@@ -209,6 +246,11 @@ export default function DigestiveBalanceTrends({ data }) {
                 alt="info"
                 width={20}
                 height={20}
+                onClick={() => {
+                  setPopupType("digestive");
+                  setShowPopup(true);
+                }}
+                className="cursor-pointer"
               />
             </div>
 
@@ -241,19 +283,54 @@ export default function DigestiveBalanceTrends({ data }) {
               </p>
             </div>
 
+<div className="flex flex-col gap-2.5 items-center">
+
+
+
             <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
               <b className="font-semibold">
-                {(digestiveActivity?.intervention || "").split(":")[0]}:
-              </b>{" "}
+              intervention:{" "}
+                
+              </b>
+              {(digestiveActivity?.intervention || "").split(":")[0]}
+              {" "}
               {(digestiveActivity?.intervention || "")
                 .split(":")
                 .slice(1)
                 .join(":")
                 .trim()}
             </p>
+
+
+            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
+              <b className="font-semibold">
+              interpretation:{" "}
+                
+              </b>
+              {(digestiveActivity?.interpretation || "").split(":")[0]}
+              {" "}
+              {(digestiveActivity?.interpretation || "")
+                .split(":")
+                .slice(1)
+                .join(":")
+                .trim()}
+            </p>
+
+            </div>
           </div>
         </div>
       </div>
+
+      {showPopup && (
+  <div
+    className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+    onClick={() => setShowPopup(false)}
+  >
+    <SomeInfoPopup 
+     type={popupType} 
+    onClose={() => setShowPopup(false)} />
+  </div>
+)}
     </>
   );
 }

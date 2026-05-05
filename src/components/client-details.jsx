@@ -588,13 +588,13 @@ const transformDatesToDisplay = () => {
                   Weekly Diet Analysis
                 </p>
 
-                <Image
+                {/* <Image
                   src="/icons/hugeicons_information-circle1.svg"
                   alt="info"
                   width={20}
                   height={20}
                   className={`${!isDietAnalysisAvailable ? "opacity-50" : ""}`}
-                />
+                /> */}
               </div>
 
               <div
@@ -611,13 +611,13 @@ const transformDatesToDisplay = () => {
                   Habits Analysis
                 </p>
 
-                <Image
+                {/* <Image
                   src="/icons/hugeicons_information-circle1.svg"
                   alt="info"
                   width={20}
                   height={20}
                   className=""
-                />
+                /> */}
               </div>
             </div>
           </div>

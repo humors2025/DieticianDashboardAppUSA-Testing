@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
+import SomeInfoPopup from "./pop-folder/some-info-popup";
 
 function SegmentedProgressBar({
     value = 85,
@@ -122,6 +124,8 @@ const getZoneConfig = (zone) => {
 };
 
 export default function MetabolicRecoveryTrends({ data }) {
+    const [showPopup, setShowPopup] = useState(false);
+    const [popupType, setPopupType] = useState(null);
 
     // Extract the two items from the data
     const metabolicLoad = data?.items?.find(
@@ -158,6 +162,10 @@ export default function MetabolicRecoveryTrends({ data }) {
                                 alt="info"
                                 width={20}
                                 height={20}
+                                onClick={() => {
+                                    setPopupType("metabolic");
+                                    setShowPopup(true);
+                                  }}
                             />
                         </div>
 
@@ -190,12 +198,45 @@ export default function MetabolicRecoveryTrends({ data }) {
                             </p>
                         </div>
 
-                        <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-                            <b className="font-semibold">
-                                {(metabolicLoad?.intervention || "").split(":")[0]}:
-                            </b>{" "}
-                            {(metabolicLoad?.intervention || "").split(":").slice(1).join(":").trim()}
-                        </p>
+                     
+
+
+
+                        <div className="flex flex-col gap-2.5 items-center">
+
+
+
+<p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
+  <b className="font-semibold">
+  intervention:{" "}
+    
+  </b>
+  {(metabolicLoad?.intervention || "").split(":")[0]}
+
+  {" "}
+  {(metabolicLoad?.intervention || "")
+    .split(":")
+    .slice(1)
+    .join(":")
+    .trim()}
+</p>
+
+
+<p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
+  <b className="font-semibold">
+  interpretation:{" "}
+    
+  </b>
+  {(recoveryActivity?.interpretation || "").split(":")[0]}
+  {" "}
+  {(recoveryActivity?.interpretation || "")
+    .split(":")
+    .slice(1)
+    .join(":")
+    .trim()}
+</p>
+
+</div>
                     </div>
                 </div>
 
@@ -210,6 +251,10 @@ export default function MetabolicRecoveryTrends({ data }) {
                                 alt="info"
                                 width={20}
                                 height={20}
+                                onClick={() => {
+                                    setPopupType("recovery");
+                                    setShowPopup(true);
+                                  }}
                             />
                         </div>
 
@@ -242,15 +287,60 @@ export default function MetabolicRecoveryTrends({ data }) {
                             </p>
                         </div>
 
-                        <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-                            <b className="font-semibold">
-                                {(recoveryActivity?.intervention || "").split(":")[0]}:
-                            </b>{" "}
-                            {(recoveryActivity?.intervention || "").split(":").slice(1).join(":").trim()}
-                        </p>
+                    
+
+
+                        <div className="flex flex-col gap-2.5 items-center">
+
+
+
+            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
+              <b className="font-semibold">
+              intervention:{" "}
+                
+              </b>
+              {(recoveryActivity?.intervention || "").split(":")[0]}
+           
+              {" "}
+              {(recoveryActivity?.intervention || "")
+                .split(":")
+                .slice(1)
+                .join(":")
+                .trim()}
+            </p>
+
+
+            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
+              <b className="font-semibold">
+              interpretation:{" "}
+                
+              </b>
+              {(recoveryActivity?.interpretation || "").split(":")[0]}
+              {" "}
+              {(recoveryActivity?.interpretation || "")
+                .split(":")
+                .slice(1)
+                .join(":")
+                .trim()}
+            </p>
+
+            </div>
                     </div>
                 </div>
             </div>
+
+
+            {showPopup && (
+  <div
+    className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+    onClick={() => setShowPopup(false)}
+  >
+    <SomeInfoPopup 
+     type={popupType} 
+    onClose={() => setShowPopup(false)} />
+  </div>
+)}
+
         </>
     );
 }

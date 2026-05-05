@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import { useSelector } from "react-redux";
+import { useState } from "react";
+import InfoPopUp from "./pop-folder/info-popup";
 
 function SegmentedProgressBar({
   value = 85,
@@ -97,6 +99,8 @@ function SegmentedProgressBar({
 }
 
 export default function FatUsePatternTrend() {
+  const [showPopup, setShowPopup] = useState(false);
+
   const clientIndividualProfile = useSelector(
     (state) => state.clientIndividualProfile.data
   );
@@ -107,6 +111,7 @@ export default function FatUsePatternTrend() {
     rawJson?.Muscle_Gain_Trend ||
     rawJson?.Fat_Use_Pattern_trend ||
     {};
+
 
   const value = trendData?.score ?? "NA";
   const status =
@@ -136,6 +141,7 @@ export default function FatUsePatternTrend() {
   const statusColor = statusColorMap[status] || "#3FAF58";
 
   return (
+    <>
     <div className="w-[410px] flex flex-col gap-[28px] border border-[#E1E6ED] px-5 pt-[18px] pb-5 rounded-[15px] bg-white">
       <div className="flex justify-between items-center">
         <div className="flex gap-[5px] items-center">
@@ -148,6 +154,8 @@ export default function FatUsePatternTrend() {
             alt="info"
             width={20}
             height={20}
+            onClick={() => setShowPopup(true)}
+            className="cursor-pointer"
           />
         </div>
 
@@ -185,12 +193,27 @@ export default function FatUsePatternTrend() {
         </div>
       </div>
 
-      <div>
+      <div className="flex flex-col gap-2.5 items-center"> 
         <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
           <b className="font-semibold">{scientificTitle}. </b>
           {scientificText}
         </p>
+
+        <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
+          <b className="font-semibold">intervention: </b>
+          {trendData?.intervention}
+        </p>
+
+        <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
+          <b className="font-semibold">interpretation: </b>
+          {trendData?.scientific_interpretation?.title} {trendData?.scientific_interpretation?.text}
+        </p>
       </div>
     </div>
+
+    {showPopup && (
+  <InfoPopUp onClose={() => setShowPopup(false)} />
+)}
+</>
   );
 }

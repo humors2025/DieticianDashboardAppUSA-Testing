@@ -277,7 +277,7 @@ const formatLastLoggedDate = (dateString) => {
     const params = new URLSearchParams({
       profile_id: client.profileId,
     });
-    router.push(`/partners/clients-profile?${params.toString()}`);
+    router.push(`/trainer/clients-profile?${params.toString()}`);
   };
 
   return (

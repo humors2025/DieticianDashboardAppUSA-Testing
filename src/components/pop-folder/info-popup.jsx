@@ -1,493 +1,145 @@
-"use client"
+"use client";
+
 import { useSelector } from "react-redux";
-export default function InfoPopUp({ onClose, children }) {
+import SignalDetailCard from "./SignalDetailCard";
 
-    const clientIndividualProfile = useSelector(
-        (state) => state.clientIndividualProfile.data
-      );
-    
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose()
+// Deep-dive popup for Fat-use Pattern Trend. Shows ALL 6 sub-scores grouped
+// by their breath marker (acetone / ethanol / hydrogen).
+//
+// IMPORTANT: backend response shape varies. Sometimes both `metabolism_signals`
+// (flat) AND `metabolism_signals_by_marker` (grouped) are present; sometimes
+// only the flat list is populated; sometimes the grouped form is partial
+// (e.g., ethanol populated, acetone/hydrogen empty). To be robust:
+//   1. Read both fields.
+//   2. If a marker's grouped array is empty/missing, rebuild it from the flat
+//      list filtered by signal.marker_source.
+//   3. Iterate the resulting arrays directly — don't assume a fixed signal at
+//      a fixed index. Whatever signals the engine returns gets rendered.
+//
+// Reference: trainer_direction_2tabs.html (engineer's canonical UI) does the
+// same thing — it iterates byMrk.acetone, .ethanol, .hydrogen as arrays.
+
+const MARKERS = [
+  { key: "acetone",  title: "Acetone",  subtitle: "Fuel & Energy" },
+  { key: "ethanol",  title: "Ethanol",  subtitle: "Metabolic Recovery" },
+  { key: "hydrogen", title: "Hydrogen", subtitle: "Digestive Balance" },
+];
+
+// Mark these signals' UI as a "Limiter" badge (instead of a numeric score)
+// when they're flagged as a limiter — matches the original popup behaviour
+// only Hydrogen-derived signals were treated as limiter-style cards.
+const LIMITER_BADGE_SIGNALS = new Set([
+  "Nutrient Utilization",
+  "Digestive Activity",
+]);
+
+// Resolve a marker-grouped view of the signals from the response.
+// Prefers the engine's pre-grouped object; falls back to filtering the flat
+// list. Always returns { acetone: [], ethanol: [], hydrogen: [] }.
+function resolveSignalsByMarker(metabolismSignals, signalsByMarker) {
+  const fromGrouped = signalsByMarker || {};
+  const fromFlat = Array.isArray(metabolismSignals) ? metabolismSignals : [];
+
+  return MARKERS.reduce((acc, { key }) => {
+    const grouped = Array.isArray(fromGrouped[key]) ? fromGrouped[key] : [];
+    if (grouped.length > 0) {
+      acc[key] = grouped;
+    } else {
+      acc[key] = fromFlat.filter((s) => s?.marker_source === key);
     }
-  }
+    return acc;
+  }, {});
+}
 
-  // Extract metabolism signals data
-  const metabolismSignals = clientIndividualProfile?.data?.raw_json?.trainer_direction_elite?.why_todays_plan?.metabolism_signals_by_marker;
+export default function InfoPopUp({ onClose }) {
+  const clientIndividualProfile = useSelector(
+    (state) => state.clientIndividualProfile.data
+  );
 
-  // Get individual marker data
-  const acetoneSignals = metabolismSignals?.acetone || [];
-  const ethanolSignals = metabolismSignals?.ethanol || [];
-  const hydrogenSignals = metabolismSignals?.hydrogen || [];
+  const why =
+    clientIndividualProfile?.data?.raw_json?.trainer_direction_elite
+      ?.why_todays_plan || {};
 
-  // Helper function to get the first signal from an array
-  const getFirstSignal = (signals) => signals[0] || {};
-  const getSecondSignal = (signals) => signals[1] || {};
+  const byMarker = resolveSignalsByMarker(
+    why.metabolism_signals,
+    why.metabolism_signals_by_marker
+  );
+
+  const handleOverlayClick = (e) => {
+    if (e.target === e.currentTarget) onClose();
+  };
 
   return (
-    <>
     <div
-      className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       onClick={handleOverlayClick}
     >
       <div
-        className="bg-white rounded-[12px] shadow-lg relative max-w-[90vw] max-h-[90vh] overflow-auto p-6"
+        className="relative bg-white rounded-[16px] shadow-xl max-w-[980px] w-full max-h-[90vh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 text-[18px] font-normal text-[#252525] z-10 cursor-pointer hover:opacity-70 transition-opacity"
-          type="button"
-          aria-label="Close popup"
-        >
-          X
-        </button>
-
-        <div>
-          <p className="text-[#252525] font-semibold text-[25px] leading-[100%] tracking-[-4%]">
-            Fat-use Pattern Trend Breakdown
-          </p>
-
-          <div className="flex gap-[19px]">
-            {/* Acetone Column - Fuel & Energy Trends */}
-            <div className="px-[15px] py-[15px] bg-[#F5F7FA] rounded-[15px] border border-[#E1E6ED]">
-              <div className="flex flex-col gap-1 justify-start pt-[15px] pl-[5px] pr-[13px]">
-                <span className="text-[#252525] font-semibold text-[15px] leading-[100%] tracking-[-2%]">
-                  Acetone
-                </span>
-                <span className="text-[#535359] text-[12px] leading-[110%] tracking-[-2%]">
-                  Fuel & Energy Trends
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-[15px]">
-                {/* Fuel Utilization */}
-                {(() => {
-                  const signal = getFirstSignal(acetoneSignals);
-                  const score = signal.score || 71.1;
-                  const tier = signal.tier || 'mid';
-                  const zoneLabel = signal.zone_label || 'Strong (fat-use dominant)';
-                  const flag = signal.flag || 'strong';
-                  const thresholdRule = signal.threshold_rule || '≥80 strong / 70–79 mid / 70 low';
-                  const interpretation = signal.trainer_interpretation || 'Mixed day — some stored-energy use with periods of quick-use reliance. Improving meal structure usually strengthens consistency.';
-                  
-                  // Determine border color based on tier/flag
-                  const getBorderColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#3FAF58';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  // Determine score color based on tier/flag
-                  const getScoreColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#3FAF58';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  return (
-                    <div className={`mt-5 pl-5 pr-[13px] pt-[14px] pb-[37px] border-l-[3px] bg-[#FFFFFF] rounded-[10px]`} 
-                         style={{ borderLeftColor: getBorderColor(flag, tier) }}>
-                      <div className="flex justify-between">
-                        <div className="flex flex-col gap-[5px] justify-start">
-                          <span className="text-[#252525] font-semibold text-[12px] leading-[100%] tracking-[-2%]">
-                            {signal.signal || 'Fuel Utilization'}
-                          </span>
-                          <div className="flex flex-col">
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              {zoneLabel}
-                            </span>
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              tier: {tier}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="font-semibold text-[18px] leading-[110%] tracking-[-2px]"
-                              style={{ color: getScoreColor(flag, tier) }}>
-                          {score}
-                        </span>
-                      </div>
-
-                      <div className="mt-[15px] py-[5px]">
-                        <p className="text-[#738298] text-[9px] font-normal leading-[110%] tracking-[-0.18px]">
-                          {thresholdRule}
-                        </p>
-                      </div>
-
-                      <div className="mt-3">
-                        <p className="text-[#738298] text-[11px] font-normal leading-[130%]">
-                          {interpretation}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Energy Source */}
-                {(() => {
-                  const signal = getSecondSignal(acetoneSignals);
-                  const score = signal.score || 71.1;
-                  const tier = signal.tier || 'mid';
-                  const zoneLabel = signal.zone_label || 'Ideal (steady meals)';
-                  const flag = signal.flag || 'ideal';
-                  const thresholdRule = signal.threshold_rule || '≤20 ideal / 21–30 mid / 30 limiter';
-                  const interpretation = signal.trainer_interpretation || 'Quick-use reliance moderate (21–30). Some meals balanced, others lean carb-heavy. Pairing carbs with protein and fiber improves steadiness.';
-
-                  const getBorderColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#3FAF58';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  const getScoreColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#3FAF58';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  return (
-                    <div className="mt-5 pl-5 pr-[13px] pt-[14px] pb-[37px] border-l-[3px] bg-[#FFFFFF] rounded-[10px]"
-                         style={{ borderLeftColor: getBorderColor(flag, tier) }}>
-                      <div className="flex justify-between">
-                        <div className="flex flex-col gap-[5px] justify-start">
-                          <span className="text-[#252525] font-semibold text-[12px] leading-[100%] tracking-[-2%]">
-                            {signal.signal || 'Energy Source'}
-                          </span>
-                          <div className="flex flex-col">
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              {zoneLabel}
-                            </span>
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              tier: {tier}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="font-semibold text-[18px] leading-[110%] tracking-[-2px]"
-                              style={{ color: getScoreColor(flag, tier) }}>
-                          {score}
-                        </span>
-                      </div>
-
-                      <div className="mt-[15px] py-[5px]">
-                        <p className="text-[#738298] text-[9px] font-normal leading-[110%] tracking-[-0.18px]">
-                          {thresholdRule}
-                        </p>
-                      </div>
-
-                      <div className="mt-3">
-                        <p className="text-[#738298] text-[11px] font-normal leading-[130%]">
-                          {interpretation}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-
-            {/* Ethanol Column - Metabolic Recovery Trends */}
-            <div className="px-[15px] py-[15px] bg-[#F5F7FA] rounded-[15px] border border-[#E1E6ED]">
-              <div className="flex flex-col gap-1 justify-start pt-[15px] pl-[5px] pr-[13px]">
-                <span className="text-[#252525] font-semibold text-[15px] leading-[100%] tracking-[-2%]">
-                Ethanol
-                </span>
-                <span className="text-[#535359] text-[12px] leading-[110%] tracking-[-2%]">
-                Metabolic Recovery Trends
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-[15px]">
-                {/* Metabolic Load */}
-                {(() => {
-                  const signal = getFirstSignal(ethanolSignals);
-                  const score = signal.score || 71.1;
-                  const tier = signal.tier || 'mid';
-                  const zoneLabel = signal.zone_label || 'High limiter (elevated load)';
-                  const flag = signal.flag || 'high_limiter';
-                  const thresholdRule = signal.threshold_rule || '≥80 strong / 70–79 mid / 70 low';
-                  const interpretation = signal.trainer_interpretation || 'Load high (30). Common pattern: late heavy meals, higher sugar/refined intake, heavier cooking. Simplifying meals 24–48h often reduces load quickly.';
-
-                  const getBorderColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#F8B10F';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  const getScoreColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#F8B10F';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  return (
-                    <div className="mt-5 pl-5 pr-[13px] pt-[14px] pb-[37px] border-l-[3px] bg-[#FFFFFF] rounded-[10px]"
-                         style={{ borderLeftColor: getBorderColor(flag, tier) }}>
-                      <div className="flex justify-between">
-                        <div className="flex flex-col gap-[5px] justify-start">
-                          <span className="text-[#252525] font-semibold text-[12px] leading-[100%] tracking-[-2%]">
-                          {signal.signal || 'Metabolic Load'}
-                          </span>
-                          <div className="flex flex-col">
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              {zoneLabel}
-                            </span>
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              tier: {tier}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="font-semibold text-[18px] leading-[110%] tracking-[-2px]"
-                              style={{ color: getScoreColor(flag, tier) }}>
-                          {score}
-                        </span>
-                      </div>
-
-                      <div className="mt-[15px] py-[5px]">
-                        <p className="text-[#738298] text-[9px] font-normal leading-[110%] tracking-[-0.18px]">
-                          {thresholdRule}
-                        </p>
-                      </div>
-
-                      <div className="mt-3">
-                        <p className="text-[#738298] text-[11px] font-normal leading-[130%]">
-                          {interpretation}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Recovery Activity */}
-                {(() => {
-                  const signal = getSecondSignal(ethanolSignals);
-                  const score = signal.score || 71.1;
-                  const tier = signal.tier || 'mid';
-                  const zoneLabel = signal.zone_label || 'Low stability';
-                  const flag = signal.flag || 'low_limiter';
-                  const thresholdRule = signal.threshold_rule || '≤20 ideal / 21–30 mid / 30 limiter';
-                  const interpretation = signal.trainer_interpretation || 'Stability low (70). Reflects irregular meal windows, late heavy meals, inconsistent hydration. A structured day usually improves this quickly.';
-
-                  const getBorderColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#3FAF58';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  const getScoreColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#3FAF58';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  return (
-                    <div className="mt-5 pl-5 pr-[13px] pt-[14px] pb-[37px] border-l-[3px] bg-[#FFFFFF] rounded-[10px]"
-                         style={{ borderLeftColor: getBorderColor(flag, tier) }}>
-                      <div className="flex justify-between">
-                        <div className="flex flex-col gap-[5px] justify-start">
-                          <span className="text-[#252525] font-semibold text-[12px] leading-[100%] tracking-[-2%]">
-                          {signal.signal || 'Recovery Activity'}
-                          </span>
-                          <div className="flex flex-col">
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              {zoneLabel}
-                            </span>
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              tier: {tier}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="font-semibold text-[18px] leading-[110%] tracking-[-2px]"
-                              style={{ color: getScoreColor(flag, tier) }}>
-                          {score}
-                        </span>
-                      </div>
-
-                      <div className="mt-[15px] py-[5px]">
-                        <p className="text-[#738298] text-[9px] font-normal leading-[110%] tracking-[-0.18px]">
-                          {thresholdRule}
-                        </p>
-                      </div>
-
-                      <div className="mt-3">
-                        <p className="text-[#738298] text-[11px] font-normal leading-[130%]">
-                          {interpretation}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-
-            {/* Hydrogen Column - Digestive Balance Trends */}
-            <div className="px-[15px] py-[15px] bg-[#F5F7FA] rounded-[15px] border border-[#E1E6ED]">
-              <div className="flex flex-col gap-1 justify-start pt-[15px] pl-[5px] pr-[13px]">
-                <span className="text-[#252525] font-semibold text-[15px] leading-[100%] tracking-[-2%]">
-                Hydrogen
-                </span>
-                <span className="text-[#535359] text-[12px] leading-[110%] tracking-[-2%]">
-                Digestive Balance trends
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-[15px]">
-                {/* Nutrient Utilization */}
-                {(() => {
-                  const signal = getFirstSignal(hydrogenSignals);
-                  const score = signal.score || 71.1;
-                  const tier = signal.tier || 'mid';
-                  const zoneLabel = signal.zone_label || 'Low absorption';
-                  const flag = signal.flag || 'low_limiter';
-                  const thresholdRule = signal.threshold_rule || '≥80 strong / 70–79 mid / 70 low';
-                  const interpretation = signal.trainer_interpretation || 'Load high (30). Common pattern: late heavy meals, higher sugar/refined intake, heavier cooking. Simplifying meals 24–48h often reduces load quickly.';
-
-                  const getBorderColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#3FAF58';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  const getScoreColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#3FAF58';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  // Determine if we should show the "Limiter" badge
-                  const showLimiterBadge = flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter';
-
-                  return (
-                    <div className="mt-5 pl-5 pr-[13px] pt-[14px] pb-[37px] border-l-[3px] bg-[#FFFFFF] rounded-[10px]"
-                         style={{ borderLeftColor: getBorderColor(flag, tier) }}>
-                      <div className="flex justify-between">
-                        <div className="flex flex-col gap-[5px] justify-start">
-                          <span className="text-[#252525] font-semibold text-[12px] leading-[100%] tracking-[-2%]">
-                          {signal.signal || 'Nutrient Utilization'}
-                          </span>
-                          <div className="flex flex-col">
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              {zoneLabel}
-                            </span>
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              tier: {tier}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        {showLimiterBadge && (
-                          <div className="flex items-center px-2.5 py-0.5 rounded-[20px] bg-[#DA5747]">
-                            <span className="text-[#FFFFFF] text-[10px] font-semibold leading-[110%] tracking-[-0.2px]">Limiter</span>
-                          </div>
-                        )}
-                        {!showLimiterBadge && (
-                          <span className="font-semibold text-[18px] leading-[110%] tracking-[-2px]"
-                                style={{ color: getScoreColor(flag, tier) }}>
-                            {score}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-[15px] py-[5px]">
-                        <p className="text-[#738298] text-[9px] font-normal leading-[110%] tracking-[-0.18px]">
-                          {thresholdRule}
-                        </p>
-                      </div>
-
-                      <div className="mt-3">
-                        <p className="text-[#738298] text-[11px] font-normal leading-[130%]">
-                          {interpretation}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Digestive Activity */}
-                {(() => {
-                  const signal = getSecondSignal(hydrogenSignals);
-                  const score = signal.score || 71.1;
-                  const tier = signal.tier || 'mid';
-                  const zoneLabel = signal.zone_label || 'High fermentation';
-                  const flag = signal.flag || 'high_limiter';
-                  const thresholdRule = signal.threshold_rule || '≤20 ideal / 21–30 mid / 30 limiter';
-                  const interpretation = signal.trainer_interpretation || 'Stability low (70). Reflects irregular meal windows, late heavy meals, inconsistent hydration. A structured day usually improves this quickly.';
-
-                  const getBorderColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#3FAF58';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  const getScoreColor = (flag, tier) => {
-                    if (flag === 'strong' || tier === 'best') return '#3FAF58';
-                    if (flag === 'ideal' || tier === 'mid') return '#3FAF58';
-                    if (flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter') return '#DA5747';
-                    return '#F8B10F';
-                  };
-
-                  const showLimiterBadge = flag === 'high_limiter' || flag === 'low_limiter' || tier === 'limiter';
-
-                  return (
-                    <div className="mt-5 pl-5 pr-[13px] pt-[14px] pb-[37px] border-l-[3px] bg-[#FFFFFF] rounded-[10px]"
-                         style={{ borderLeftColor: getBorderColor(flag, tier) }}>
-                      <div className="flex justify-between">
-                        <div className="flex flex-col gap-[5px] justify-start">
-                          <span className="text-[#252525] font-semibold text-[12px] leading-[100%] tracking-[-2%]">
-                          {signal.signal || 'Digestive Activity'}
-                          </span>
-                          <div className="flex flex-col">
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              {zoneLabel}
-                            </span>
-                            <span className="text-[#535359] text-[10px] leading-[110%] tracking-[-2%] capitalize">
-                              tier: {tier}
-                            </span>
-                          </div>
-                        </div>
-                        {showLimiterBadge && (
-                          <div className="flex items-center px-2.5 py-0.5 rounded-[20px] bg-[#DA5747]">
-                            <span className="text-[#FFFFFF] text-[10px] font-semibold leading-[110%] tracking-[-0.2px]">Limiter</span>
-                          </div>
-                        )}
-                        {!showLimiterBadge && (
-                          <span className="font-semibold text-[18px] leading-[110%] tracking-[-2px]"
-                                style={{ color: getScoreColor(flag, tier) }}>
-                            {score}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-[15px] py-[5px]">
-                        <p className="text-[#738298] text-[9px] font-normal leading-[110%] tracking-[-0.18px]">
-                          {thresholdRule}
-                        </p>
-                      </div>
-
-                      <div className="mt-3">
-                        <p className="text-[#738298] text-[11px] font-normal leading-[130%]">
-                          {interpretation}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
+        <div className="sticky top-0 bg-white border-b border-[#E1E6ED] px-6 py-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
+              Fat-use Pattern Trend — breakdown
+            </h2>
+            <p className="text-[#535359] text-[12px] mt-1">
+              All sub-scores across the three breath markers powering this trend.
+            </p>
           </div>
+          <button
+            onClick={onClose}
+            type="button"
+            aria-label="Close"
+            className="flex-shrink-0 w-8 h-8 rounded-full bg-[#F5F7FA] hover:bg-[#E1E6ED] text-[#535359] text-[16px] font-semibold flex items-center justify-center"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6">
+          {MARKERS.map(({ key, title, subtitle }) => {
+            const signals = byMarker[key] || [];
+            return (
+              <div
+                key={key}
+                className="bg-[#F5F7FA] rounded-[12px] border border-[#E1E6ED] p-4 flex flex-col gap-4"
+              >
+                <div>
+                  <div className="text-[#252525] font-semibold text-[14px] tracking-[-0.02em]">
+                    {title}
+                  </div>
+                  <div className="text-[#535359] text-[11px] mt-0.5">
+                    {subtitle}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {signals.length === 0 ? (
+                    <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-4 text-[#A1A1A1] text-[11px] text-center">
+                      No {title.toLowerCase()} signals available.
+                    </div>
+                  ) : (
+                    signals.map((sig, idx) => (
+                      <SignalDetailCard
+                        key={`${key}-${sig.signal || idx}`}
+                        signalName={sig.signal}
+                        zoneLabel={sig.zone_label}
+                        tier={sig.tier}
+                        flag={sig.flag}
+                        score={sig.score}
+                        thresholdRule={sig.threshold_rule}
+                        interpretation={sig.trainer_interpretation}
+                        showLimiterBadge={LIMITER_BADGE_SIGNALS.has(sig.signal)}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
-    </>
-  )
+  );
 }

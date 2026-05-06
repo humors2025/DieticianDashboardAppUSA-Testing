@@ -192,7 +192,7 @@ export default function ClientLists() {
 
   return (
     <>
-      <div className="bg-white rounded-[15px] px-[5px]">
+      <div className=" bg-white rounded-[15px]  px-[5px]">
         <div className="flex flex-col gap-6 mb-[22px]">
           <div className="flex gap-1.5 items-center pt-[22px] pl-[15px]">
             <Image
@@ -291,7 +291,7 @@ export default function ClientLists() {
         </div>
 
         <div
-          className="max-h-[500px] overflow-y-auto custom-scrollbar"
+          className=" h-[55vh] overflow-y-auto  custom-scrollbar"
           onScroll={(e) => {
             if (isSearching) return;
 

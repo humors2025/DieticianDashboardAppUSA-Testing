@@ -432,7 +432,7 @@ const transformDatesToDisplay = () => {
     <>
       <PDFLoadingModal isOpen={isPDFExporting} />
 
-      <div className="w-full relative h-[calc(88vh-24px)] overflow-hidden">
+      <div className="w-full relative overflow-hidden">
         {isSidebarOpen && (
           <div
             className="absolute inset-0 bg-black/30 z-40 transition-all duration-300 rounded-[15px]"
@@ -441,7 +441,7 @@ const transformDatesToDisplay = () => {
         )}
 
         <div
-          className={`w-full bg-white px-[15px] pt-[23px] pb-5 rounded-[15px] flex flex-col h-[calc(88vh-24px)] overflow-hidden transition-all duration-300 relative ${isSidebarOpen ? "opacity-90" : "opacity-100"
+          className={`w-full h-full bg-white px-[15px] pt-[23px] pb-5 rounded-[15px] flex flex-col overflow-hidden transition-all duration-300 relative ${isSidebarOpen ? "opacity-90" : "opacity-100"
             }`}
         >
           <div className="flex justify-between items-center pb-[22px] border-b border-[#E1E6ED]">

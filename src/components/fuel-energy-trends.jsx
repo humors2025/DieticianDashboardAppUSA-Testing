@@ -198,7 +198,7 @@ export default function FuelEnergyTrends({ data }) {
                         </div>
 
 
-<div className="flex flex-col gap-2.5 items-center">
+<div className="flex flex-col gap-2.5 items-start">
 
 
 

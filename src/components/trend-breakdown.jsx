@@ -62,7 +62,7 @@ export default function TrendBreakdown() {
 
     return (
         <>
-            <div className="w-[800px] border border-[#E1E6ED] rounded-[15px] px-5 pt-[18px] pb-6">
+            <div className="w-full border border-[#E1E6ED] rounded-[15px] px-5 pt-[18px] pb-6">
 
                 {/* Header */}
                 <div className="flex justify-between items-center">
@@ -91,7 +91,7 @@ export default function TrendBreakdown() {
                         ${activeTab === "digestive" ? "border-b-2 border-[#308BF9]" : ""}`}
                     >
                         <span
-                            className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px]
+                            className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] whitespace-nowrap
                             ${activeTab === "digestive" ? "text-[#308BF9]" : "text-[#A1A1A1]"}`}
                         >
                             Digestive Balance Trend
@@ -110,7 +110,7 @@ export default function TrendBreakdown() {
                         ${activeTab === "fuel" ? "border-b-2 border-[#308BF9]" : ""}`}
                     >
                         <span
-                            className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px]
+                            className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px]  whitespace-nowrap
                             ${activeTab === "fuel" ? "text-[#308BF9]" : "text-[#A1A1A1]"}`}
                         >
                             Fuel & Energy Trend
@@ -129,7 +129,7 @@ export default function TrendBreakdown() {
                         ${activeTab === "metabolic" ? "border-b-2 border-[#308BF9]" : ""}`}
                     >
                         <span
-                            className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px]
+                            className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px]  whitespace-nowrap
                             ${activeTab === "metabolic" ? "text-[#308BF9]" : "text-[#A1A1A1]"}`}
                         >
                             Metabolic Recovery Trend

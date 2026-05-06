@@ -202,7 +202,7 @@ export default function MetabolicRecoveryTrends({ data }) {
 
 
 
-                        <div className="flex flex-col gap-2.5 items-center">
+                        <div className="flex flex-col gap-2.5 items-start">
 
 
 

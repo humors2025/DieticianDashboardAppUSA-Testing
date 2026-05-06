@@ -142,7 +142,7 @@ export default function FatUsePatternTrend() {
 
   return (
     <>
-    <div className="w-full flex flex-col gap-[28px] border border-[#E1E6ED] px-5 pt-[18px] pb-5 rounded-[15px] bg-white">
+    <div className="w-[410px] flex flex-col gap-[28px] border border-[#E1E6ED] px-5 pt-[18px] pb-5 rounded-[15px] bg-white">
       <div className="flex justify-between items-center gap-3">
         <div className="flex gap-[5px] items-center min-w-0">
           <p className="text-[#252525] text-[15px] font-semibold leading-normal tracking-[-0.3px] whitespace-nowrap">
@@ -193,7 +193,7 @@ export default function FatUsePatternTrend() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2.5 items-start"> 
+      <div className="flex flex-col gap-2.5 items-center"> 
         <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
           <b className="font-semibold">{scientificTitle}. </b>
           {scientificText}

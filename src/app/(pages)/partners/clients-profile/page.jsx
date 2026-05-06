@@ -9,7 +9,7 @@ export default function ClientsProfile() {
       
 
         <Suspense fallback={<div>Loading...</div>}>
-            <div className="flex gap-5 h-[85vh] overflow-hidden  ">
+            <div className="flex gap-5 ">
                 <ClientLists/>
                 <ClientDetails/>
             </div>

@@ -14,7 +14,7 @@ export default function TrainerNote() {
         <>
 
 
-            <div className="w-full pt-[25px] pb-5 pl-5 pr-[22px] bg-[#F5F7FA] rounded-[10px]">
+            <div className="w-[800px] pt-[25px] pb-5 pl-5 pr-[22px] bg-[#F5F7FA] rounded-[10px]">
 
                 <p className="text-[#738298] text-[12px] font-semibold leading-normal tracking-[-0.24px] uppercase">TRAINER NOTE</p>
 

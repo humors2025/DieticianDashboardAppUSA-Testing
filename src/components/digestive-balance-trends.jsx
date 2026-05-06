@@ -198,7 +198,7 @@ export default function DigestiveBalanceTrends({ data }) {
 
         
 
-<div className="flex flex-col gap-2.5 items-start">
+<div className="flex flex-col gap-2.5 items-center">
 
 
 

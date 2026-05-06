@@ -5,6 +5,8 @@ import { fetchCalendarData } from "../services/authService";
 import { cookieManager } from "../lib/cookies";
 import { useDispatch, useSelector  } from "react-redux";
 import { setSelectedDate } from "../store/dateSlice";
+import { MdArrowBackIosNew } from "react-icons/md";
+import { MdArrowForwardIos } from "react-icons/md";
 
 export default function Calender() {
    const today = new Date();
@@ -235,7 +237,7 @@ const summary = useSelector((state) => state.clients.summary);
     <>
       {/* Card */}
       <div className="w-[385px] rounded-[15px] border border-[#E1E6ED] bg-[#F5F7FA] px-2.5 pt-2.5">
-        <div className="flex flex-col gap-1 bg-[#DBDFE5] rounded-[15px]">
+        {/* <div className="flex flex-col gap-1 bg-[#DBDFE5] rounded-[15px]">
           <div className="flex justify-between py-5 pl-[18px] pr-14">
             <div className="flex flex-col gap-1.5">
               <p className="text-[#252525] text-[15px] font-semibold leading-[126%] tracking-[-0.3px]">
@@ -260,9 +262,10 @@ const summary = useSelector((state) => state.clients.summary);
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div className="mt-2.5 pl-2 pr-0 flex flex-col gap-5">
+          <div className="flex justify-between items-start">
           <div className="flex flex-col gap-1">
             <p className="text-[#252525] text-[34px] font-normal leading-normal tracking-[-2.04px]">
               {monthLabel}
@@ -271,6 +274,18 @@ const summary = useSelector((state) => state.clients.summary);
               {totalTestsRecorded} Tests Recorded
             </p>
           </div>
+
+<div className="flex gap-5 items-start mr-5 pt-2">
+ <MdArrowBackIosNew  
+ className="w-[24px] h-[24px] cursor-pointer text-[#738298]"
+ onClick={goToPreviousMonth}
+ />
+  <MdArrowForwardIos  
+  className="w-[24px] h-[24px] cursor-pointer text-[#738298]"
+    onClick={goToNextMonth}
+  />
+</div>
+</div>
 
           <div className="flex flex-col gap-2.5 pt-2.5 overflow-y-scroll custom-scrollbar">
             {/* Week header */}

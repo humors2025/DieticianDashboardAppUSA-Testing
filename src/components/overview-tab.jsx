@@ -16,18 +16,14 @@ export default function OverviewTab() {
     const trainerElite = trainerData?.trainer_direction_elite;
     const realTimeDecisionRule = trainerElite?.real_time_decision_rule;
     const profileData = trainerData?.profile_data;
-    console.log("profileData17:-", profileData);
     const readinessSnapshot = trainerElite?.readiness_snapshot;
     const trainingPrescription = trainerElite?.training_prescription;
     const performanceExpectation = trainerElite?.performance_expectation;
-    console.log("performanceExpectation20:-", performanceExpectation);
     const exerciseStrategy = trainerElite?.exercise_strategy;
     const whyTodaysPlan = trainerElite?.why_todays_plan;
-    console.log("whyTodaysPlan24:-", whyTodaysPlan);
     const finalMacros = whyTodaysPlan?.final_macros;
     const energyBudget = whyTodaysPlan?.energy_budget;
     const clientSnapshot = whyTodaysPlan?.client_snapshot;
-    console.log("clientSnapshot26:-", clientSnapshot);
     const foodDirectionSummary = whyTodaysPlan?.food_direction_summary;
     const metabolismSignals = whyTodaysPlan?.metabolism_signals || [];
     const drivers = whyTodaysPlan?.drivers;
@@ -175,9 +171,7 @@ export default function OverviewTab() {
     const exclusions = exerciseStrategy?.exclusions || [];
 
     const clientName = profileData?.email?.split("@")[0] || "Client";
-    console.log("clientName173:-", clientName);
     const formattedClientName = clientName.charAt(0).toUpperCase() + clientName.slice(1);
-    console.log("formattedClientName174:-", formattedClientName);
 
     if (loading) {
         return (

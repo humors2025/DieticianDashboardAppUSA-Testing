@@ -58,7 +58,6 @@ export default function ClientDetails() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const profileId = searchParams.get("profile_id");
-  console.log("profileId:-",profileId);
   const dietitianData = cookieManager.getJSON("dietician");
   const dietitianId = dietitianData?.dietician_id || null;
 
@@ -409,22 +408,45 @@ const transformDatesToDisplay = () => {
     (weeklyDatesError && activeTab === "diet")
   ) {
     return (
+      // <div className="w-full h-[calc(88vh-24px)] bg-white rounded-[15px] flex items-center justify-center">
+      //   <div className="text-center">
+      //     <div className="text-red-500 text-4xl mb-4">⚠️</div>
+      //     <p className="text-red-600 mb-2">
+      //       {activeTab === "diet"
+      //         ? "Failed to load weeks"
+      //         : "Failed to load dates"}
+      //     </p>
+      //     <button
+      //       onClick={() => window.location.reload()}
+      //       className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+      //     >
+      //       Retry
+      //     </button>
+      //   </div>
+      // </div>
+
+
       <div className="w-full h-[calc(88vh-24px)] bg-white rounded-[15px] flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-4xl mb-4">⚠️</div>
-          <p className="text-red-600 mb-2">
-            {activeTab === "diet"
-              ? "Failed to load weeks"
-              : "Failed to load dates"}
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
+  <div className="flex flex-col gap-2.5 text-center">
+    <div className="flex items-center justify-center">
+      <Image
+      src="/icons/freepic-sad.png"
+      alt="freepic-sad.png"
+      width={80}
+      height={80}
+      />
+  </div>
+  <div className="flex flex-col">
+    <p className="text-gray-600 font-medium mb-1">
+      Client hasn't taken their first test yet
+    </p>
+    <p className="text-gray-500 text-sm">
+      Data will appear after the first test is completed.
+    </p>
+    </div>
+  
+    </div>
+</div>
     );
   }
 

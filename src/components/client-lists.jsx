@@ -149,7 +149,7 @@ export default function ClientLists() {
 
   const handleClientClick = (index, profileId) => {
     setActiveIndex(index);
-    router.push(`/partners/clients-profile?profile_id=${profileId}`);
+    router.push(`/trainer/clients-profile?profile_id=${profileId}`);
   };
 
   const handleSearchResults = (results) => {
@@ -201,7 +201,7 @@ export default function ClientLists() {
               width={32}
               height={32}
               className="cursor-pointer"
-              onClick={() => router.push("/dashboard")}
+              onClick={() => router.push("/trainer/dashboard")}
             />
             <p className="text-[#252525] text-[12px] font-semibold leading-[126%] tracking-[-0.24px]">
               Go to Dashboard

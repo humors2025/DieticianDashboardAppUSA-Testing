@@ -348,8 +348,6 @@
 
 
 
-
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -359,6 +357,8 @@ import { fetchClientsDashboard } from "../services/authService";
 import { cookieManager } from "../lib/cookies";
 import { useSelector, useDispatch } from "react-redux";
 import { setSummary } from "../store/clientsDashboardSlice";
+
+const ITEMS_PER_PAGE = 10;
 
 export default function ClientsSection() {
   const [activeTab, setActiveTab] = useState("all");
@@ -430,6 +430,78 @@ export default function ClientsSection() {
 
   const displayClients =
     isValidSearch && searchResults !== null ? searchResults : clients;
+
+  // Get total count based on active tab
+  const getTotalCount = () => {
+    switch (activeTab) {
+      case "tested":
+        return summary.tested_total || 0;
+      case "missed":
+        return summary.missed_total || 0;
+      case "all":
+      default:
+        return summary.all_total || 0;
+    }
+  };
+
+  const totalCount = getTotalCount();
+  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+
+  // Reset to page 1 if current page exceeds total pages (e.g., when switching tabs)
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(1);
+    }
+  }, [totalPages, page]);
+
+  // Pagination with ellipsis - scales well for many pages
+  const getPageNumbers = () => {
+    const maxVisible = 5;
+    const pages = [];
+
+    if (totalPages <= maxVisible + 2) {
+      // Show all pages if total is small enough
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    // Always show first page
+    pages.push(1);
+
+    let start = Math.max(2, page - 1);
+    let end = Math.min(totalPages - 1, page + 1);
+
+    // Adjust window near start
+    if (page <= 3) {
+      start = 2;
+      end = 4;
+    }
+
+    // Adjust window near end
+    if (page >= totalPages - 2) {
+      start = totalPages - 3;
+      end = totalPages - 1;
+    }
+
+    // Add ellipsis after first page if needed
+    if (start > 2) {
+      pages.push("...");
+    }
+
+    // Add middle pages
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    // Add ellipsis before last page if needed
+    if (end < totalPages - 1) {
+      pages.push("...");
+    }
+
+    // Always show last page
+    pages.push(totalPages);
+
+    return pages;
+  };
 
   const tabClass = (tabName) =>
     `px-[30px] py-[11px] rounded-[20px] cursor-pointer transition-all duration-200 whitespace-nowrap ${
@@ -503,11 +575,11 @@ export default function ClientsSection() {
           )}
         </div>
 
-        {!search.trim() && (
+        {!search.trim() && totalCount > 0 && (
           <div className="flex justify-center items-center gap-2 py-5 flex-wrap">
             <button
               disabled={page === 1}
-              onClick={() => setPage((p) => p - 1)}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
               className={`px-3 py-1 border rounded ${
                 page === 1
                   ? "opacity-40 cursor-not-allowed"
@@ -517,25 +589,38 @@ export default function ClientsSection() {
               Prev
             </button>
 
-            {Array.from({ length: 5 }, (_, i) => i + 1).map((num) => (
-              <button
-                key={num}
-                onClick={() => setPage(num)}
-                className={`px-3 py-1 text-[14px] border rounded ${
-                  page === num
-                    ? "bg-[#252525] text-white cursor-pointer"
-                    : "text-[#535359] cursor-pointer"
-                }`}
-              >
-                {num}
-              </button>
-            ))}
+            {getPageNumbers().map((num, idx) => {
+              if (num === "...") {
+                return (
+                  <span
+                    key={`ellipsis-${idx}`}
+                    className="px-3 py-1 text-[14px] text-[#535359]"
+                  >
+                    ...
+                  </span>
+                );
+              }
+
+              return (
+                <button
+                  key={num}
+                  onClick={() => setPage(num)}
+                  className={`px-3 py-1 text-[14px] border rounded ${
+                    page === num
+                      ? "bg-[#252525] text-white cursor-pointer"
+                      : "text-[#535359] cursor-pointer"
+                  }`}
+                >
+                  {num}
+                </button>
+              );
+            })}
 
             <button
-              disabled={clients.length < 10}
-              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               className={`px-3 py-1 border rounded ${
-                clients.length < 10
+                page >= totalPages
                   ? "opacity-40 cursor-not-allowed"
                   : "cursor-pointer"
               }`}

@@ -32,7 +32,7 @@ const initialState = {
   data: null,
   loading: false,
   error: null,
-  selectedRange: "weekly",
+  selectedRange: "all_time",
 };
 
 const progressSlice = createSlice({

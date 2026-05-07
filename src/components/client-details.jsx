@@ -664,7 +664,7 @@ const transformDatesToDisplay = () => {
                 /> */}
               </div>
 
-              {/* <div
+             {/* <div
   onClick={() => handleTabChange("trainer")}
   className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${
     activeTab === "trainer"
@@ -679,8 +679,8 @@ const transformDatesToDisplay = () => {
   >
     Trainer Direction
   </p>
-</div> */}
-              <div
+</div>  */}
+              {/* <div
                 onClick={() => handleTabChange("trainer-direction")}
                 className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${activeTab === "trainer-direction"
                   ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
@@ -693,7 +693,7 @@ const transformDatesToDisplay = () => {
                 >
                   Trainer Direction
                 </p>
-              </div>
+              </div> */}
             </div>
           </div>
 

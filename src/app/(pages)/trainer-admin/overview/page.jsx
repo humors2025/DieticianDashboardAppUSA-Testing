@@ -63,7 +63,7 @@ export default function TrainerAdminOverview() {
   const KPIS = [
     { label: "My trainers",         value: myTrainers.length.toString(),         hint: `${myTrainers.filter((t) => t.status === "active").length} active`, accent: true },
     { label: "Clients in network",  value: myClients.length.toString(),          hint: `${activeClients.length} active subscriptions` },
-    { label: "Override this month", value: fmtUSDCents(overrideMonth),           hint: "20% override on your trainers' clients" },
+    // { label: "Override this month", value: fmtUSDCents(overrideMonth),           hint: "20% override on your trainers' clients" },
     { label: "Override (year est.)",value: fmtUSDCents(overrideMonth * 12),      hint: "Assuming current activity persists" },
   ];
 

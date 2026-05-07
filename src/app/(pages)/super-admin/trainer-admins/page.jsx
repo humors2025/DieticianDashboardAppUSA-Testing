@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   TRAINER_ADMINS,
@@ -9,6 +10,7 @@ import {
   taOverrideThisMonth,
   fmtUSDCents,
 } from "@/lib/demo-data";
+import { isSuspended } from "@/lib/demo-state";
 
 async function inviteTrainerAdmin({ firstName, lastName, email, phone }) {
   await new Promise((r) => setTimeout(r, 400));
@@ -103,23 +105,32 @@ function ExistingTAsTable() {
           </tr>
         </thead>
         <tbody>
-          {TRAINER_ADMINS.map((ta) => (
-            <tr key={ta.id} className="border-t border-[#F5F7FA]">
-              <td className="py-2.5 px-4">
-                <div className="text-[#252525] font-semibold">{ta.first_name} {ta.last_name}</div>
-                <div className="text-[#A1A1A1] text-[11px]">{ta.email}</div>
-              </td>
-              <td className="py-2.5 px-4 text-[#535359] font-mono">{ta.partner_code}</td>
-              <td className="py-2.5 px-4 text-right text-[#252525]">{trainersOf(ta.id).length}</td>
-              <td className="py-2.5 px-4 text-right text-[#252525]">{clientsUnderTA(ta.id).length}</td>
-              <td className="py-2.5 px-4 text-right text-[#252525] font-semibold">{fmtUSDCents(taOverrideThisMonth(ta.id))}</td>
-              <td className="py-2.5 px-4">
-                <span className={`inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${ta.status === "active" ? "bg-[#E5F6EE] text-[#1F7A4A]" : "bg-[#FCEAEB] text-[#B5363A]"}`}>
-                  {ta.status}
-                </span>
-              </td>
-            </tr>
-          ))}
+          {TRAINER_ADMINS.map((ta) => {
+            const taSuspended = isSuspended(ta.id);
+            return (
+              <tr key={ta.id} className="border-t border-[#F5F7FA] hover:bg-[#F5F7FA]">
+                <td className="py-2.5 px-4">
+                  <Link href={`/super-admin/trainer-admins/${ta.id}`} className="text-[#308BF9] font-semibold hover:underline">
+                    {ta.first_name} {ta.last_name}
+                  </Link>
+                  <div className="text-[#A1A1A1] text-[11px]">{ta.email}</div>
+                </td>
+                <td className="py-2.5 px-4 text-[#535359] font-mono">{ta.partner_code}</td>
+                <td className="py-2.5 px-4 text-right text-[#252525]">{trainersOf(ta.id).length}</td>
+                <td className="py-2.5 px-4 text-right text-[#252525]">{clientsUnderTA(ta.id).length}</td>
+                <td className="py-2.5 px-4 text-right text-[#252525] font-semibold">{fmtUSDCents(taOverrideThisMonth(ta.id))}</td>
+                <td className="py-2.5 px-4">
+                  <span className={`inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${
+                    taSuspended ? "bg-[#FCEAEB] text-[#B5363A]" :
+                    ta.status === "active" ? "bg-[#E5F6EE] text-[#1F7A4A]" :
+                    "bg-[#FCEAEB] text-[#B5363A]"
+                  }`}>
+                    {taSuspended ? "suspended" : ta.status}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

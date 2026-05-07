@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   TRAINERS,
   TRAINER_ADMINS,
@@ -91,9 +92,11 @@ export default function SuperAdminTrainersPage() {
             {filtered.map((t) => {
               const ta = taById[t.parent_user_id];
               return (
-                <tr key={t.id} className="border-t border-[#F5F7FA]">
+                <tr key={t.id} className="border-t border-[#F5F7FA] hover:bg-[#F5F7FA]">
                   <td className="py-2.5 px-4">
-                    <div className="text-[#252525] font-semibold">{t.first_name} {t.last_name}</div>
+                    <Link href={`/super-admin/trainers/${t.id}`} className="text-[#308BF9] font-semibold hover:underline">
+                      {t.first_name} {t.last_name}
+                    </Link>
                     <div className="text-[#A1A1A1] text-[11px]">{t.email}</div>
                   </td>
                   <td className="py-2.5 px-4 text-[#535359]">{ta ? `${ta.first_name} ${ta.last_name}` : "—"}</td>

@@ -27,10 +27,11 @@ const MonoIcon = ({ src, size = 20, color = "#A1A1A1", alt = "" }) => (
   />
 );
 
-// Trainers, Earnings, Settings menu items are added in follow-up PRs as
-// their pages land. PR2 ships the empty Trainer Admin shell with just Overview.
 const MENU = [
-  { name: "Overview", icon: "/icons/hugeicons_home-05.svg", path: "/trainer-admin/overview" },
+  { name: "Overview", icon: "/icons/hugeicons_home-05.svg",     path: "/trainer-admin/overview" },
+  { name: "Trainers", icon: "/icons/hugeicons_user-group.png",  path: "/trainer-admin/trainers" },
+  { name: "Earnings", icon: "/icons/hugeicons_award-01.svg",    path: "/trainer-admin/earnings" },
+  { name: "Settings", icon: "/icons/hugeicons_settings-03.svg", path: "/trainer-admin/settings" },
 ];
 
 export default function TrainerAdminHeader() {

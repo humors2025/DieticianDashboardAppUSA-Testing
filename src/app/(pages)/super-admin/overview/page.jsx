@@ -1,28 +1,27 @@
-// TODO: replace placeholder values once backend exposes the admin analytics endpoint.
-// Suggested shape: GET /api/admin/analytics returning
-// { trainer_admins, trainers, clients, this_month_revenue, conversion_funnel: {...},
-//   tier_mix: { coach, lease, owned }, recent_activity: [...] }
+"use client";
 
-const PLACEHOLDER = "—";
+import { networkSummary, fmtUSDCents } from "@/lib/demo-data";
+
+const summary = networkSummary();
 
 const KPIS = [
-  { label: "Trainer Admins",          value: PLACEHOLDER, hint: "Active in the network",        accent: true },
-  { label: "Trainers",                value: PLACEHOLDER, hint: "Across all trainer admins" },
-  { label: "Clients",                 value: PLACEHOLDER, hint: "Active subscriptions" },
-  { label: "This-month revenue",      value: PLACEHOLDER, hint: "Gross before commission" },
+  { label: "Trainer Admins",     value: summary.trainerAdmins.toString(),                       hint: "Active in the network",            accent: true },
+  { label: "Trainers",           value: summary.trainers.toString(),                            hint: `${summary.activeTrainers} active` },
+  { label: "Clients",            value: summary.clients.toString(),                             hint: `${summary.activeClients} active subscriptions` },
+  { label: "This-month revenue", value: fmtUSDCents(summary.monthRevenueCents),                 hint: "Gross before commission" },
 ];
 
 const FUNNEL_STEPS = [
-  { label: "Trainer Admins",  value: PLACEHOLDER },
-  { label: "Trainers onboarded", value: PLACEHOLDER },
-  { label: "Clients onboarded",  value: PLACEHOLDER },
-  { label: "Subscribed",         value: PLACEHOLDER },
+  { label: "Trainer Admins",     value: summary.trainerAdmins.toString() },
+  { label: "Trainers onboarded", value: summary.trainers.toString() },
+  { label: "Clients onboarded",  value: summary.clients.toString() },
+  { label: "Subscribed",         value: summary.activeClients.toString() },
 ];
 
 const TIER_MIX = [
-  { label: "Coach's Device",     value: PLACEHOLDER, color: "#308BF9" },
-  { label: "Lease to Own",       value: PLACEHOLDER, color: "#2EAF6A" },
-  { label: "Owned",              value: PLACEHOLDER, color: "#F2A93B" },
+  { label: "Coach's Device", value: summary.tierMix.coach.toString(), color: "#308BF9" },
+  { label: "Lease to Own",   value: summary.tierMix.lease.toString(), color: "#2EAF6A" },
+  { label: "Owned",          value: summary.tierMix.owned.toString(), color: "#F2A93B" },
 ];
 
 function KpiCard({ label, value, hint, accent }) {
@@ -47,13 +46,18 @@ function KpiCard({ label, value, hint, accent }) {
 export default function SuperAdminOverview() {
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
-          Overview
-        </h1>
-        <p className="text-[#535359] text-[13px] mt-1">
-          A full-network snapshot — trainer admins, trainers, clients, conversion, and revenue.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
+            Overview
+          </h1>
+          <p className="text-[#535359] text-[13px] mt-1">
+            A full-network snapshot — trainer admins, trainers, clients, conversion, and revenue.
+          </p>
+        </div>
+        <span className="rounded-full bg-[#FFF4E0] text-[#A66B00] text-[11px] font-semibold px-3 py-1">
+          Demo data
+        </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -107,14 +111,6 @@ export default function SuperAdminOverview() {
               <div className="text-[#252525] text-[22px] font-bold">{t.value}</div>
             </div>
           ))}
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-[#252525] text-[14px] font-bold mb-3">Recent activity</h3>
-        <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
-          No activity yet. Wires up to the network-wide event stream once backend ships
-          the admin analytics endpoint.
         </div>
       </div>
     </div>

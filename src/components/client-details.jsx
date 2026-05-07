@@ -9,7 +9,7 @@ import TestAnalysis from "./test-analysis";
 import DietAnalysis from "./diet-analysis";
 import MacrosAnalysis from "./macros-analysis";
 import HabitsAnalysis from "./habits-analysis";
-import TrainerDirection from "./trainer-direction";
+// import TrainerDirection from "./trainer-direction";
 import TrainerDirection from "./training-direction/TrainerDirection";
 import RightSidebar from "./rightSidebar";
 import PDFLoadingModal from "./PDFLoadingModal";

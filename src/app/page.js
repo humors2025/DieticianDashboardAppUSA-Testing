@@ -1,27 +1,22 @@
 "use client";
 
-
+import { Suspense } from "react";
 import { LoginForm } from "@/components/login-form";
-import Image from "next/image";
-
 
 export default function Home() {
-
-
   return (
-    <>
-<div 
-className="flex items-center pl-[25px] w-full min-h-screen"
- style={{
-        backgroundImage: "url('/icons/dietician_image_freepik.jpg')", 
+    <div
+      className="flex items-center pl-[25px] w-full min-h-screen"
+      style={{
+        backgroundImage: "url('/icons/dietician_image_freepik.jpg')",
         backgroundSize: "cover",
         backgroundPosition: "center",
-        backgroundRepeat: "no-repeat"
+        backgroundRepeat: "no-repeat",
       }}
->
-
-      <LoginForm />
-      </div>
-    </>
+    >
+      <Suspense fallback={<div className="text-lg text-[#252525]">Loading...</div>}>
+        <LoginForm />
+      </Suspense>
+    </div>
   );
 }

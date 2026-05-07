@@ -1,9 +1,11 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CLIENTS, TRAINERS, TRAINER_ADMINS, fmtUSDCents } from "@/lib/demo-data";
+import { getAttributionOverride } from "@/lib/demo-state";
+import ReattributeDialog from "@/components/admin/ReattributeDialog";
 
 const TIER_LABEL = { coach: "Coach's Device", lease: "Lease to Own", owned: "Owned" };
 const TIER_TERM = { coach: "1 month", lease: "3 months", owned: "12 months" };
@@ -14,7 +16,15 @@ export default function ClientDetailPage({ params }) {
 
   if (!client) notFound();
 
-  const trainer = TRAINERS.find((t) => t.id === client.parent_user_id);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [reattributeOpen, setReattributeOpen] = useState(false);
+
+  useEffect(() => {}, [refreshTick]);
+
+  // Resolve trainer accounting for any attribution override.
+  const attrOverride = getAttributionOverride(client.id);
+  const effectiveTrainerId = attrOverride?.trainer_id || client.parent_user_id;
+  const trainer = TRAINERS.find((t) => t.id === effectiveTrainerId);
   const ta = trainer ? TRAINER_ADMINS.find((t) => t.id === trainer.parent_user_id) : null;
 
   const directCommission = Math.round(client.amount_paid * 0.20);
@@ -49,12 +59,16 @@ export default function ClientDetailPage({ params }) {
 
         <div className="flex flex-col gap-2 items-end">
           <button
-            disabled
-            className="rounded-[10px] bg-[#F5F7FA] text-[#A1A1A1] text-[13px] font-semibold px-4 py-2.5 cursor-not-allowed"
-            title="Coming in a follow-up PR — only Super Admin authorizes retroactive recompute"
+            onClick={() => setReattributeOpen(true)}
+            className="rounded-[10px] bg-[#308BF9] text-white text-[13px] font-semibold px-4 py-2.5"
           >
             Reassign attribution
           </button>
+          {attrOverride && (
+            <span className="rounded-full bg-[#FFF4E0] text-[#A66B00] text-[10px] font-semibold px-2 py-0.5">
+              Reattributed
+            </span>
+          )}
         </div>
       </div>
 
@@ -105,6 +119,14 @@ export default function ClientDetailPage({ params }) {
           </div>
         </div>
       </div>
+
+      <ReattributeDialog
+        open={reattributeOpen}
+        client={client}
+        currentTrainer={trainer}
+        onClose={() => setReattributeOpen(false)}
+        onConfirm={() => setRefreshTick((t) => t + 1)}
+      />
     </div>
   );
 }

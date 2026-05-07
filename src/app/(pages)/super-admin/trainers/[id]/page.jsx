@@ -10,8 +10,9 @@ import {
   trainerCommissionThisMonth,
   fmtUSDCents,
 } from "@/lib/demo-data";
-import { isSuspended, getSuspension } from "@/lib/demo-state";
+import { isSuspended, getSuspension, getRoleOverride } from "@/lib/demo-state";
 import SuspensionDialog from "@/components/admin/SuspensionDialog";
+import EditRoleDialog from "@/components/admin/EditRoleDialog";
 
 const TIER_LABEL = { coach: "Coach's Device", lease: "Lease to Own", owned: "Owned" };
 
@@ -28,6 +29,8 @@ export default function TrainerDetailPage({ params }) {
 
   const suspended = isSuspended(trainer.id);
   const suspension = getSuspension(trainer.id);
+  const roleOverride = getRoleOverride(trainer.id);
+  const currentRole = roleOverride?.role || "trainer";
   const ta = TRAINER_ADMINS.find((t) => t.id === trainer.parent_user_id);
   const myClients = clientsOf(trainer.id);
   const commissionMonth = trainerCommissionThisMonth(trainer.id);
@@ -91,9 +94,8 @@ export default function TrainerDetailPage({ params }) {
             </button>
           )}
           <button
-            disabled
-            className="rounded-[10px] bg-[#F5F7FA] text-[#A1A1A1] text-[13px] font-semibold px-4 py-2.5 cursor-not-allowed"
-            title="Coming in a follow-up PR"
+            onClick={() => setDialogMode("edit-role")}
+            className="rounded-[10px] bg-white border border-[#E1E6ED] text-[#535359] text-[13px] font-semibold px-4 py-2.5 hover:bg-[#F5F7FA]"
           >
             Edit role
           </button>
@@ -164,6 +166,14 @@ export default function TrainerDetailPage({ params }) {
         open={dialogMode === "suspend" || dialogMode === "reinstate"}
         mode={dialogMode}
         target={trainer}
+        onClose={() => setDialogMode(null)}
+        onConfirm={() => setRefreshTick((t) => t + 1)}
+      />
+
+      <EditRoleDialog
+        open={dialogMode === "edit-role"}
+        target={trainer}
+        currentRole={currentRole}
         onClose={() => setDialogMode(null)}
         onConfirm={() => setRefreshTick((t) => t + 1)}
       />

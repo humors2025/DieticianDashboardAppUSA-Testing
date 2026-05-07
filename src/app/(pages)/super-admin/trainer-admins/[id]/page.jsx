@@ -12,8 +12,9 @@ import {
   clientsOf,
   fmtUSDCents,
 } from "@/lib/demo-data";
-import { isSuspended, getSuspension } from "@/lib/demo-state";
+import { isSuspended, getSuspension, getRoleOverride } from "@/lib/demo-state";
 import SuspensionDialog from "@/components/admin/SuspensionDialog";
+import EditRoleDialog from "@/components/admin/EditRoleDialog";
 
 export default function TrainerAdminDetailPage({ params }) {
   const { id } = use(params);
@@ -22,12 +23,14 @@ export default function TrainerAdminDetailPage({ params }) {
   if (!ta) notFound();
 
   const [refreshTick, setRefreshTick] = useState(0);
-  const [dialogMode, setDialogMode] = useState(null); // 'suspend' | 'reinstate'
+  const [dialogMode, setDialogMode] = useState(null); // 'suspend' | 'reinstate' | 'edit-role'
 
   useEffect(() => {}, [refreshTick]);
 
   const suspended = isSuspended(ta.id);
   const suspension = getSuspension(ta.id);
+  const roleOverride = getRoleOverride(ta.id);
+  const currentRole = roleOverride?.role || "trainer_admin";
   const myTrainers = trainersOf(ta.id);
   const myClients = clientsUnderTA(ta.id);
   const overrideMonth = taOverrideThisMonth(ta.id);
@@ -87,9 +90,8 @@ export default function TrainerAdminDetailPage({ params }) {
             </button>
           )}
           <button
-            disabled
-            className="rounded-[10px] bg-[#F5F7FA] text-[#A1A1A1] text-[13px] font-semibold px-4 py-2.5 cursor-not-allowed"
-            title="Coming in a follow-up PR"
+            onClick={() => setDialogMode("edit-role")}
+            className="rounded-[10px] bg-white border border-[#E1E6ED] text-[#535359] text-[13px] font-semibold px-4 py-2.5 hover:bg-[#F5F7FA]"
           >
             Edit role
           </button>
@@ -162,6 +164,14 @@ export default function TrainerAdminDetailPage({ params }) {
         open={dialogMode === "suspend" || dialogMode === "reinstate"}
         mode={dialogMode}
         target={ta}
+        onClose={() => setDialogMode(null)}
+        onConfirm={() => setRefreshTick((t) => t + 1)}
+      />
+
+      <EditRoleDialog
+        open={dialogMode === "edit-role"}
+        target={ta}
+        currentRole={currentRole}
         onClose={() => setDialogMode(null)}
         onConfirm={() => setRefreshTick((t) => t + 1)}
       />

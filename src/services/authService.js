@@ -596,6 +596,23 @@ export const fetchTrainerDirection = async (profileId, dietitianId, date) => {
 
 
 
+export const approveDietPlanService = async (profileId, dieticianId, id, status) => {
+  return apiFetcher(API_ENDPOINTS.DIETANALYSIS.APPROVALPLAN, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      profile_id: profileId,
+      dietician_id: dieticianId,
+      id: id,
+      status: status,
+    }),
+  });
+};
+
+
+
 // // services/authService.js
 
 // import { apiFetcher } from "../config/fetcher";

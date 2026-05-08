@@ -2,18 +2,30 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
+import { toast } from "sonner";
 import EditDietPopup from "./pop-folder/edit-diet-popup";
+import ApproveConfirmationPopup from "./pop-folder/approve-confirmation-popup";
 import {
   selectDietAnalysisData,
   selectDietAnalysisError,
   selectDietAnalysisLoading,
 } from "../store/dietAnalysisSlice";
+import { approveDietPlanService } from "../services/authService";
+import { cookieManager } from "../lib/cookies";
 
 export default function DietPlan() {
   const [activeDay, setActiveDay] = useState(1);
   const [activeMeal, setActiveMeal] = useState("Breakfast");
   const [showPopup, setShowPopup] = useState(false);
+  const [showApprovePopup, setShowApprovePopup] = useState(false);
+  const [isApproved, setIsApproved] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const profileId = searchParams.get("profile_id");
 
   const dietAnalysisData = useSelector(selectDietAnalysisData);
   const dietAnalysisLoading = useSelector(selectDietAnalysisLoading);
@@ -51,6 +63,12 @@ export default function DietPlan() {
   useEffect(() => {
     setActiveDay(1);
     setActiveMeal("Breakfast");
+
+    // Check status_value from API response to set approval state
+    const statusValue = dietAnalysisData?.data?.status_value;
+    setIsApproved(statusValue === 1);
+    setShowPopup(false);
+    setShowApprovePopup(false);
   }, [dietAnalysisData]);
 
   const selectedDayData = days[activeDay - 1]?.data || null;
@@ -79,15 +97,66 @@ export default function DietPlan() {
   };
 
   const formatValue = (value, suffix = "") => {
-    if (value === null || value === undefined || value === "") return `0${suffix}`;
+    if (value === null || value === undefined || value === "") {
+      return `0${suffix}`;
+    }
+
     const num = Number(value);
-    if (Number.isNaN(num)) return `0${suffix}`;
+
+    if (Number.isNaN(num)) {
+      return `0${suffix}`;
+    }
+
     return `${parseFloat(num.toFixed(2))}${suffix}`;
   };
 
+  const handleApproveConfirm = async () => {
+    try {
+      setIsApproving(true);
 
+      // Get dietician_id from cookies
+      const dieticianCookie = cookieManager.getJSON("dietician");
+      const dieticianId = dieticianCookie?.dietician_id;
 
-  return ( 
+      // Get id from dietAnalysisData
+      const planId = dietAnalysisData?.data?.id;
+
+      // Set status to 1 for approval
+      if (!profileId || !dieticianId || !planId) {
+        toast.error("Missing required data for approval");
+        return;
+      }
+
+      const response = await approveDietPlanService(
+        profileId,
+        dieticianId,
+        planId,
+        1 // status: 1 for approved
+      );
+
+      if (response?.status === "success") {
+        setShowApprovePopup(false);
+        setShowPopup(false);
+        
+        toast.success("Diet plan approved successfully");
+        
+        // Reload the page after a short delay to show the success toast
+        setTimeout(() => {
+          router.refresh(); // This refreshes the current route
+          window.location.reload(); // This does a full page reload
+        }, 300);
+      } else {
+        throw new Error(response?.message || "Failed to approve diet plan");
+      }
+    } catch (error) {
+      console.error("Approval error:", error);
+      toast.error(error.message || "Failed to approve diet plan");
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  return (
     <>
       <div
         id="diet-plan-container"
@@ -101,7 +170,8 @@ export default function DietPlan() {
 
             {selectedDayData?.day && (
               <p className="text-[#738298] text-[12px] font-medium leading-normal tracking-[-0.24px]">
-                {days[activeDay - 1]?.dayCode?.toUpperCase()} - {selectedDayData.day}
+                {days[activeDay - 1]?.dayCode?.toUpperCase()} -{" "}
+                {selectedDayData.day}
               </p>
             )}
           </div>
@@ -134,139 +204,232 @@ export default function DietPlan() {
           </div>
         </div>
 
-        <div className="flex gap-[3px] mt-[15px]">
-          <div className="flex flex-col gap-[15px] px-[15px] pt-[15px] pb-[54px] rounded-[15px] border-4 border-[#F5F7FA] min-w-[180px]">
-            {meals.map((meal, index) => {
-              const isActive = activeMeal === meal.name;
+        <div>
+          <div className="flex gap-[3px] mt-[15px]">
+            <div className="flex flex-col gap-[15px] px-[15px] pt-[15px] pb-[54px] rounded-[15px] border-4 border-[#F5F7FA] min-w-[180px]">
+              {meals.map((meal, index) => {
+                const isActive = activeMeal === meal.name;
 
-              return (
-                <div
-                  key={meal.name}
-                  onClick={() => setActiveMeal(meal.name)}
-                  className={`flex flex-col gap-2.5 py-2.5 pl-[15px] pr-2.5 w-full cursor-pointer ${
-                    isActive ? "bg-[#308BF9] rounded-[10px]" : ""
-                  } ${!isActive && index !== 0 ? "border-t border-[#E1E6ED]" : ""}`}
-                >
-                  <p
-                    className={`text-[12px] font-semibold leading-[110%] tracking-[-0.48px] ${
-                      isActive ? "text-white" : "text-[#252525]"
+                return (
+                  <div
+                    key={meal.name}
+                    onClick={() => setActiveMeal(meal.name)}
+                    className={`flex flex-col gap-2.5 py-2.5 pl-[15px] pr-2.5 w-full cursor-pointer ${
+                      isActive ? "bg-[#308BF9] rounded-[10px]" : ""
+                    } ${
+                      !isActive && index !== 0
+                        ? "border-t border-[#E1E6ED]"
+                        : ""
                     }`}
                   >
-                    {meal.name}
-                  </p>
+                    <p
+                      className={`text-[12px] font-semibold leading-[110%] tracking-[-0.48px] ${
+                        isActive ? "text-white" : "text-[#252525]"
+                      }`}
+                    >
+                      {meal.name}
+                    </p>
 
-                  <p
-                    className={`text-[10px] font-normal leading-normal tracking-[-0.2px] ${
-                      isActive ? "text-white" : "text-[#252525]"
-                    }`}
-                  >
-                    {meal.time}
+                    <p
+                      className={`text-[10px] font-normal leading-normal tracking-[-0.2px] ${
+                        isActive ? "text-white" : "text-[#252525]"
+                      }`}
+                    >
+                      {meal.time}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-5 pb-[43px] pl-[15px] pr-2.5 border-4 border-[#F5F7FA] rounded-[15px] flex-1 h-[360px] overflow-y-auto scroll-hide">
+              {dietAnalysisLoading ? (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-[#738298] text-[13px] font-medium">
+                    Loading diet plan...
                   </p>
                 </div>
-              );
-            })}
-          </div>
+              ) : dietAnalysisError ? (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-[#E76F51] text-[13px] font-medium">
+                    {dietAnalysisError}
+                  </p>
+                </div>
+              ) : currentMealFoods.length > 0 ? (
+                <div className="flex flex-col gap-5">
+                  {currentMealFoods.map((food, index) => (
+                    <div
+                      key={`${food.food_name}-${index}`}
+                      className="flex gap-[5px]"
+                    >
+                      <div className="flex my-[3px] items-start shrink-0">
+                        <Image
+                          src={getMealIcon(food.category)}
+                          alt="food-icon"
+                          width={24}
+                          height={24}
+                        />
 
-          <div className="pt-5 pb-[43px] pl-[15px] pr-2.5 border-4 border-[#F5F7FA] rounded-[15px] flex-1 h-[360px] overflow-y-auto scroll-hide">
-            {dietAnalysisLoading ? (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-[#738298] text-[13px] font-medium">
-                  Loading diet plan...
-                </p>
-              </div>
-            ) : dietAnalysisError ? (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-[#E76F51] text-[13px] font-medium">
-                  {dietAnalysisError}
-                </p>
-              </div>
-            ) : currentMealFoods.length > 0 ? (
-              <div className="flex flex-col gap-5">
-                {currentMealFoods.map((food, index) => (
-                  <div key={`${food.food_name}-${index}`} className="flex gap-[5px]">
-                    <div className="flex my-[3px] items-start shrink-0">
-                      <Image
-                        src={getMealIcon(food.category)}
-                        alt="food-icon"
-                        width={24}
-                        height={24}
-                      />
-                      <p className="px-[9px] pt-[3px] pb-0.5 text-[#252525] text-[15px] font-bold leading-[126%] tracking-[-0.3px]">
-                        {index + 1}
-                      </p>
-                    </div>
+                        <p className="px-[9px] pt-[3px] pb-0.5 text-[#252525] text-[15px] font-bold leading-[126%] tracking-[-0.3px]">
+                          {index + 1}
+                        </p>
+                      </div>
 
-                    <div className="flex-1">
-                      <div className="flex flex-col gap-2.5">
-                        <div className="flex flex-col gap-1">
-                          <p className="text-[#252525] text-[12px] font-semibold leading-[126%] tracking-[-0.24px]">
-                            {food.food_name}
-                          </p>
-
-                          <div className="flex flex-wrap items-center gap-[5px]">
-                            <p className="text-[#252525] text-[10px] font-normal leading-normal tracking-[-0.2px]">
-                              {formatValue(food.calories, " kcal")}
+                      <div className="flex-1">
+                        <div className="flex flex-col gap-2.5">
+                          <div className="flex flex-col gap-1">
+                            <p className="text-[#252525] text-[12px] font-semibold leading-[126%] tracking-[-0.24px]">
+                              {food.food_name}
                             </p>
 
-                            {food.portion_with_metric && (
+                            <div className="flex flex-wrap items-center gap-[5px]">
                               <p className="text-[#252525] text-[10px] font-normal leading-normal tracking-[-0.2px]">
-                            
-                              {food.portion_with_metric} 
+                                {formatValue(food.calories, " kcal")}
                               </p>
-                            )}
 
-                            <Image
-                              src="/icons/hugeicons_information-circle0.svg"
-                              alt="hugeicons_information-circle0.svg"
-                              width={12}
-                              height={12}
-                              className="cursor-pointer"
-                            />
-                          </div>
-                        </div>
+                              {food.portion_with_metric && (
+                                <p className="text-[#252525] text-[10px] font-normal leading-normal tracking-[-0.2px]">
+                                  {food.portion_with_metric}
+                                </p>
+                              )}
 
-                        <div className="flex flex-wrap gap-1">
-                          <div className="px-2.5 py-[5px] rounded-[5px] bg-[#2A9D8F1A]">
-                            <p className="text-[#2A9D8F] text-[10px] font-semibold leading-[110%] tracking-[-0.2px]">
-                              {formatValue(food.carbs_g, "g")} Carbs
-                            </p>
+                              <Image
+                                src="/icons/hugeicons_information-circle0.svg"
+                                alt="info-icon"
+                                width={12}
+                                height={12}
+                                className="cursor-pointer"
+                              />
+                            </div>
                           </div>
 
-                          <div className="px-2.5 py-[5px] rounded-[5px] bg-[#F4A2611A]">
-                            <p className="text-[#F4A261] text-[10px] font-semibold leading-[110%] tracking-[-0.2px]">
-                              {formatValue(food.protein_g, "g")} Protein
-                            </p>
-                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            <div className="px-2.5 py-[5px] rounded-[5px] bg-[#2A9D8F1A]">
+                              <p className="text-[#2A9D8F] text-[10px] font-semibold leading-[110%] tracking-[-0.2px]">
+                                {formatValue(food.carbs_g, "g")} Carbs
+                              </p>
+                            </div>
 
-                          <div className="px-2.5 py-[5px] rounded-[5px] bg-[#3A86FF1A]">
-                            <p className="text-[#3A86FF] text-[10px] font-semibold leading-[110%] tracking-[-0.2px]">
-                              {formatValue(food.fat_g, "g")} Fat
-                            </p>
-                          </div>
+                            <div className="px-2.5 py-[5px] rounded-[5px] bg-[#F4A2611A]">
+                              <p className="text-[#F4A261] text-[10px] font-semibold leading-[110%] tracking-[-0.2px]">
+                                {formatValue(food.protein_g, "g")} Protein
+                              </p>
+                            </div>
 
-                          <div className="px-2.5 py-[5px] rounded-[5px] bg-[#E76F511A]">
-                            <p className="text-[#E76F51] text-[10px] font-semibold leading-[110%] tracking-[-0.2px]">
-                              {formatValue(food.fiber_g, "g")} Fiber
-                            </p>
+                            <div className="px-2.5 py-[5px] rounded-[5px] bg-[#3A86FF1A]">
+                              <p className="text-[#3A86FF] text-[10px] font-semibold leading-[110%] tracking-[-0.2px]">
+                                {formatValue(food.fat_g, "g")} Fat
+                              </p>
+                            </div>
+
+                            <div className="px-2.5 py-[5px] rounded-[5px] bg-[#E76F511A]">
+                              <p className="text-[#E76F51] text-[10px] font-semibold leading-[110%] tracking-[-0.2px]">
+                                {formatValue(food.fiber_g, "g")} Fiber
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-[#738298] text-[13px] font-medium">
-                  No food data available
-                </p>
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-[#738298] text-[13px] font-medium">
+                    No food data available
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2.5 justify-end mt-2">
+            {!isApproved && (
+              <p className="py-[11px] text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
+                Auto-approved if not reviewed within 24 hours
+              </p>
             )}
+
+            <div className="flex gap-2.5">
+              {/* <div
+                onClick={() => {
+                  if (!isApproved) {
+                    setShowPopup(true);
+                  }
+                }}
+                aria-disabled={isApproved}
+                className={[
+                  "flex items-center gap-[5px] px-[11px] py-1 border rounded-[4px]",
+                  isApproved
+                    ? "border-[#E1E6ED] bg-[#F5F7FA] cursor-not-allowed opacity-60"
+                    : "border-[#E1E6ED] bg-white cursor-pointer",
+                ].join(" ")}
+              >
+                <Image
+                  src="/icons/hugeicons_edit-04.svg"
+                  alt="edit-icon"
+                  width={20}
+                  height={20}
+                  className={isApproved ? "opacity-50" : ""}
+                />
+
+                <span
+                  className={[
+                    "text-[12px] font-semibold leading-normal tracking-[-0.24px]",
+                    isApproved ? "text-[#A1A1A1]" : "text-[#308BF9]",
+                  ].join(" ")}
+                >
+                  Edit
+                </span>
+              </div> */}
+
+              <div
+                onClick={() => {
+                  if (!isApproved) {
+                    setShowApprovePopup(true);
+                  }
+                }}
+                aria-disabled={isApproved}
+                className={[
+                  "flex items-center gap-[5px] justify-center px-[11px] py-1 rounded-[4px]",
+                  isApproved
+                    ? "bg-[#E1E6ED] cursor-not-allowed"
+                    : "bg-[#308BF9] cursor-pointer",
+                ].join(" ")}
+              >
+                <Image
+                  src="/icons/hugeicons_tick-0236.svg"
+                  alt="approve-icon"
+                  width={20}
+                  height={20}
+                  className={isApproved ? "opacity-50 grayscale" : ""}
+                />
+
+                <span
+                  className={[
+                    "text-[12px] font-semibold leading-normal tracking-[-0.24px]",
+                    isApproved ? "text-[#738298]" : "text-white",
+                  ].join(" ")}
+                >
+                  {isApproved ? "Approved" : "Approve"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {showPopup && <EditDietPopup closePopup={() => setShowPopup(false)} />}
+      {showPopup && !isApproved && (
+        <EditDietPopup closePopup={() => setShowPopup(false)} />
+      )}
+
+      {showApprovePopup && !isApproved && (
+        <ApproveConfirmationPopup
+          onClose={() => setShowApprovePopup(false)}
+          onConfirm={handleApproveConfirm}
+          isLoading={isApproving}
+        />
+      )}
     </>
   );
 }

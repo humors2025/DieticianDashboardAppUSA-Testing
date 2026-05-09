@@ -10,7 +10,7 @@ export default function DietAnalysis() {
 
   useEffect(() => {
     const checkScreenSize = () => {
-      setIsLargeScreen(window.innerWidth > 1440);
+      setIsLargeScreen(window.innerWidth > 1800);
     };
 
     checkScreenSize();

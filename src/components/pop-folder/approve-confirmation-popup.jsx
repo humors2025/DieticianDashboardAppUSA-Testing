@@ -1,6 +1,10 @@
 "use client";
 
-export default function ApproveConfirmationPopup({ onClose, onConfirm, isLoading = false }) {
+export default function ApproveConfirmationPopup({
+  onClose,
+  onConfirm,
+  isLoading = false,
+}) {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-[360px] rounded-[16px] bg-white p-5 shadow-lg">

@@ -138,13 +138,10 @@ export default function DietPlan() {
         setShowApprovePopup(false);
         setShowPopup(false);
         
-        toast.success("Diet plan approved successfully");
+        // Update local state instead of reloading the page
+        setIsApproved(true);
         
-        // Reload the page after a short delay to show the success toast
-        setTimeout(() => {
-          router.refresh(); // This refreshes the current route
-          window.location.reload(); // This does a full page reload
-        }, 300);
+        toast.success("Diet plan approved successfully");
       } else {
         throw new Error(response?.message || "Failed to approve diet plan");
       }
@@ -354,14 +351,14 @@ export default function DietPlan() {
             <div className="flex gap-2.5">
               <div
                 onClick={() => {
-                  if (!isApproved) {
+                  if (!isApproved && !isApproving) {
                     setShowApprovePopup(true);
                   }
                 }}
-                aria-disabled={isApproved}
+                aria-disabled={isApproved || isApproving}
                 className={[
                   "flex items-center gap-[5px] justify-center px-[11px] py-1 rounded-[4px]",
-                  isApproved
+                  isApproved || isApproving
                     ? "bg-[#E1E6ED] cursor-not-allowed"
                     : "bg-[#308BF9] cursor-pointer",
                 ].join(" ")}
@@ -371,16 +368,16 @@ export default function DietPlan() {
                   alt="approve-icon"
                   width={20}
                   height={20}
-                  className={`xl:w-[22px] xl:h-[22px] 2xl:w-[24px] 2xl:h-[24px] ${isApproved ? "opacity-50 grayscale" : ""}`}
+                  className={`xl:w-[22px] xl:h-[22px] 2xl:w-[24px] 2xl:h-[24px] ${isApproved || isApproving ? "opacity-50 grayscale" : ""}`}
                 />
 
                 <span
                   className={[
                     "text-[12px] xl:text-[13px] 2xl:text-[14px] font-semibold leading-normal tracking-[-0.24px]",
-                    isApproved ? "text-[#738298]" : "text-white",
+                    isApproved || isApproving ? "text-[#738298]" : "text-white",
                   ].join(" ")}
                 >
-                  {isApproved ? "Approved" : "Approve"}
+                  {isApproved ? "Approved" : isApproving ? "Approving..." : "Approve"}
                 </span>
               </div>
             </div>
@@ -394,7 +391,11 @@ export default function DietPlan() {
 
       {showApprovePopup && !isApproved && (
         <ApproveConfirmationPopup
-          onClose={() => setShowApprovePopup(false)}
+          onClose={() => {
+            if (!isApproving) {
+              setShowApprovePopup(false);
+            }
+          }}
           onConfirm={handleApproveConfirm}
           isLoading={isApproving}
         />

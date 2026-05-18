@@ -1,10 +1,17 @@
 -- ============================================================
--- SCHEMA PROPOSAL — ID MIGRATION + ROLE HIERARCHY + REFERRAL
+-- SCHEMA PROPOSAL v2 — ID MIGRATION + ROLE HIERARCHY + REFERRAL
 -- Prepared for: Monday May 19, 2026 session with Chandan
 -- DB: dietician_db
 -- NOTE: Do NOT run against live DB. For review only.
 -- ============================================================
 --
+-- v2 CHANGE: ZERO ALTER STATEMENTS on existing tables.
+-- Only NEW tables are created. All existing tables (table_dietician,
+-- table_clients, otp_verifications, app_refresh_token, table_fcm_tokens,
+-- coupon_codes) remain 100% untouched. Old APIs keep working as-is.
+-- The bridge between old and new is handled in PHP logic, not schema.
+--
+-- ============================================================
 -- FRONTEND CONTRACT (from user.js normalizeUser):
 --   user_id, role, first_name, last_name, email, phone,
 --   partner_code, parent_user_id, is_reset_password,
@@ -31,16 +38,16 @@
 
 
 -- ############################################################
--- PART A: UNIFIED USERS TABLE
+-- PART A: UNIFIED USERS TABLE (NEW — no existing table touched)
 -- ############################################################
--- One table for all roles. The backend login endpoint returns a
--- row from here; the frontend reads `role` to route + render.
--- This replaces the need for separate super_admins / trainer_admins
--- / trainers / users tables and ensures dietician_login.php can
--- resolve any role from one query.
+-- One table for all roles. The backend login endpoint queries
+-- this table for new flows; old flows keep hitting table_dietician
+-- and table_clients as before. No conflict.
 --
--- The EXISTING tables (table_dietician, table_clients) stay
--- untouched. New code writes to both during the transition.
+-- dietician_login.php logic:
+--   1. Try app_users by email → if found, return new shape (res.user)
+--   2. Fallback: try table_dietician → return legacy shape (res.dietician)
+--   3. Frontend persistLoginResponse() already handles both shapes
 -- ############################################################
 
 CREATE TABLE `app_users` (
@@ -61,10 +68,10 @@ CREATE TABLE `app_users` (
   `is_reset_password` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0 = must change on first login',
   `email_verified_at` datetime DEFAULT NULL,
 
-  -- Status
+  -- Status (matches demo-data.js: active, suspended)
   `status` enum('active','suspended','inactive') NOT NULL DEFAULT 'active',
 
-  -- Profile (carried over from table_clients for client role)
+  -- Profile fields (for client role — mirrors table_clients columns)
   `profile_image` longblob,
   `dob` varchar(50) DEFAULT NULL,
   `age` varchar(10) DEFAULT NULL,
@@ -74,10 +81,10 @@ CREATE TABLE `app_users` (
   `region` varchar(255) DEFAULT NULL,
   `location` varchar(255) DEFAULT NULL,
 
-  -- Trainer-specific (carried over from table_dietician)
+  -- Trainer-specific (mirrors table_dietician)
   `logo` longblob,
 
-  -- Client-specific
+  -- Client-specific (mirrors table_clients)
   `tier` enum('coach','lease','owned') DEFAULT NULL COMMENT 'Subscription tier, only for role=client',
   `is_trainer_linked` tinyint(1) DEFAULT '0',
   `is_notification_enabled` tinyint(1) NOT NULL DEFAULT '1',
@@ -98,11 +105,13 @@ CREATE TABLE `app_users` (
 
 
 -- ############################################################
--- PART B: ID MAPPING (legacy ↔ new)
+-- PART B: ID MAPPING (legacy ↔ new) — NEW TABLE
 -- ############################################################
 -- Maps old dietician_id/profile_id to new app_users.user_id.
--- Backend JOINs on this during transition so 11 existing tables
--- continue working with their old column names unchanged.
+-- Backend JOINs on this when it needs to cross-reference.
+-- Example: new referral API receives user_id "EvanG", needs to
+-- look up test data → JOIN id_map to get "RespyrD05" → query
+-- table_test_data with the old dietitian_id. No ALTER needed.
 -- ############################################################
 
 CREATE TABLE `id_map` (
@@ -133,9 +142,8 @@ INSERT INTO `id_map` (`legacy_table`, `legacy_id`, `new_user_id`) VALUES
 ('table_dietician', 'RespyrD10', 'SophiaL'),
 ('table_dietician', 'RespyrD11', 'SachineD');
 
--- Corresponding app_users rows for existing trainers
--- (password migrated from table_dietician, email from there too)
--- This is a TEMPLATE — actual insert uses data from table_dietician
+-- TEMPLATE: Seed app_users from existing table_dietician via id_map
+-- (Run on Monday with Chandan after confirming IDs)
 --
 -- INSERT INTO `app_users` (user_id, role, first_name, last_name, email, phone, partner_code, parent_user_id, password, is_reset_password, status, location, logo, created_at)
 -- SELECT
@@ -145,7 +153,7 @@ INSERT INTO `id_map` (`legacy_table`, `legacy_id`, `new_user_id`) VALUES
 --   IF(LOCATE(' ', d.name) > 0, SUBSTRING(d.name, LOCATE(' ', d.name) + 1), ''),
 --   d.email,
 --   d.phone_no,
---   m.new_user_id,          -- partner_code = user_id for trainers
+--   m.new_user_id,
 --   NULL,                    -- parent_user_id: Chandan to assign trainer_admin
 --   d.password,
 --   d.is_reset_password,
@@ -157,7 +165,7 @@ INSERT INTO `id_map` (`legacy_table`, `legacy_id`, `new_user_id`) VALUES
 -- JOIN id_map m ON m.legacy_id = d.dietician_id AND m.legacy_table = 'table_dietician';
 
 
--- TABLES THAT REFERENCE OLD dietician_id / dietitian_id (11 total):
+-- EXISTING TABLES THAT STILL USE OLD IDs (11 total, ALL UNTOUCHED):
 -- ┌─────────────────────────────────┬──────────────────┬──────────────┐
 -- │ Table                           │ Column           │ Width        │
 -- ├─────────────────────────────────┼──────────────────┼──────────────┤
@@ -173,82 +181,27 @@ INSERT INTO `id_map` (`legacy_table`, `legacy_id`, `new_user_id`) VALUES
 -- │ table_diet_plan_strategy        │ dietitian_id     │ varchar(15)  │
 -- │ table_test_data                 │ dietitian_id     │ varchar(15)  │
 -- └─────────────────────────────────┴──────────────────┴──────────────┘
+-- NONE of these tables are altered. PHP code uses id_map JOINs to bridge.
 --
--- MIGRATION STRATEGY (no existing table is modified until Phase 3):
+-- MIGRATION STRATEGY:
 --   Phase 0 (now):  Create app_users + id_map. Seed trainers.
---                   dietician_login.php returns BOTH legacy + new shape.
---                   Frontend already handles both (persistLoginResponse).
---   Phase 1:        Backend APIs start reading from app_users for auth.
---                   Data APIs still query legacy tables via id_map JOIN.
---   Phase 2:        Add trainer_id column (nullable) to each of the 11
---                   legacy tables. Backfill from id_map.
---   Phase 3:        Swap all queries to trainer_id. Drop old columns.
+--                   dietician_login.php adds app_users lookup, returns
+--                   BOTH legacy + new shape. Frontend already handles both.
+--                   ALL old APIs stay exactly as they are.
+--   Phase 1:        New APIs (referral, hierarchy) use app_users only.
+--                   Old APIs (test data, food log, etc.) still use old tables.
+--                   id_map bridges when cross-referencing is needed.
+--   Phase 2:        When Chandan is ready, gradually migrate old APIs to
+--                   read app_users. Each API migrated independently.
+--   Phase 3:        Once all APIs migrated, old tables become read-only
+--                   archive. No rush — can take months.
 
 
 -- ############################################################
--- PART C: ALTER EXISTING TABLES (non-breaking additions only)
--- ############################################################
--- Add columns to existing tables that the frontend already needs.
--- All are nullable → no existing row breaks.
+-- PART C: REFERRAL SYSTEM (NEW TABLES ONLY)
 -- ############################################################
 
--- C1. table_dietician: add role + parent + status columns
---     so the login endpoint can return the full user.js shape
---     even before full migration to app_users.
-ALTER TABLE `table_dietician`
-  ADD COLUMN `role` enum('super_admin','trainer_admin','trainer') NOT NULL DEFAULT 'trainer' AFTER `is_reset_password`,
-  ADD COLUMN `first_name` varchar(100) DEFAULT NULL AFTER `role`,
-  ADD COLUMN `last_name` varchar(100) DEFAULT NULL AFTER `first_name`,
-  ADD COLUMN `partner_code` varchar(50) DEFAULT NULL AFTER `last_name`,
-  ADD COLUMN `parent_user_id` varchar(50) DEFAULT NULL AFTER `partner_code` COMMENT 'FK → app_users.user_id of their trainer_admin',
-  ADD COLUMN `status` enum('active','suspended','inactive') NOT NULL DEFAULT 'active' AFTER `parent_user_id`,
-  ADD COLUMN `email_verified_at` datetime DEFAULT NULL AFTER `status`;
-
--- Backfill first_name / last_name from existing name column
--- UPDATE table_dietician SET
---   first_name = SUBSTRING_INDEX(name, ' ', 1),
---   last_name  = IF(LOCATE(' ', name) > 0, SUBSTRING(name, LOCATE(' ', name) + 1), ''),
---   partner_code = dietician_id;
-
--- C2. table_clients: add tier + status for client shape
-ALTER TABLE `table_clients`
-  ADD COLUMN `first_name` varchar(100) DEFAULT NULL AFTER `profile_name`,
-  ADD COLUMN `last_name` varchar(100) DEFAULT NULL AFTER `first_name`,
-  ADD COLUMN `tier` enum('coach','lease','owned') DEFAULT NULL AFTER `last_name`,
-  ADD COLUMN `status` enum('active','suspended','past_due','inactive') NOT NULL DEFAULT 'active' AFTER `tier`;
-
--- Backfill first_name / last_name from profile_name
--- UPDATE table_clients SET
---   first_name = SUBSTRING_INDEX(profile_name, ' ', 1),
---   last_name  = IF(LOCATE(' ', profile_name) > 0, SUBSTRING(profile_name, LOCATE(' ', profile_name) + 1), '');
-
--- C3. otp_verifications: add role so OTP works for all hierarchy levels
-ALTER TABLE `otp_verifications`
-  ADD COLUMN `role` enum('super_admin','trainer_admin','trainer','client') DEFAULT 'client' AFTER `email`,
-  ADD COLUMN `user_id` varchar(50) DEFAULT NULL AFTER `role`;
-
--- C4. app_refresh_token: currently uses int user_id (table_clients.id).
---     Add varchar column for new app_users.user_id alongside.
-ALTER TABLE `app_refresh_token`
-  ADD COLUMN `app_user_id` varchar(50) DEFAULT NULL AFTER `user_id` COMMENT 'FK → app_users.user_id. Nullable during transition.',
-  ADD COLUMN `role` enum('super_admin','trainer_admin','trainer','client') DEFAULT NULL AFTER `app_user_id`;
-
--- C5. table_fcm_tokens: currently uses profile_id as user_id varchar.
---     Add role column so push works for all hierarchy levels.
-ALTER TABLE `table_fcm_tokens`
-  ADD COLUMN `role` enum('super_admin','trainer_admin','trainer','client') DEFAULT 'client' AFTER `user_id`;
-
--- C6. coupon_codes: add referral as a source
-ALTER TABLE `coupon_codes`
-  MODIFY COLUMN `coupon_source` enum('coach','website','referral') NOT NULL,
-  ADD COLUMN `referral_code_id` int(11) DEFAULT NULL AFTER `coupon_source`;
-
-
--- ############################################################
--- PART D: REFERRAL SYSTEM
--- ############################################################
-
--- D1. REFERRAL CODES
+-- C1. REFERRAL CODES
 CREATE TABLE `referral_codes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `referral_code` varchar(20) NOT NULL,
@@ -264,7 +217,7 @@ CREATE TABLE `referral_codes` (
   KEY `idx_owner` (`owner_role`, `owner_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- D2. REFERRAL TRANSACTIONS
+-- C2. REFERRAL TRANSACTIONS
 CREATE TABLE `referral_transactions` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `referral_code_id` int(11) NOT NULL COMMENT 'FK → referral_codes.id',
@@ -284,7 +237,7 @@ CREATE TABLE `referral_transactions` (
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- D3. REFERRAL REWARDS
+-- C3. REFERRAL REWARDS
 CREATE TABLE `referral_rewards` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `transaction_id` int(11) NOT NULL COMMENT 'FK → referral_transactions.id',
@@ -305,7 +258,7 @@ CREATE TABLE `referral_rewards` (
 
 
 -- ############################################################
--- PART E: AUDIT LOG
+-- PART D: AUDIT LOG (NEW TABLE ONLY)
 -- ############################################################
 -- Required per user lifecycle rules: every privileged action logged.
 -- EditRoleDialog.jsx already sends: userId, fromRole, toRole,
@@ -335,9 +288,9 @@ CREATE TABLE `audit_log` (
 
 
 -- ############################################################
--- PART F: CONFLICT CHECK — TABLE/COLUMN NAME COLLISIONS
+-- PART E: CONFLICT CHECK
 -- ############################################################
--- New tables created in this migration:
+-- NEW tables created (6 total):
 --   app_users              ✓ does not exist in dietician_db
 --   id_map                 ✓ does not exist
 --   referral_codes         ✓ does not exist
@@ -345,36 +298,15 @@ CREATE TABLE `audit_log` (
 --   referral_rewards       ✓ does not exist
 --   audit_log              ✓ does not exist
 --
--- Columns added to EXISTING tables (all nullable, non-breaking):
---   table_dietician:
---     role                 ✓ column does not exist
---     first_name           ✓ column does not exist
---     last_name            ✓ column does not exist
---     partner_code         ✓ column does not exist
---     parent_user_id       ✓ column does not exist
---     status               ✓ column does not exist
---     email_verified_at    ✓ column does not exist
---   table_clients:
---     first_name           ✓ column does not exist
---     last_name            ✓ column does not exist
---     tier                 ✓ column does not exist
---     status               ✓ column does not exist
---   otp_verifications:
---     role                 ✓ column does not exist
---     user_id              ✓ column does not exist
---   app_refresh_token:
---     app_user_id          ✓ column does not exist
---     role                 ✓ column does not exist
---   table_fcm_tokens:
---     role                 ✓ column does not exist
---   coupon_codes:
---     coupon_source        enum extended (coach,website → coach,website,referral)
---     referral_code_id     ✓ column does not exist
+-- EXISTING tables altered: NONE (0)
+-- EXISTING columns modified: NONE (0)
+-- EXISTING columns dropped: NONE (0)
+-- EXISTING tables dropped: NONE (0)
 --
--- NO existing columns are renamed or dropped.
--- NO existing tables are renamed or dropped.
--- NO default values on existing columns change.
--- ALL new columns are nullable or have safe defaults.
+-- RISK TO EXISTING APIs: ZERO
+-- Old APIs never touch these 6 new tables.
+-- New APIs only touch these 6 new tables.
+-- id_map is the bridge — read-only from old API perspective.
 -- ############################################################
 
 
@@ -406,13 +338,15 @@ CREATE TABLE `audit_log` (
 --       (on signup / on first subscription / on first test)
 --   Q9: Referral code format?
 --       (auto e.g. RSPREF-A3X9K2 / custom e.g. DRJOHN / both)
---   Q10: Integrate with existing coupon_codes table or keep separate?
+--   Q10: Keep referral separate from coupon_codes table?
+--        (v1 had ALTER on coupon_codes — removed in v2.
+--         If integration needed, Chandan handles in PHP)
 --   Q11: Deep link for sharing? (respyr.ai/refer/CODE → app store / web)
 --
 -- AUTH:
---   Q12: dietician_login.php — can we add a `role` check there so it
---        queries app_users first, falls back to table_dietician?
---        Frontend already reads both res.user and res.dietician.
+--   Q12: dietician_login.php — add app_users lookup first,
+--        fallback to table_dietician? Frontend already handles
+--        both res.user and res.dietician shapes.
 --   Q13: Does app (Flutter) need to auth against app_users too,
 --        or only web dashboard for now?
 -- ############################################################

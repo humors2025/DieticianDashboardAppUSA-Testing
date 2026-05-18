@@ -10,7 +10,7 @@
 --   - NO profile data (name, email, password, phone, dob, etc.)
 --   - Profile stays in table_dietician / table_clients — zero duplication
 --   - Login: JOIN app_users (role/hierarchy) + old table (credentials/profile)
---   - Super Admin confirmed: connect@respyr.in / RespyrD01 / OfficeHQ
+--   - Super Admin confirmed: ishan@respyr.in / IshanS
 --
 -- v2 CHANGES (carried forward):
 --   - ZERO ALTER STATEMENTS on existing tables
@@ -47,7 +47,7 @@
 
 CREATE TABLE `app_users` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `user_id` varchar(50) NOT NULL COMMENT 'New business ID e.g. OfficeHQ, EvanG',
+  `user_id` varchar(50) NOT NULL COMMENT 'New business ID e.g. IshanS, EvanG',
   `role` enum('super_admin','trainer_admin','trainer','client') NOT NULL,
   `partner_code` varchar(50) DEFAULT NULL COMMENT 'Public-facing code e.g. EVAN2026',
   `parent_user_id` varchar(50) DEFAULT NULL COMMENT 'FK → app_users.user_id. Hierarchy chain: SA→TA→Trainer→Client',
@@ -62,13 +62,18 @@ CREATE TABLE `app_users` (
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- SEED: Super Admin (confirmed by Chandan)
+-- SEED: Super Admin (ishan@respyr.in — password: Qwerty@12345)
+-- NOTE FOR CHANDAN: ishan@respyr.in needs a row in table_dietician first.
+--   INSERT INTO table_dietician (dietician_id, name, email, password, ...)
+--   VALUES ('RespyrD12', 'Ishan Sinha', 'ishan@respyr.in', '$2y$12$<bcrypt_hash_of_Qwerty@12345>', ...);
+--   Then the id_map below bridges RespyrD12 → IshanS.
 INSERT INTO `app_users` (`user_id`, `role`, `partner_code`, `parent_user_id`, `status`) VALUES
-('OfficeHQ', 'super_admin', 'OfficeHQ', NULL, 'active');
+('IshanS', 'super_admin', 'IshanS', NULL, 'active');
 
 -- SEED: Existing trainers (Chandan to confirm user_id values + who is TA vs Trainer)
 -- parent_user_id TBD — depends on Q3: which trainers report to which TA
 INSERT INTO `app_users` (`user_id`, `role`, `partner_code`, `parent_user_id`, `status`) VALUES
+('OfficeHQ',  'trainer', 'OfficeHQ',  NULL, 'active'),   -- RespyrD01, connect@respyr.in — role TBD with Chandan
 ('GayatriR',  'trainer', 'GayatriR',  NULL, 'active'),   -- RespyrD02, parent TBD
 ('SagarH',    'trainer', 'SagarH',    NULL, 'active'),   -- RespyrD03, parent TBD
 ('AnkurJ',    'trainer', 'AnkurJ',    NULL, 'active'),   -- RespyrD04, parent TBD
@@ -110,8 +115,10 @@ CREATE TABLE `id_map` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- SEED: Map old dietician_id → new user_id
+-- NOTE: RespyrD12 for IshanS needs to be created in table_dietician first (see above)
 INSERT INTO `id_map` (`legacy_table`, `legacy_id`, `new_user_id`) VALUES
-('table_dietician', 'RespyrD01', 'OfficeHQ'),   -- OFFICE → Super Admin
+('table_dietician', 'RespyrD12', 'IshanS'),     -- Ishan → Super Admin
+('table_dietician', 'RespyrD01', 'OfficeHQ'),   -- OFFICE (connect@respyr.in) → demoted to trainer or TBD
 ('table_dietician', 'RespyrD02', 'GayatriR'),   -- Gayatri
 ('table_dietician', 'RespyrD03', 'SagarH'),     -- Sagar
 ('table_dietician', 'RespyrD04', 'AnkurJ'),     -- Ankur Jaiswal
@@ -256,7 +263,7 @@ CREATE TABLE `audit_log` (
 -- ############################################################
 --
 -- ANSWERED:
---   ✅ Q2: Super Admin = connect@respyr.in / RespyrD01 / OfficeHQ
+--   ✅ Q2: Super Admin = ishan@respyr.in / RespyrD12 / IshanS (password: Qwerty@12345)
 --   ✅ app_users = thin table (Option A), no profile duplication
 --
 -- STILL OPEN:

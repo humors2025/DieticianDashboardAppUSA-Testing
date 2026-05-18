@@ -6,6 +6,40 @@
 ```mermaid
 erDiagram
     %% ============================================================
+    %% LEGACY TABLES (existing — not altered, shown first for context)
+    %% ============================================================
+
+    table_dietician {
+        varchar dietician_id PK "e.g. RespyrD01"
+        varchar name
+        varchar email
+        varchar password "bcrypt"
+        varchar phone_no
+        tinyint is_reset_password
+    }
+
+    table_clients {
+        varchar profile_id PK "e.g. profile257"
+        varchar dietician_id FK "FK → table_dietician"
+        varchar name
+        varchar email
+        varchar phone_no
+        varchar dob
+        varchar gender
+        float height
+        float weight
+    }
+
+    client_subscriptions {
+        int id PK
+        varchar dietician_id FK
+        varchar profile_id FK
+        varchar plan_type
+        datetime start_date
+        datetime end_date
+    }
+
+    %% ============================================================
     %% NEW TABLES (6)
     %% ============================================================
 
@@ -83,40 +117,6 @@ erDiagram
         text reason
         json details
         datetime created_at
-    }
-
-    %% ============================================================
-    %% LEGACY TABLES (not altered — shown for context)
-    %% ============================================================
-
-    table_dietician {
-        varchar dietician_id PK "e.g. RespyrD01"
-        varchar name
-        varchar email
-        varchar password "bcrypt"
-        varchar phone_no
-        tinyint is_reset_password
-    }
-
-    table_clients {
-        varchar profile_id PK "e.g. profile257"
-        varchar dietician_id FK "FK → table_dietician"
-        varchar name
-        varchar email
-        varchar phone_no
-        varchar dob
-        varchar gender
-        float height
-        float weight
-    }
-
-    client_subscriptions {
-        int id PK
-        varchar dietician_id FK
-        varchar profile_id FK
-        varchar plan_type
-        datetime start_date
-        datetime end_date
     }
 
     %% ============================================================

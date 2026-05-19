@@ -15,10 +15,11 @@ import Image from "next/image";
 // the recipient lands on a heading that matches their role. Default (no param)
 // is the generic "Welcome!".
 const ROLE_HEADINGS = {
-  super_admin:   "Welcome Super-Admin!",
+  super_admin: "Welcome Super-Admin!",
+  admin: "Welcome Trainer-Admin!",
   trainer_admin: "Welcome Trainer-Admin!",
-  trainer:       "Welcome Trainer!",
-  client:        "Welcome!",
+  trainer: "Welcome Trainer!",
+  client: "Welcome!",
 };
 
 export function LoginForm({ className, ...props }) {

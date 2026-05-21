@@ -13,6 +13,7 @@ import progressReducer from "./progressSlice";
 import dietAnalysisReducer from "./dietAnalysisSlice";
 import macroSummaryReducer from "./macroSummarySlice";
 import habitMonitoringReducer from "./habitMonitoringSlice";
+import habitDetailReducer from "./habitDetailSlice";
 import trainerDirectionReducer from "./trainerDirectionSlice";
 
 
@@ -31,6 +32,7 @@ export const store = configureStore({
         dietAnalysis: dietAnalysisReducer,
         macroSummary: macroSummaryReducer,
       habitMonitoring: habitMonitoringReducer,
+      habitDetail: habitDetailReducer,
       trainerDirection: trainerDirectionReducer,
   },
 

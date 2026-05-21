@@ -1,23 +1,111 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "next/navigation";
 import { IoChevronBackOutline } from "react-icons/io5";
 import { IoIosArrowForward } from "react-icons/io";
 import { IoIosArrowRoundBack } from "react-icons/io";
+import { getHabitDetail, clearHabitDetail } from "../store/habitDetailSlice";
+import { cookieManager } from "../lib/cookies";
+
+const HABIT_COLOR_SCHEMES = {
+  "Nutrition Habits": { color: "#91850E", bgColor: "#FCF8CF" },
+  "Activity Habits": { color: "#078C21", bgColor: "#CAE8D0" },
+  "Sleep & Recovery Habits": { color: "#179C9C", bgColor: "#E1F3F3" },
+  "Health / Digestion / Lifestyle": { color: "#B42525", bgColor: "#FFEDED" },
+};
+
+const FALLBACK_COLOR_SCHEMES = [
+  { color: "#1D57A0", bgColor: "#E4F0FF" },
+  { color: "#91850E", bgColor: "#FCF8CF" },
+  { color: "#078C21", bgColor: "#CAE8D0" },
+];
+
+const getHabitColorScheme = (category, index = 0) =>
+  HABIT_COLOR_SCHEMES[category] ||
+  FALLBACK_COLOR_SCHEMES[index % FALLBACK_COLOR_SCHEMES.length];
+
+// Parse "YYYY-MM-DD" (or "YYYY-MM-DD HH:MM:SS") as a *local* date at midnight.
+// Avoids the timezone shift that `new Date("YYYY-MM-DD")` causes by treating
+// the input as UTC.
+const parseLocalDate = (raw) => {
+  if (!raw) return null;
+  const match = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const [, y, m, d] = match;
+  return new Date(Number(y), Number(m) - 1, Number(d));
+};
 
 export default function RightHandSidebar({ isOpen, onClose, selectedHabit, setSelectedHabit }) {
-  const [calendarDate, setCalendarDate] = useState(new Date());
+  const dispatch = useDispatch();
+  const searchParams = useSearchParams();
+
+  const { habitList, loading: listLoading } = useSelector(
+    (state) => state.habitMonitoring
+  );
+  const {
+    habit: detailHabit,
+    data: detailData,
+    loading: detailLoading,
+    error: detailError,
+  } = useSelector((state) => state.habitDetail);
+
+  const habits = habitList || [];
+
+  const profileId = searchParams.get("profile_id");
+  const dieticianCookie = cookieManager.getJSON("dietician");
+  const dietitianId =
+    dieticianCookie?.dietitian_id ||
+    dieticianCookie?.dietician_id ||
+    dieticianCookie?.id ||
+    "";
+
+  const fetchHabit = (habit) => {
+    if (profileId && dietitianId && habit?.selected_habit_id) {
+      dispatch(
+        getHabitDetail({
+          profileId,
+          dietitianId,
+          selectedHabitId: habit.selected_habit_id,
+        })
+      );
+    }
+  };
 
   const handleClose = () => {
-    // Don't reset selectedHabit here, let the parent handle it
     onClose();
   };
 
-  /* ---------------- CURRENT MONTH CALENDAR ---------------- */
-  const currentMonth = calendarDate.getMonth();
-  const currentYear = calendarDate.getFullYear();
+  const handleBackToList = () => {
+    if (setSelectedHabit) {
+      setSelectedHabit(null);
+    }
+    dispatch(clearHabitDetail());
+  };
 
-  const monthTitle = calendarDate.toLocaleString("default", {
+  /* ---------------- DETAIL VIEW DATA ---------------- */
+  // Prefer fresh API data; fall back to the habit object from the list
+  // (so we render something immediately while the detail call is in flight).
+  const activeHabit = detailHabit || selectedHabit;
+  const activeScheme = activeHabit
+    ? getHabitColorScheme(activeHabit.category)
+    : null;
+  const activeColor = activeScheme?.color || "#1D57A0";
+  const activeBgColor = activeScheme?.bgColor || "#E4F0FF";
+
+  const weekTracking = activeHabit?.week_tracking || [];
+
+  /* ---------------- CALENDAR LOCKED TO WEEK_TRACKING MONTH ---------------- */
+  const calendarAnchor = useMemo(() => {
+    const firstDateStr = weekTracking[0]?.date || detailData?.today;
+    return parseLocalDate(firstDateStr) || new Date();
+  }, [weekTracking, detailData?.today]);
+
+  const currentMonth = calendarAnchor.getMonth();
+  const currentYear = calendarAnchor.getFullYear();
+
+  const monthTitle = calendarAnchor.toLocaleString("default", {
     month: "short",
     year: "numeric",
   });
@@ -29,40 +117,53 @@ export default function RightHandSidebar({ isOpen, onClose, selectedHabit, setSe
   startDay = startDay === 0 ? 6 : startDay - 1; // Mon=0
 
   const calendarDays = [];
-
-  for (let i = 0; i < startDay; i++) {
-    calendarDays.push(null);
-  }
-
-  for (let i = 1; i <= lastDate; i++) {
-    calendarDays.push(i);
-  }
-
-  while (calendarDays.length % 7 !== 0) {
-    calendarDays.push(null);
-  }
+  for (let i = 0; i < startDay; i++) calendarDays.push(null);
+  for (let i = 1; i <= lastDate; i++) calendarDays.push(i);
+  while (calendarDays.length % 7 !== 0) calendarDays.push(null);
 
   const rows = [];
   for (let i = 0; i < calendarDays.length; i += 7) {
     rows.push(calendarDays.slice(i, i + 7));
   }
 
-  const completedDays = [2, 5, 9, 12];
+  const todayDate = useMemo(
+    () => parseLocalDate(detailData?.today),
+    [detailData?.today]
+  );
 
-  const goPrevMonth = () => {
-    setCalendarDate(
-      new Date(currentYear, currentMonth - 1, 1)
-    );
+  // Split week_tracking entries (within the displayed month) into completed
+  // vs. missed. "Missed" = past day with is_completed=false.
+  const { completedDays, missedDays } = (() => {
+    const completed = [];
+    const missed = [];
+    weekTracking.forEach((entry) => {
+      const d = parseLocalDate(entry?.date);
+      if (!d) return;
+      if (d.getFullYear() !== currentYear || d.getMonth() !== currentMonth) return;
+
+      const dayNum = d.getDate();
+      if (entry.is_completed) {
+        completed.push(dayNum);
+      } else if (todayDate && d.getTime() < todayDate.getTime()) {
+        missed.push(dayNum);
+      }
+    });
+    return { completedDays: completed, missedDays: missed };
+  })();
+
+  const getDayState = (num) => {
+    if (num === null) return "empty";
+    const cellDate = new Date(currentYear, currentMonth, num);
+    cellDate.setHours(0, 0, 0, 0);
+
+    if (todayDate) {
+      if (cellDate.getTime() > todayDate.getTime()) return "future";
+      if (cellDate.getTime() === todayDate.getTime()) return "today";
+    }
+    if (completedDays.includes(num)) return "completed";
+    if (missedDays.includes(num)) return "missed";
+    return "past";
   };
-
-  const goNextMonth = () => {
-    setCalendarDate(
-      new Date(currentYear, currentMonth + 1, 1)
-    );
-  };
-
-  // Remove the local selectedHabit state since we're receiving it as prop
-  // const [selectedHabit, setSelectedHabit] = useState(null);
 
   return (
     <>
@@ -90,16 +191,14 @@ export default function RightHandSidebar({ isOpen, onClose, selectedHabit, setSe
         <div className="flex flex-col h-full w-[450px] bg-white shadow-lg rounded-r-[15px] overflow-hidden pt-[26px]">
           <div className="flex gap-1.5 ml-[25px] mb-[29px] items-center">
             <IoIosArrowRoundBack
-              onClick={() => {
-                if (setSelectedHabit) {
-                  setSelectedHabit(null);
-                }
-              }}
+              onClick={handleBackToList}
               className="w-[33px] h-8 cursor-pointer"
             />
 
             <span className="text-[#252525] text-[15px] font-semibold leading-[110%] tracking-[-0.3px]">
-              {selectedHabit ? selectedHabit.title : "All Habits (6)"}
+              {activeHabit
+                ? activeHabit.title || activeHabit.habit_name
+                : `All Habits (${habits.length})`}
             </span>
           </div>
 
@@ -107,174 +206,204 @@ export default function RightHandSidebar({ isOpen, onClose, selectedHabit, setSe
             <div className="group flex-1 min-h-0 overflow-hidden">
               <div className="h-full overflow-y-auto group-hover-scrollbar">
                 <div className="flex flex-col gap-[15px] px-[15px] pb-4">
-                  {Array.from({ length: 9 }).map((_, index) => (
-                    <div
-                      key={index}
-                      onClick={() => {
-                        if (setSelectedHabit) {
-                          // Create a default habit object or use your data
-                          setSelectedHabit({
-                            id: index,
-                            title: "Grocery shop 1× per week",
-                            frequency: "Once a week",
-                            frequencyShort: "Once a week",
-                            color: "#1D57A0",
-                            completionRate: 50,
-                            perfectWeeks: 1,
-                            weeksTracked: 5
-                          });
-                        }
-                      }}
-                      className="flex justify-between bg-[#F5F7FA] rounded-[12px] pl-5 pr-[22px] pt-[18px] pb-[23px] border-l-[12px] border-[#1D57A0] cursor-pointer"
-                    >
-                      <div className="flex flex-col gap-[5px]">
-                        <p className="text-[#252525] text-[15px] font-normal leading-[110%] tracking-[-0.3px]">
-                          Grocery shop 1× per week
-                        </p>
-
-                        <p className="text-[#1D57A0] text-[10px] font-normal leading-normal tracking-[-0.2px]">
-                          Once a week
-                        </p>
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <p className="text-[#252525] text-[15px] font-semibold leading-[126%] tracking-[-0.3px]">
-                          50%
-                        </p>
-
-                        <p className="text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
-                          Once a week
-                        </p>
-                      </div>
+                  {listLoading ? (
+                    <div className="flex justify-center items-center py-10">
+                      <p className="text-[#535359] text-[13px]">Loading habits...</p>
                     </div>
-                  ))}
+                  ) : habits.length === 0 ? (
+                    <div className="flex justify-center items-center py-10">
+                      <p className="text-[#535359] text-[13px]">No habits found</p>
+                    </div>
+                  ) : (
+                    habits.map((habit, index) => {
+                      const scheme = getHabitColorScheme(habit.category, index);
+                      return (
+                        <div
+                          key={habit.selected_habit_id ?? index}
+                          onClick={() => {
+                            if (setSelectedHabit) {
+                              setSelectedHabit(habit);
+                            }
+                            fetchHabit(habit);
+                          }}
+                          className="flex justify-between bg-[#F5F7FA] rounded-[12px] pl-5 pr-[22px] pt-[18px] pb-[23px] border-l-[12px] cursor-pointer"
+                          style={{ borderLeftColor: scheme.color }}
+                        >
+                          <div className="flex flex-col gap-[5px]">
+                            <p className="text-[#252525] text-[15px] font-normal leading-[110%] tracking-[-0.3px]">
+                              {habit.title || habit.habit_name}
+                            </p>
+
+                            <p
+                              className="text-[10px] font-normal leading-normal tracking-[-0.2px]"
+                              style={{ color: scheme.color }}
+                            >
+                              {habit.frequency_type}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5 items-end">
+                            <p className="text-[#252525] text-[15px] font-semibold leading-[126%] tracking-[-0.3px]">
+                              {habit.weekly_completion_rate ?? 0}%
+                            </p>
+
+                            <p className="text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
+                              {habit.frequency_type}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </div>
           ) : (
             <div className="flex flex-col gap-[17px] px-[15px]">
-              <div 
-                className="flex flex-col gap-5 rounded-[12px] pl-5 pr-[22px] pt-[18px] pb-[23px] cursor-pointer"
-                style={{ 
-                  backgroundColor: '#F5F7FA',
-                  borderLeft: `12px solid ${selectedHabit.color || '#1D57A0'}` 
-                }}
-              >
-                <div className="flex flex-col gap-[5px]">
-                  <p className="text-[#252525] text-[15px] font-normal leading-[110%] tracking-[-0.3px]">
-                    {selectedHabit.title}
-                  </p>
-
-                  <p 
-                    className="text-[10px] font-normal leading-normal tracking-[-0.2px]"
-                    style={{ color: selectedHabit.color || '#1D57A0' }}
+              {detailLoading && !detailHabit ? (
+                <div className="flex justify-center items-center py-10">
+                  <p className="text-[#535359] text-[13px]">Loading habit details...</p>
+                </div>
+              ) : detailError && !detailHabit ? (
+                <div className="flex justify-center items-center py-10">
+                  <p className="text-[#DA5747] text-[13px]">{detailError}</p>
+                </div>
+              ) : activeHabit ? (
+                <>
+                  <div
+                    className="flex flex-col gap-5 rounded-[12px] pl-5 pr-[22px] pt-[18px] pb-[23px]"
+                    style={{
+                      backgroundColor: "#F5F7FA",
+                      borderLeft: `12px solid ${activeColor}`,
+                    }}
                   >
-                    {selectedHabit.frequency}
-                  </p>
-                </div>
+                    <div className="flex flex-col gap-[5px]">
+                      <p className="text-[#252525] text-[15px] font-normal leading-[110%] tracking-[-0.3px]">
+                        {activeHabit.title || activeHabit.habit_name}
+                      </p>
 
-                <div className="flex justify-between">
-                  <div className="flex flex-col gap-1.5">
-                    <p className="text-[#252525] text-[15px] font-semibold leading-[126%] tracking-[-0.3px]">
-                      {selectedHabit.completionRate}%
-                    </p>
+                      <p
+                        className="text-[10px] font-normal leading-normal tracking-[-0.2px]"
+                        style={{ color: activeColor }}
+                      >
+                        {activeHabit.frequency_type}
+                      </p>
+                    </div>
 
-                    <p className="text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
-                      Completion Rate
-                    </p>
+                    <div className="flex justify-between">
+                      <div className="flex flex-col gap-1.5">
+                        <p className="text-[#252525] text-[15px] font-semibold leading-[126%] tracking-[-0.3px]">
+                          {activeHabit.weekly_completion_rate ?? 0}%
+                        </p>
+
+                        <p className="text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
+                          Completion Rate
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <p className="text-[#252525] text-[15px] font-semibold leading-[126%] tracking-[-0.3px]">
+                          {activeHabit.completed_days ?? 0}
+                        </p>
+
+                        <p className="text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
+                          Completed Days
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <p className="text-[#252525] text-[15px] font-semibold leading-[126%] tracking-[-0.3px]">
+                          {activeHabit.total_days ?? 0}
+                        </p>
+
+                        <p className="text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
+                          Total Days
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <p className="text-[#252525] text-[15px] font-semibold leading-[126%] tracking-[-0.3px]">
-                      {selectedHabit.perfectWeeks}
-                    </p>
+                  {/* CALENDAR LOCKED TO WEEK_TRACKING MONTH */}
+                  <div>
+                    <div className="flex justify-between items-center py-[15px] px-[12px]">
+                      <span className="text-[15px] font-semibold leading-[126%] tracking-[-0.3px]">
+                        {monthTitle}
+                      </span>
 
-                    <p className="text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
-                      Total Perfect Weeks
-                    </p>
-                  </div>
+                      <div className="flex gap-5 items-center mx-[27px]">
+                        <IoChevronBackOutline className="w-6 h-6 text-[#C5CAD1]" />
+                        <IoIosArrowForward className="w-6 h-6 text-[#C5CAD1]" />
+                      </div>
+                    </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <p className="text-[#252525] text-[15px] font-semibold leading-[126%] tracking-[-0.3px]">
-                      {selectedHabit.weeksTracked}
-                    </p>
-
-                    <p className="text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
-                      Weeks Tracked
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* CURRENT MONTH CALENDAR */}
-              <div>
-                <div className="flex justify-between items-center py-[15px] px-[12px]">
-                  <span className="text-[15px] font-semibold leading-[126%] tracking-[-0.3px]">
-                    {monthTitle}
-                  </span>
-
-                  <div className="flex gap-5 items-center mx-[27px]">
-                    <IoChevronBackOutline
-                      onClick={goPrevMonth}
-                      className="w-6 h-6 cursor-pointer"
-                    />
-
-                    <IoIosArrowForward
-                      onClick={goNextMonth}
-                      className="w-6 h-6 cursor-pointer"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-[9px] mx-5">
-                  <div className="grid grid-cols-7 gap-2.5 border-b border-[#E1E6ED] pb-1">
-                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
-                      (day, index) => (
-                        <div
-                          key={day}
-                          className="flex justify-center px-3.5 py-1.5"
-                        >
-                          <span
-                            className={`text-[10px] font-normal leading-normal tracking-[-0.2px] ${index === 6
-                                ? "text-[#DA5747]"
-                                : "text-[#252525]"
-                              }`}
-                          >
-                            {day}
-                          </span>
-                        </div>
-                      )
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    {rows.map((week, rowIndex) => (
-                      <div key={rowIndex} className="grid grid-cols-7 gap-2.5">
-                        {week.map((num, i) => (
-                          <div
-                            key={i}
-                            className={`h-[30px] flex items-center justify-center rounded-[25px] px-[7px] py-[5px] cursor-pointer ${num === null
-                                ? ""
-                                : completedDays.includes(num)
-                                  ? "border"
-                                  : "bg-[#E4F0FF]"
-                              }`}
-                            style={num !== null && completedDays.includes(num) ? 
-                              { borderColor: selectedHabit.color || '#1D57A0' } : 
-                              {}}
-                          >
-                            {num !== null && (
-                              <span className="text-[#252525] text-[10px] font-normal leading-normal tracking-[-0.2px]">
-                                {num}
+                    <div className="flex flex-col gap-[9px] mx-5">
+                      <div className="grid grid-cols-7 gap-2.5 border-b border-[#E1E6ED] pb-1">
+                        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
+                          (day, index) => (
+                            <div
+                              key={day}
+                              className="flex justify-center px-3.5 py-1.5"
+                            >
+                              <span
+                                className={`text-[10px] font-normal leading-normal tracking-[-0.2px] ${index === 6
+                                    ? "text-[#DA5747]"
+                                    : "text-[#252525]"
+                                  }`}
+                              >
+                                {day}
                               </span>
-                            )}
+                            </div>
+                          )
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        {rows.map((week, rowIndex) => (
+                          <div key={rowIndex} className="grid grid-cols-7 gap-2.5">
+                            {week.map((num, i) => {
+                              const state = getDayState(num);
+
+                              let cellStyle = {};
+                              let cellBgClass = "";
+
+                              if (state === "completed") {
+                                cellStyle = { backgroundColor: activeBgColor };
+                              } else if (state === "missed") {
+                                cellStyle = {
+                                  border: `1px solid ${activeColor}`,
+                                  backgroundColor: "#FFFFFF",
+                                };
+                              } else if (state === "past") {
+                                cellBgClass = "bg-[#E4F0FF]";
+                              }
+
+                              const textColor =
+                                state === "future" ? "#A1A1A1" : "#252525";
+
+                              return (
+                                <div
+                                  key={i}
+                                  className={`h-[30px] flex items-center justify-center rounded-[25px] px-[7px] py-[5px] ${cellBgClass}`}
+                                  style={cellStyle}
+                                >
+                                  {num !== null && (
+                                    <span
+                                      className="text-[10px] font-normal leading-normal tracking-[-0.2px]"
+                                      style={{ color: textColor }}
+                                    >
+                                      {num}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         ))}
                       </div>
-                    ))}
+                    </div>
                   </div>
-                </div>
-              </div>
+                </>
+              ) : null}
             </div>
           )}
         </div>

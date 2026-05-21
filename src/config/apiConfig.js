@@ -7,8 +7,7 @@ process.env.NEXT_PUBLIC_API_BASE_URL  || "https://humorstech.com";
 // Centralized API endpoints
 export const API_ENDPOINTS = {
   AUTH: {
-    // LOGIN: "/humors_app/app_final/dieticianapp/web/api/dietician_login.php",
-    LOGIN: "/dietitian/api/web/role-login-jwt.php",
+    LOGIN: "/humors_app/app_final/dieticianapp/web/api/dietician_login.php",
     SEND_OTP: "/humors_app/app_final/dieticianapp/web/api/send_diatitian_otp.php",
     RESET_PASSWORD: "/humors_app/app_final/dieticianapp/web/api/update_diatitian_password.php",
     DIETPLANSTATUS:"/dietitian/api/web/update_diet_plan_status.php",
@@ -76,14 +75,6 @@ LEVEL:"/dietitian/api/web/level-type-update-change.php"
   },
 TRAINER:{
   TRAINERDIRECTION:"/dietitian/api/web/get_trainer_direction.php"
-},
-ADMINPANEL:{
-  INVITETRAINERADMIN:"/dietitian/api/web/super-admin-invite-admin.php",
-  TRAINERADMINLIST:"/dietitian/api/web/list-admin-trainer-users-jwt.php",
-
-  INVITETRAINER:"/dietitian/api/web/send_trainer_client_invite.php",
-  TRAINERLISTINVITES:"/dietitian/api/web/list-trainer-client-invites.php"
-
 }
   
   

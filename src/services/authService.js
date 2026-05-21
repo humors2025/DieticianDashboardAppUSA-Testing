@@ -703,7 +703,7 @@ export const fetchTrainerAdminListService = async () => {
 
 
 
-export const inviteTrainerClientService = async ({ trainerID, clientName, clientMobile, clientEmail, plan }) => {
+export const inviteTrainerClientService = async ({ trainerID, clientName, clientMobile, clientEmail }) => {
   return apiFetcher(API_ENDPOINTS.ADMINPANEL.INVITETRAINER, {
     method: "POST",
     headers: {
@@ -714,109 +714,11 @@ export const inviteTrainerClientService = async ({ trainerID, clientName, client
       client_name: clientName,
       client_mobile: clientMobile,
       client_email: clientEmail,
-      plan: plan,
     }),
   });
 };
 
 
-
-export const resendTrainerAdminInviteService = async ({ invitationId, firstName, lastName, email, phone }) => {
-  const actorUserId = getActorUserIdFromAccessToken();
-
-  if (!actorUserId) {
-    throw new Error("Session expired. Please login again.");
-  }
-
-  return apiFetcher(API_ENDPOINTS.ADMINPANEL.INVITETRAINERADMIN, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      actor_user_id: actorUserId,
-      first_name: firstName,
-      last_name: lastName,
-      email: email,
-      phone: phone,
-      resend: true,
-    }),
-  });
-};
-
-export const revokeTrainerAdminInviteService = async ({ invitationId }) => {
-  const actorUserId = getActorUserIdFromAccessToken();
-
-  if (!actorUserId) {
-    throw new Error("Session expired. Please login again.");
-  }
-
-  return apiFetcher(API_ENDPOINTS.ADMINPANEL.REVOKETRAINERADMININVITE, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      actor_user_id: actorUserId,
-      invitation_id: invitationId,
-    }),
-  });
-};
-
-export const resendTrainerClientInviteService = async ({ inviteId, trainerID, clientName, clientMobile, clientEmail, plan }) => {
-  return apiFetcher(API_ENDPOINTS.ADMINPANEL.INVITETRAINER, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      trainer_id: trainerID,
-      client_name: clientName,
-      client_mobile: clientMobile,
-      client_email: clientEmail,
-      plan: plan,
-      resend: true,
-    }),
-  });
-};
-
-export const revokeTrainerClientInviteService = async ({ inviteId }) => {
-  const actorUserId = getActorUserIdFromAccessToken();
-
-  if (!actorUserId) {
-    throw new Error("Session expired. Please login again.");
-  }
-
-  return apiFetcher(API_ENDPOINTS.ADMINPANEL.REVOKETRAINERCLIENTINVITE, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      actor_user_id: actorUserId,
-      invite_id: inviteId,
-    }),
-  });
-};
-
-export const validateInviteTokenService = async (token) => {
-  return apiFetcher(`${API_ENDPOINTS.ADMINPANEL.VALIDATEINVITETOKEN}?token=${encodeURIComponent(token)}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-};
-
-export const acceptInviteService = async (payload) => {
-  return apiFetcher(API_ENDPOINTS.ADMINPANEL.ACCEPTINVITE, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-};
 
 export const fetchTrainerClientInvitesService = async ({ actorUserId }) => {
   if (!actorUserId) {

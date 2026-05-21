@@ -69,11 +69,6 @@ export function middleware(request) {
     }
   }
 
-  // Allow accept-invite and signup through even if logged in
-  if (pathname === '/accept-invite' || pathname === '/signup') {
-    return NextResponse.next();
-  }
-
   // 🔓 Logged in and visiting public auth page → bounce to role-appropriate home.
   const authPages = ['/', '/login', '/register'];
   if (authPages.includes(pathname) && token) {
@@ -89,8 +84,6 @@ export const config = {
     '/',
     '/login',
     '/register',
-    '/accept-invite',
-    '/signup',
     '/trainer/:path*',
     '/trainer-admin/:path*',
     '/super-admin/:path*',

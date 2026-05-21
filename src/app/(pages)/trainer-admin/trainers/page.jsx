@@ -6,8 +6,6 @@ import Cookies from "js-cookie";
 import {
   inviteTrainerClientService,
   fetchTrainerClientInvitesService,
-  resendTrainerClientInviteService,
-  revokeTrainerClientInviteService,
 } from "@/services/authService";
 
 // ---------------------------------------------------------------------------
@@ -73,7 +71,6 @@ function normalizeInvite(invite = {}) {
     last_name,
     email: invite.client_email ?? "",
     phone: invite.client_mobile ?? "",
-    plan: invite.plan ?? null,
     status: invite.status ?? "sent",
     sentAt: invite.created_at ?? invite.updated_at ?? new Date().toISOString(),
     acceptedAt: invite.accepted_at ?? null,
@@ -109,40 +106,14 @@ function formatInviteDate(dateValue) {
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const isValidPhone = (p) => /^\+?[0-9\s\-()]{7,}$/.test(p);
 
-const AUDIT_ACTION_STYLES = {
-  invited: "bg-[#E5F6EE] text-[#1F7A4A]",
-  resent: "bg-[#EEF4FE] text-[#308BF9]",
-  revoked: "bg-[#FCEAEB] text-[#B5363A]",
-  rejected: "bg-[#FFF4E0] text-[#A66B00]",
-  "accepted (email)": "bg-[#E5F6EE] text-[#1F7A4A]",
-  "accepted (phone)": "bg-[#E5F6EE] text-[#1F7A4A]",
-};
-
-function formatAuditTimestamp(dateValue) {
-  if (!dateValue) return "";
-  const d = new Date(dateValue);
-  if (Number.isNaN(d.getTime())) return String(dateValue);
-  return d.toLocaleString("en-US", {
-    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-  });
-}
-
 // ---------------------------------------------------------------------------
 // InviteForm — calls send_trainer_client_invite API
 // ---------------------------------------------------------------------------
-const PLANS = [
-  { id: "free_trial",  label: "Free Trial",           price: "$0",   badge: "Free",  badgeColor: "bg-[#E5F6EE] text-[#1F7A4A]" },
-  { id: "monthly",     label: "Monthly Plan",         price: "$50",  badge: "$50/mo", badgeColor: "bg-[#EEF4FE] text-[#308BF9]" },
-  { id: "lease",       label: "Lease (Quarterly)",    price: "$150", badge: "$150",   badgeColor: "bg-[#FFF4E0] text-[#A66B00]" },
-  { id: "yearly",      label: "Yearly Plan",          price: "$300", badge: "$300/yr", badgeColor: "bg-[#F3EEFE] text-[#6B45BC]" },
-];
-
 function InviteForm({ onSent }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [selectedPlan, setSelectedPlan] = useState("free_trial");
   const [submitting, setSubmitting] = useState(false);
 
   const reset = () => {
@@ -150,7 +121,6 @@ function InviteForm({ onSent }) {
     setLastName("");
     setEmail("");
     setPhone("");
-    setSelectedPlan("free_trial");
   };
 
   const onSubmit = async (e) => {
@@ -175,7 +145,6 @@ function InviteForm({ onSent }) {
         clientName: `${firstName.trim()} ${lastName.trim()}`,
         clientMobile: phone.trim(),
         clientEmail: email.trim(),
-        plan: selectedPlan,
       });
 
       await onSent({
@@ -184,7 +153,6 @@ function InviteForm({ onSent }) {
           res?.data?.client_name ?? `${firstName.trim()} ${lastName.trim()}`,
         client_mobile: res?.data?.client_mobile ?? phone.trim(),
         client_email: res?.data?.client_email ?? email.trim(),
-        plan: res?.data?.plan ?? selectedPlan,
         status: res?.data?.invite_status ?? res?.data?.status ?? "sent",
         created_at: res?.data?.created_at ?? new Date().toISOString(),
         trainer_name: res?.data?.trainer_name ?? "",
@@ -219,7 +187,7 @@ function InviteForm({ onSent }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>First name <span className="text-red-500">*</span></label>
+          <label className={labelClass}>First name</label>
           <input
             className={fieldClass}
             value={firstName}
@@ -229,7 +197,7 @@ function InviteForm({ onSent }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>Last name <span className="text-red-500">*</span></label>
+          <label className={labelClass}>Last name</label>
           <input
             className={fieldClass}
             value={lastName}
@@ -239,7 +207,7 @@ function InviteForm({ onSent }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>Email <span className="text-red-500">*</span></label>
+          <label className={labelClass}>Email</label>
           <input
             className={fieldClass}
             value={email}
@@ -250,7 +218,7 @@ function InviteForm({ onSent }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>Phone <span className="text-red-500">*</span></label>
+          <label className={labelClass}>Phone</label>
           <input
             className={fieldClass}
             value={phone}
@@ -261,40 +229,14 @@ function InviteForm({ onSent }) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label className={labelClass}>Plan <span className="text-red-500">*</span></label>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {PLANS.map((plan) => (
-            <button
-              key={plan.id}
-              type="button"
-              onClick={() => setSelectedPlan(plan.id)}
-              className={`rounded-[10px] border px-3 py-2.5 text-left transition-all cursor-pointer ${
-                selectedPlan === plan.id
-                  ? "border-[#308BF9] bg-[#EEF4FE] ring-1 ring-[#308BF9]"
-                  : "border-[#E1E6ED] bg-white hover:border-[#C4C9D4]"
-              }`}
-            >
-              <span className={`inline-flex rounded-full text-[10px] font-semibold px-2 py-0.5 mb-1.5 ${plan.badgeColor}`}>
-                {plan.badge}
-              </span>
-              <p className="text-[12px] font-semibold text-[#252525]">{plan.label}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="flex items-center gap-3">
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-[10px] bg-[#308BF9] text-white text-[13px] font-semibold px-5 py-2.5 disabled:opacity-60 hover:bg-[#1a76e8] transition-colors cursor-pointer"
+          className="rounded-[10px] bg-[#308BF9] text-white text-[13px] font-semibold px-5 py-2.5 disabled:opacity-60 hover:bg-[#1a76e8] transition-colors"
         >
           {submitting ? "Sending…" : "Send invite"}
         </button>
-        <span className="text-[#A1A1A1] text-[11px]">
-          {PLANS.find((p) => p.id === selectedPlan)?.label} — client will receive a code for this plan.
-        </span>
       </div>
     </form>
   );
@@ -403,34 +345,7 @@ function AcceptedClientsTable({ clients }) {
 // PendingInvitesTable
 // Same UI is used for pending_invites and failed_invites
 // ---------------------------------------------------------------------------
-function PendingInvitesTable({ invites, onResend, onRevoke, auditLogs }) {
-  const [actionInProgress, setActionInProgress] = useState({});
-  const [expandedRows, setExpandedRows] = useState({});
-
-  const toggleRow = (id) => {
-    setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const handleResend = async (inv) => {
-    const key = `resend-${inv.id}`;
-    setActionInProgress((prev) => ({ ...prev, [key]: true }));
-    try {
-      await onResend(inv);
-    } finally {
-      setActionInProgress((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const handleRevoke = async (inv) => {
-    const key = `revoke-${inv.id}`;
-    setActionInProgress((prev) => ({ ...prev, [key]: true }));
-    try {
-      await onRevoke(inv);
-    } finally {
-      setActionInProgress((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
+function PendingInvitesTable({ invites }) {
   return (
     <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
       <table className="w-full text-[12px]">
@@ -439,118 +354,38 @@ function PendingInvitesTable({ invites, onResend, onRevoke, auditLogs }) {
             <th className="py-2.5 px-4 font-semibold">Name</th>
             <th className="py-2.5 px-4 font-semibold">Email</th>
             <th className="py-2.5 px-4 font-semibold">Phone</th>
-            <th className="py-2.5 px-4 font-semibold">Plan</th>
             <th className="py-2.5 px-4 font-semibold">Status</th>
             <th className="py-2.5 px-4 font-semibold">Sent</th>
-            <th className="py-2.5 px-4 font-semibold">Actions</th>
           </tr>
         </thead>
 
         <tbody>
-          {invites.map((inv) => {
-            const resendKey = `resend-${inv.id}`;
-            const revokeKey = `revoke-${inv.id}`;
-            const isExpanded = expandedRows[inv.id];
-            const logs = auditLogs[inv.id] || [];
+          {invites.map((inv) => (
+            <tr key={inv.id} className="border-t border-[#F5F7FA]">
+              <td className="py-2.5 px-4 text-[#252525] font-semibold">
+                {inv.first_name} {inv.last_name}
+              </td>
 
-            return (
-              <>
-                <tr key={inv.id} className="border-t border-[#F5F7FA]">
-                  <td className="py-2.5 px-4">
-                    <button
-                      type="button"
-                      onClick={() => toggleRow(inv.id)}
-                      className="flex items-center gap-1.5 text-[#252525] font-semibold hover:text-[#308BF9] cursor-pointer text-left"
-                    >
-                      <span className={`text-[10px] transition-transform ${isExpanded ? "rotate-90" : ""}`}>&#9654;</span>
-                      {inv.first_name} {inv.last_name}
-                      {logs.length > 0 && (
-                        <span className="text-[10px] text-[#A1A1A1] font-normal">({logs.length})</span>
-                      )}
-                    </button>
-                  </td>
+              <td className="py-2.5 px-4 text-[#535359]">{inv.email}</td>
 
-                  <td className="py-2.5 px-4 text-[#535359]">{inv.email}</td>
+              <td className="py-2.5 px-4 text-[#535359]">{inv.phone}</td>
 
-                  <td className="py-2.5 px-4 text-[#535359]">{inv.phone}</td>
+              <td className="py-2.5 px-4">
+                <span className="inline-flex rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5">
+                  {inv.status}
+                </span>
+              </td>
 
-                  <td className="py-2.5 px-4">
-                    {inv.plan ? (
-                      <span className={`inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${
-                        PLANS.find((p) => p.id === inv.plan)?.badgeColor || "bg-[#F5F7FA] text-[#535359]"
-                      }`}>
-                        {PLANS.find((p) => p.id === inv.plan)?.badge || inv.plan}
-                      </span>
-                    ) : (
-                      <span className="text-[#A1A1A1]">-</span>
-                    )}
-                  </td>
-
-                  <td className="py-2.5 px-4">
-                    <span className="inline-flex rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5">
-                      {inv.status}
-                    </span>
-                  </td>
-
-                  <td className="py-2.5 px-4 text-[#A1A1A1]">
-                    {formatInviteDate(inv.sentAt)}
-                  </td>
-
-                  <td className="py-2.5 px-4">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleResend(inv)}
-                        disabled={actionInProgress[resendKey]}
-                        className="rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#d9e8fd] disabled:opacity-60 cursor-pointer"
-                      >
-                        {actionInProgress[resendKey] ? "Sending..." : "Resend"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRevoke(inv)}
-                        disabled={actionInProgress[revokeKey]}
-                        className="rounded-full bg-[#FCEAEB] text-[#B5363A] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#f8d4d5] disabled:opacity-60 cursor-pointer"
-                      >
-                        {actionInProgress[revokeKey] ? "Revoking..." : "Revoke"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-
-                {isExpanded && (
-                  <tr key={`${inv.id}-audit`} className="bg-[#FAFBFC]">
-                    <td colSpan={7} className="px-4 py-3">
-                      <div className="ml-4 border-l-2 border-[#E1E6ED] pl-4">
-                        <p className="text-[11px] font-semibold text-[#535359] mb-2">Audit log</p>
-                        {logs.length === 0 ? (
-                          <p className="text-[11px] text-[#A1A1A1]">No activity recorded yet.</p>
-                        ) : (
-                          <div className="flex flex-col gap-1.5">
-                            {logs.map((log, idx) => (
-                              <div key={idx} className="flex items-center gap-2 text-[11px]">
-                                <span className={`inline-flex rounded-full font-semibold px-2 py-0.5 ${AUDIT_ACTION_STYLES[log.action] || "bg-[#F5F7FA] text-[#535359]"}`}>
-                                  {log.action}
-                                </span>
-                                <span className="text-[#535359]">by <span className="font-semibold">{log.actor}</span></span>
-                                {log.detail && <span className="text-[#535359] italic">{log.detail}</span>}
-                                <span className="text-[#A1A1A1]">{formatAuditTimestamp(log.timestamp)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </>
-            );
-          })}
+              <td className="py-2.5 px-4 text-[#A1A1A1]">
+                {formatInviteDate(inv.sentAt)}
+              </td>
+            </tr>
+          ))}
 
           {invites.length === 0 && (
             <tr>
               <td
-                colSpan={7}
+                colSpan={5}
                 className="py-8 px-4 text-center text-[#A1A1A1] text-[12px]"
               >
                 No pending invites found.
@@ -573,21 +408,8 @@ export default function TrainerAdminTrainersPage() {
   const [acceptedClients, setAcceptedClients] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
 
-  const [auditLogs, setAuditLogs] = useState({});
-
   const [loadingInvites, setLoadingInvites] = useState(false);
   const [inviteListError, setInviteListError] = useState("");
-
-  const addAuditEntry = (inviteId, action, detail = null) => {
-    const actor = user?.email || user?.user_id || "Unknown";
-    setAuditLogs((prev) => ({
-      ...prev,
-      [inviteId]: [
-        ...(prev[inviteId] || []),
-        { action, actor, timestamp: new Date().toISOString(), detail },
-      ],
-    }));
-  };
 
   const loadTrainerClientInvites = useCallback(async () => {
     const actorUserId = getActorUserIdFromCookie();
@@ -662,53 +484,7 @@ export default function TrainerAdminTrainersPage() {
       ...prev.filter((item) => item.id !== normalizedInvite.id),
     ]);
 
-    const planLabel = PLANS.find((p) => p.id === normalizedInvite.plan)?.label || normalizedInvite.plan;
-    addAuditEntry(normalizedInvite.id, "invited", `to ${normalizedInvite.email} — ${planLabel}`);
-
     await loadTrainerClientInvites();
-  };
-
-  const handleResendInvite = async (inv) => {
-    const trainerId = getTrainerIdFromCookie();
-    if (!trainerId) {
-      return toast.error("Session expired. Please log in again.");
-    }
-
-    try {
-      await resendTrainerClientInviteService({
-        inviteId: inv.id,
-        trainerID: trainerId,
-        clientName: `${inv.first_name} ${inv.last_name}`.trim(),
-        clientMobile: inv.phone,
-        clientEmail: inv.email,
-        plan: inv.plan,
-      });
-      addAuditEntry(inv.id, "resent", `to ${inv.email}`);
-      toast.success(`Invite resent to ${inv.first_name} ${inv.last_name}`);
-    } catch (error) {
-      const msg = error?.data?.message || error?.message || "";
-      if (msg.toLowerCase().includes("already has a pending invitation")) {
-        addAuditEntry(inv.id, "resent", `to ${inv.email}`);
-        toast.success(`Invite resent to ${inv.first_name} ${inv.last_name}`);
-      } else {
-        toast.error(msg || "Could not resend invite.");
-      }
-    }
-  };
-
-  const handleRevokeInvite = async (inv) => {
-    try {
-      await revokeTrainerClientInviteService({
-        inviteId: inv.id,
-      });
-      addAuditEntry(inv.id, "revoked");
-      setPendingInvites((prev) => prev.filter((item) => item.id !== inv.id));
-      toast.success(`Invite to ${inv.first_name} ${inv.last_name} revoked.`);
-    } catch (error) {
-      toast.error(
-        error?.message || "Could not revoke invite."
-      );
-    }
   };
 
   return (
@@ -761,12 +537,7 @@ export default function TrainerAdminTrainersPage() {
         {loadingInvites ? (
           <div className="text-[#A1A1A1] text-[13px]">Loading…</div>
         ) : (
-          <PendingInvitesTable
-            invites={pendingInvites}
-            onResend={handleResendInvite}
-            onRevoke={handleRevokeInvite}
-            auditLogs={auditLogs}
-          />
+          <PendingInvitesTable invites={pendingInvites} />
         )}
       </div>
     </div>

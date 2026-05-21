@@ -29,9 +29,9 @@ export const fetchProgressData = createAsyncThunk(
 );
 
 const initialState = {
-  byRange: {},
-  loading: {},
-  error: {},
+  data: null,
+  loading: false,
+  error: null,
   selectedRange: "all_time",
 };
 
@@ -43,34 +43,32 @@ const progressSlice = createSlice({
       state.selectedRange = action.payload;
     },
     clearProgressData: (state) => {
-      state.byRange = {};
-      state.loading = {};
-      state.error = {};
+      state.data = null;
+      state.error = null;
+      state.loading = false;
     },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchProgressData.pending, (state, action) => {
-        const range = action.meta.arg.range;
-        state.loading[range] = true;
-        state.error[range] = null;
+      .addCase(fetchProgressData.pending, (state) => {
+        state.loading = true;
+        state.error = null;
       })
       .addCase(fetchProgressData.fulfilled, (state, action) => {
-        const range = action.meta.arg.range;
-        state.loading[range] = false;
-        state.byRange[range] = {
+        state.loading = false;
+        // Store the complete data structure
+        state.data = {
           dietitian_id: action.payload?.dietitian_id || "",
           profile_id: action.payload?.profile_id || "",
           range: action.payload?.range || "",
           range_label: action.payload?.range_label || "",
-          graphs: action.payload?.graphs || {},
+          graphs: action.payload?.graphs || {}, // Store graphs object
         };
-        state.error[range] = null;
+        state.error = null;
       })
       .addCase(fetchProgressData.rejected, (state, action) => {
-        const range = action.meta.arg.range;
-        state.loading[range] = false;
-        state.error[range] = action.payload || "Failed to fetch progress data";
+        state.loading = false;
+        state.error = action.payload || "Failed to fetch progress data";
       });
   },
 });

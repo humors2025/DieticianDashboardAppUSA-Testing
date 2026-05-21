@@ -91,28 +91,19 @@ const { loading, response, data, habitList, error } = useSelector(
     };
 
     // Render week tracking dots
-    const renderWeekTracking = (weekTracking, color, today) => {
-        return weekTracking.map((day, index) => {
-            const isMissedPastDay =
-                !day.is_completed &&
-                day.completed_count === 0 &&
-                today &&
-                day.date < today;
-
-            const dotStyle = day.is_completed
-                ? { backgroundColor: color }
-                : day.completed_count > 0 || isMissedPastDay
-                    ? { border: `1px solid ${color}`, backgroundColor: 'white' }
-                    : { backgroundColor: 'white' };
-
-            return (
-                <div
-                    key={index}
-                    className="w-[14px] h-[14px] rounded-full"
-                    style={dotStyle}
-                />
-            );
-        });
+    const renderWeekTracking = (weekTracking, color) => {
+        return weekTracking.map((day, index) => (
+            <div 
+                key={index}
+                className={`w-[14px] h-[14px] rounded-full`}
+                style={day.is_completed 
+                    ? { backgroundColor: color } 
+                    : day.completed_count > 0 
+                        ? { border: `1px solid ${color}`, backgroundColor: 'white' } 
+                        : { backgroundColor: 'white' }
+                }
+            />
+        ));
     };
 
     const handleHabitClick = (habit) => {
@@ -163,7 +154,7 @@ const { loading, response, data, habitList, error } = useSelector(
                                                     </p>
                                                 </div>
                                                 <div className="flex gap-[5px]">
-                                                    {renderWeekTracking(habit.week_tracking, colorScheme.color, data?.today)}
+                                                    {renderWeekTracking(habit.week_tracking, colorScheme.color)}
                                                 </div>
                                             </div>
                                             <div className="flex gap-[109px]">
@@ -219,7 +210,7 @@ const { loading, response, data, habitList, error } = useSelector(
                                                             </p>
                                                         </div>
                                                         <div className="flex gap-[5px]">
-                                                            {renderWeekTracking(habit.week_tracking, colorScheme.color, data?.today)}
+                                                            {renderWeekTracking(habit.week_tracking, colorScheme.color)}
                                                         </div>
                                                     </div>
                                                     <div className="flex">

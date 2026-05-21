@@ -505,7 +505,6 @@
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { useSearchParams } from "next/navigation";
 import { IoIosArrowDown } from "react-icons/io";
 import {
   Chart as ChartJS,
@@ -562,29 +561,29 @@ function getGraphKeyByTitle(title) {
   return graphKeyMap[normalizedTitle] || "";
 }
 
-function ProgressCard({ graphKey, profileId }) {
+function ProgressCard({
+  color = "#308BF9",
+  graphKey,
+  profileId,
+  recommendedRange,
+}) {
   const dispatch = useDispatch();
   const [selectedRange, setSelectedRange] = useState("One Week");
   const [openDropdown, setOpenDropdown] = useState(false);
   const dropdownRef = useRef(null);
 
+  const progressState = useSelector((state) => state.progress || {});
+  const progressSliceData = progressState?.data || null;
+  const progressLoading = progressState?.loading || false;
+  const progressError = progressState?.error || null;
+
   const ranges = ["One Week", "One Month", "All Time"];
+
   const rangeToApiMap = {
     "One Week": "weekly",
     "One Month": "monthly",
     "All Time": "all_time",
   };
-  const apiRange = rangeToApiMap[selectedRange] || "weekly";
-
-  const progressSliceData = useSelector(
-    (state) => state.progress?.byRange?.[apiRange] || null
-  );
-  const progressLoading = useSelector(
-    (state) => !!state.progress?.loading?.[apiRange]
-  );
-  const progressError = useSelector(
-    (state) => state.progress?.error?.[apiRange] || null
-  );
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -592,15 +591,27 @@ function ProgressCard({ graphKey, profileId }) {
         setOpenDropdown(false);
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   useEffect(() => {
     if (!profileId) return;
-    dispatch(fetchProgressData({ profileId, range: apiRange }));
-  }, [dispatch, profileId, apiRange]);
 
+    const apiRange = rangeToApiMap[selectedRange] || "weekly";
+
+    dispatch(
+      fetchProgressData({
+        profileId,
+        range: apiRange,
+      })
+    );
+  }, [dispatch, profileId, selectedRange]);
+
+  // Get graph data from the graphs object
   const graphItem = useMemo(() => {
     if (!progressSliceData?.graphs) return null;
     
@@ -724,7 +735,15 @@ function ProgressCard({ graphKey, profileId }) {
 
   return (
     <div className="flex flex-col gap-4 pt-1">
-      <div className="flex justify-end items-center">
+      <div className="flex justify-between items-center">
+        {recommendedRange?.label ? (
+          <p className="text-[#738298] text-[12px] font-normal leading-[110%] tracking-[-0.24px]">
+            {/* Recommended: {recommendedRange.label} */}
+          </p>
+        ) : (
+          <div />
+        )}
+
         <div className="relative" ref={dropdownRef}>
           <button
             type="button"
@@ -805,6 +824,7 @@ function TrendCard({
   highlightText,
   graphKey,
   profileId,
+  recommendedRange,
 }) {
   const totalSegments = 55;
   const roundedValue = Math.round(Number(value) || 0);
@@ -885,15 +905,19 @@ function TrendCard({
         </p>
       </div>
 
-      {showProgress && <ProgressCard graphKey={graphKey} profileId={profileId} />}
+      {showProgress && (
+        <ProgressCard
+          color={chartColor}
+          graphKey={graphKey}
+          profileId={profileId}
+          recommendedRange={recommendedRange}
+        />
+      )}
     </div>
   );
 }
 
-export default function TrendPopUp({ closePopup, profileId: profileIdProp }) {
-  const searchParams = useSearchParams();
-  const profileId = profileIdProp || searchParams.get("profile_id");
-
+export default function TrendPopUp({ closePopup, profileId }) {
   const [activeTab, setActiveTab] = useState("digestive_balance_trend");
 
   const clientIndividualProfile = useSelector((state) => state.clientIndividualProfile?.data);
@@ -905,6 +929,15 @@ export default function TrendPopUp({ closePopup, profileId: profileIdProp }) {
   );
 
   const trendBreakdown = clientIndividualProfile?.data?.trend_breakdown || {};
+
+  const recommendedRange = useSelector((state) => {
+    const progressData = state.progress?.data;
+    return (
+      progressData?.recommended_trend_range ||
+      progressData?.data?.recommended_trend_range ||
+      null
+    );
+  });
 
   const tabs = [
     {
@@ -1070,6 +1103,7 @@ export default function TrendPopUp({ closePopup, profileId: profileIdProp }) {
                         highlightText={card.highlightText}
                         graphKey={card.graphKey}
                         profileId={profileId}
+                        recommendedRange={recommendedRange}
                       />
                     </div>
                   ))}

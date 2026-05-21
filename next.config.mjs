@@ -34,8 +34,6 @@ const nextConfig = {
 
     return [
       ...moved,
-      // accept-invite.php → accept-invite (backend emails use .php extension)
-      { source: '/accept-invite.php', destination: '/accept-invite', permanent: false },
       // Partners track removed in Phase 1, but the partners-only client
       // profile page lives under /trainer/clients-profile now. Specific
       // redirect must come BEFORE the catch-all below so query params (e.g.,

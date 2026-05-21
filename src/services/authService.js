@@ -3,6 +3,48 @@
 
 import { apiFetcher } from "../config/fetcher";
 import { API_ENDPOINTS } from "../config/apiConfig";
+import { cookieManager } from "../lib/cookies";
+import Cookies from "js-cookie";
+
+
+
+function decodeAccessTokenFromCookie() {
+  try {
+    const token = Cookies.get("access_token");
+
+    if (!token) {
+      return null;
+    }
+
+    const payload = token.split(".")[1];
+
+    if (!payload) {
+      return null;
+    }
+
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((char) => {
+          return `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`;
+        })
+        .join("")
+    );
+
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+function getActorUserIdFromAccessToken() {
+  const decoded = decodeAccessTokenFromCookie();
+
+  return decoded?.user_id ?? decoded?.email ?? null;
+}
+
 
 
 export const loginService = async (email, password) => {
@@ -611,6 +653,88 @@ export const approveDietPlanService = async (profileId, dieticianId, id, status)
   });
 };
 
+
+
+export const inviteTrainerAdminService = async ({
+  firstName,
+  lastName,
+  email,
+  phone,
+}) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.INVITETRAINERADMIN, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      first_name: firstName,
+      last_name: lastName,
+      email: email,
+      phone: phone,
+    }),
+  });
+};
+
+
+
+
+export const fetchTrainerAdminListService = async () => {
+  const accessToken = Cookies.get("access_token");
+
+  if (!accessToken) {
+    throw new Error("Access token missing. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.TRAINERADMINLIST, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    }
+  });
+};
+
+
+
+export const inviteTrainerClientService = async ({ trainerID, clientName, clientMobile, clientEmail }) => {
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.INVITETRAINER, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      trainer_id: trainerID,
+      client_name: clientName,
+      client_mobile: clientMobile,
+      client_email: clientEmail,
+    }),
+  });
+};
+
+
+
+export const fetchTrainerClientInvitesService = async ({ actorUserId }) => {
+  if (!actorUserId) {
+    throw new Error("Actor user ID missing. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.TRAINERLISTINVITES, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+    }),
+  });
+};
 
 
 // // services/authService.js

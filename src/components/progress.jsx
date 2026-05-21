@@ -36,9 +36,13 @@ export default function Progress({ title = "Progress", showDetails = true, showC
   const searchParams = useSearchParams();
   const profileId = searchParams.get("profile_id");
 
-  const { data: graphData, loading, error, selectedRange } = useSelector(
+  const { byRange, loading: loadingByRange, error: errorByRange, selectedRange } = useSelector(
     (state) => state.progress
   );
+
+  const graphData = byRange?.[selectedRange] || null;
+  const loading = !!loadingByRange?.[selectedRange];
+  const error = errorByRange?.[selectedRange] || null;
 
   const [openDropdown, setOpenDropdown] = useState(false);
   const dropdownRef = useRef(null);

@@ -51,6 +51,18 @@ const IDENTITIES = [
     parentUserId: "demo-super",
     color: "#308BF9",
   },
+   {
+    id: "ta-sagar",
+    role: "trainer_admin",
+    label: "Sagar Hosur",
+    section: "Trainer Admin",
+    home: "/trainer-admin/overview",
+    firstName: "Sagar",
+    lastName: "Hosur",
+    partnerCode: "SAGAR2026",
+    parentUserId: "demo-super",
+    color: "#308BF9",
+  },
   {
     id: "t-001",
     role: "trainer",

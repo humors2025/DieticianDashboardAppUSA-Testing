@@ -82,9 +82,11 @@ ADMINPANEL:{
   INVITETRAINERADMIN:"/dietitian/api/web/super-admin-invite-admin.php",
   TRAINERADMINLIST:"/dietitian/api/web/list-admin-trainer-users-jwt.php",
   REVOKETRAINERADMININVITE:"/dietitian/api/web/revoke-admin-invite.php",
+  RESENDUSERINVITE:"/dietitian/api/web/resend-user-invite.php",
+  REVOKEUSERINVITE:"/dietitian/api/web/revoke-user-invite.php",
 
-  INVITETRAINER:"/dietitian/api/web/send_trainer_client_invite.php",
-  TRAINERLISTINVITES:"/dietitian/api/web/list-trainer-client-invites.php",
+  INVITETRAINER:"/dietitian/api/web/admin-invite-trainer.php",
+  TRAINERLISTINVITES:"/dietitian/api/web/list-admin-trainer-users.php",
   REVOKETRAINERCLIENTINVITE:"/dietitian/api/web/revoke-trainer-client-invite.php",
 
   VALIDATEINVITETOKEN:"/dietitian/api/web/validate-invite-token.php",

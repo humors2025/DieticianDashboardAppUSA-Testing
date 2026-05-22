@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
@@ -56,6 +56,14 @@ const AUDIT_ACTION_STYLES = {
   "accepted (email)": "bg-[#E5F6EE] text-[#1F7A4A]",
   "accepted (phone)": "bg-[#E5F6EE] text-[#1F7A4A]",
 };
+
+function isInvitationExpired(invitation) {
+  if (String(invitation?.status || "").toLowerCase() === "expired") return true;
+  if (!invitation?.expires_at) return false;
+  const expiresAt = new Date(String(invitation.expires_at).replace(" ", "T"));
+  if (Number.isNaN(expiresAt.getTime())) return false;
+  return expiresAt.getTime() < Date.now();
+}
 
 const formatOverrideMonthly = (overrideMonthly) => {
   if (overrideMonthly === null || overrideMonthly === undefined) return "-";
@@ -333,8 +341,12 @@ function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
 }
 
 function PendingAdminInvitationsTable({ pendingAdminInvitations, onResend, onRevoke, auditLogs }) {
+  console.log("pendingAdminInvitations336:-", pendingAdminInvitations);
   const [actionInProgress, setActionInProgress] = useState({});
   const [expandedRows, setExpandedRows] = useState({});
+  const [revokeModalInvitation, setRevokeModalInvitation] = useState(null);
+  const [revokeReason, setRevokeReason] = useState("");
+  const [isSubmittingRevokeReason, setIsSubmittingRevokeReason] = useState(false);
 
   const toggleRow = (id) => {
     setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -351,11 +363,43 @@ function PendingAdminInvitationsTable({ pendingAdminInvitations, onResend, onRev
   };
 
   const handleRevoke = async (invitation) => {
+    if (isInvitationExpired(invitation)) {
+      const key = `revoke-${invitation.invitation_id}`;
+      setActionInProgress((prev) => ({ ...prev, [key]: true }));
+      try {
+        await onRevoke(invitation, "");
+      } finally {
+        setActionInProgress((prev) => ({ ...prev, [key]: false }));
+      }
+      return;
+    }
+
+    setRevokeReason("");
+    setRevokeModalInvitation(invitation);
+  };
+
+  const closeRevokeModal = () => {
+    if (isSubmittingRevokeReason) return;
+    setRevokeModalInvitation(null);
+    setRevokeReason("");
+  };
+
+  const submitRevokeReason = async () => {
+    const trimmedReason = revokeReason.trim();
+    if (trimmedReason.length === 0) {
+      return toast.error("Please provide a reason for revoking.");
+    }
+
+    const invitation = revokeModalInvitation;
     const key = `revoke-${invitation.invitation_id}`;
+    setIsSubmittingRevokeReason(true);
     setActionInProgress((prev) => ({ ...prev, [key]: true }));
     try {
-      await onRevoke(invitation);
+      await onRevoke(invitation, trimmedReason);
+      setRevokeModalInvitation(null);
+      setRevokeReason("");
     } finally {
+      setIsSubmittingRevokeReason(false);
       setActionInProgress((prev) => ({ ...prev, [key]: false }));
     }
   };
@@ -369,6 +413,7 @@ function PendingAdminInvitationsTable({ pendingAdminInvitations, onResend, onRev
   }
 
   return (
+    <>
     <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
       <table className="w-full text-[12px]">
         <thead>
@@ -392,11 +437,8 @@ function PendingAdminInvitationsTable({ pendingAdminInvitations, onResend, onRev
             const logs = auditLogs[invId] || [];
 
             return (
-              <>
-                <tr
-                  key={invId}
-                  className="border-t border-[#F5F7FA]"
-                >
+              <Fragment key={invId}>
+                <tr className="border-t border-[#F5F7FA]">
                   <td className="py-2.5 px-4">
                     <button
                       type="button"
@@ -456,7 +498,7 @@ function PendingAdminInvitationsTable({ pendingAdminInvitations, onResend, onRev
                 </tr>
 
                 {isExpanded && (
-                  <tr key={`${invId}-audit`} className="bg-[#FAFBFC]">
+                  <tr className="bg-[#FAFBFC]">
                     <td colSpan={7} className="px-4 py-3">
                       <div className="ml-4 border-l-2 border-[#E1E6ED] pl-4">
                         <p className="text-[11px] font-semibold text-[#535359] mb-2">Audit log</p>
@@ -480,12 +522,63 @@ function PendingAdminInvitationsTable({ pendingAdminInvitations, onResend, onRev
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             );
           })}
         </tbody>
       </table>
     </div>
+
+    {revokeModalInvitation && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+        onClick={closeRevokeModal}
+      >
+        <div
+          className="w-full max-w-[420px] rounded-[12px] bg-white p-5 shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-[#252525] text-[15px] font-bold">
+            Revoke invite
+          </h3>
+          <p className="text-[#535359] text-[12px] mt-1">
+            Tell {revokeModalInvitation.name || revokeModalInvitation.email || "this user"} why their invite is being revoked.
+          </p>
+
+          <label className="block mt-4 text-[#535359] text-[12px] font-semibold">
+            Reason <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={revokeReason}
+            onChange={(e) => setRevokeReason(e.target.value)}
+            placeholder="e.g. Wrong email"
+            rows={3}
+            disabled={isSubmittingRevokeReason}
+            className="mt-1 w-full rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5 text-[13px] text-[#252525] focus:outline-none focus:border-[#308BF9] resize-none"
+          />
+
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={closeRevokeModal}
+              disabled={isSubmittingRevokeReason}
+              className="rounded-[10px] bg-[#F5F7FA] text-[#535359] text-[12px] font-semibold px-4 py-2 disabled:opacity-60 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submitRevokeReason}
+              disabled={isSubmittingRevokeReason}
+              className="rounded-[10px] bg-[#B5363A] text-white text-[12px] font-semibold px-4 py-2 disabled:opacity-60 cursor-pointer"
+            >
+              {isSubmittingRevokeReason ? "Revoking..." : "Submit"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -571,30 +664,27 @@ export default function TrainerAdminsPage() {
     try {
       await resendTrainerAdminInviteService({
         invitationId: invitation.invitation_id,
-        firstName: invitation.first_name || invitation.name?.split(" ")[0] || "",
-        lastName: invitation.last_name || invitation.name?.split(" ").slice(1).join(" ") || "",
-        email: invitation.email,
-        phone: invitation.phone_no || invitation.phone || "",
       });
       addAuditEntry(invitation.invitation_id, "resent", `to ${invitation.email}`);
       toast.success(`Invite resent to ${invitation.name || invitation.email}`);
     } catch (error) {
-      const msg = error?.data?.message || error?.message || "";
-      if (msg.toLowerCase().includes("already has a pending invitation")) {
-        addAuditEntry(invitation.invitation_id, "resent", `to ${invitation.email}`);
-        toast.success(`Invite resent to ${invitation.name || invitation.email}`);
-      } else {
-        toast.error(msg || "Could not resend invite.");
-      }
+      toast.error(
+        error?.data?.message || error?.message || "Could not resend invite."
+      );
     }
   };
 
-  const handleRevokeInvite = async (invitation) => {
+  const handleRevokeInvite = async (invitation, reason = "") => {
     try {
       await revokeTrainerAdminInviteService({
         invitationId: invitation.invitation_id,
+        reason,
       });
-      addAuditEntry(invitation.invitation_id, "revoked");
+      addAuditEntry(
+        invitation.invitation_id,
+        "revoked",
+        reason ? `reason: ${reason}` : null
+      );
       setPendingAdminInvitations((current) =>
         current.filter((inv) => inv.invitation_id !== invitation.invitation_id)
       );

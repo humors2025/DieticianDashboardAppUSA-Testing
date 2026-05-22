@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
 import {
   inviteTrainerClientService,
   fetchTrainerClientInvitesService,
   resendTrainerClientInviteService,
+  resendUserInviteService,
   revokeTrainerClientInviteService,
 } from "@/services/authService";
 
@@ -65,22 +66,50 @@ function splitClientName(name = "") {
 }
 
 function normalizeInvite(invite = {}) {
-  const { first_name, last_name } = splitClientName(invite.client_name);
+  const hasExplicitNames = invite.first_name || invite.last_name;
+  const { first_name: derivedFirst, last_name: derivedLast } = hasExplicitNames
+    ? { first_name: invite.first_name ?? "", last_name: invite.last_name ?? "" }
+    : splitClientName(invite.name ?? invite.client_name);
 
   return {
-    id: invite.invite_id ?? `${invite.client_email}-${invite.created_at}`,
-    first_name,
-    last_name,
-    email: invite.client_email ?? "",
-    phone: invite.client_mobile ?? "",
+    id:
+      invite.invitation_id ??
+      invite.invite_id ??
+      `${invite.email ?? invite.client_email}-${invite.created_at}`,
+    first_name: derivedFirst,
+    last_name: derivedLast,
+    email: invite.email ?? invite.client_email ?? "",
+    phone: invite.phone_no ?? invite.client_mobile ?? "",
+    role: invite.role ?? "trainer",
     plan: invite.plan ?? null,
-    status: invite.status ?? "sent",
-    sentAt: invite.created_at ?? invite.updated_at ?? new Date().toISOString(),
+    status: invite.status ?? "pending",
+    sentAt:
+      invite.sent_at ??
+      invite.created_at ??
+      invite.updated_at ??
+      new Date().toISOString(),
+    expires_at: invite.expires_at ?? null,
     acceptedAt: invite.accepted_at ?? null,
-    acceptedProfileId: invite.accepted_profile_id ?? null,
-    trainer_name: invite.trainer_name ?? "",
-    trainer_code: invite.trainer_code ?? "",
+    acceptedProfileId:
+      invite.accepted_profile_id ?? invite.partner_code ?? null,
+    trainer_name:
+      invite.trainer_name ??
+      [invite.first_name, invite.last_name].filter(Boolean).join(" ") ??
+      "",
+    trainer_code: invite.partner_code ?? invite.trainer_code ?? "",
+    invited_by_user_id: invite.invited_by_user_id ?? null,
+    parent_user_id: invite.parent_user_id ?? null,
+    can_resend: invite.can_resend ?? true,
+    can_revoke: invite.can_revoke ?? true,
   };
+}
+
+function isInvitationExpired(invitation) {
+  if (String(invitation?.status || "").toLowerCase() === "expired") return true;
+  if (!invitation?.expires_at) return false;
+  const expiresAt = new Date(String(invitation.expires_at).replace(" ", "T"));
+  if (Number.isNaN(expiresAt.getTime())) return false;
+  return expiresAt.getTime() < Date.now();
 }
 
 function formatInviteDate(dateValue) {
@@ -153,52 +182,71 @@ function InviteForm({ onSent }) {
     setSelectedPlan("free_trial");
   };
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
+const onSubmit = async (e) => {
+  e.preventDefault();
 
-    if (firstName.trim().length < 2) return toast.error("First name required.");
-    if (lastName.trim().length < 1) return toast.error("Last name required.");
-    if (!isValidEmail(email)) return toast.error("Valid email required.");
-    if (!isValidPhone(phone)) return toast.error("Valid phone required.");
+  if (firstName.trim().length < 2) return toast.error("First name required.");
+  if (lastName.trim().length < 1) return toast.error("Last name required.");
+  if (!isValidEmail(email)) return toast.error("Valid email required.");
+  if (!isValidPhone(phone)) return toast.error("Valid phone required.");
 
-    const trainerId = getTrainerIdFromCookie();
+  setSubmitting(true);
 
-    if (!trainerId) {
-      return toast.error("Session expired. Please log in again.");
-    }
+  try {
+    const res = await inviteTrainerClientService({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+    });
 
-    setSubmitting(true);
+    await onSent({
+      invite_id:
+        res?.data?.invite_id ??
+        res?.data?.invitation_id ??
+        `invite-${Date.now()}`,
 
-    try {
-      const res = await inviteTrainerClientService({
-        trainerID: trainerId,
-        clientName: `${firstName.trim()} ${lastName.trim()}`,
-        clientMobile: phone.trim(),
-        clientEmail: email.trim(),
-        plan: selectedPlan,
-      });
+      client_name:
+        res?.data?.client_name ??
+        res?.data?.invited_name ??
+        `${firstName.trim()} ${lastName.trim()}`,
 
-      await onSent({
-        invite_id: res?.data?.invite_id ?? `invite-${Date.now()}`,
-        client_name:
-          res?.data?.client_name ?? `${firstName.trim()} ${lastName.trim()}`,
-        client_mobile: res?.data?.client_mobile ?? phone.trim(),
-        client_email: res?.data?.client_email ?? email.trim(),
-        plan: res?.data?.plan ?? selectedPlan,
-        status: res?.data?.invite_status ?? res?.data?.status ?? "sent",
-        created_at: res?.data?.created_at ?? new Date().toISOString(),
-        trainer_name: res?.data?.trainer_name ?? "",
-        trainer_code: res?.data?.trainer_code ?? "",
-      });
+      client_mobile:
+        res?.data?.client_mobile ??
+        res?.data?.invited_phone ??
+        phone.trim(),
 
-      toast.success(`Invite sent to ${firstName.trim()} ${lastName.trim()}`);
-      reset();
-    } catch (err) {
-      toast.error(err?.message || "Could not send invite. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+      client_email:
+        res?.data?.client_email ??
+        res?.data?.invited_email ??
+        email.trim(),
+
+      plan: res?.data?.plan ?? selectedPlan,
+
+      status:
+        res?.data?.invite_status ??
+        res?.data?.status ??
+        "pending",
+
+      created_at:
+        res?.data?.created_at ??
+        new Date().toISOString(),
+
+      trainer_name: res?.data?.trainer_name ?? "",
+      trainer_code:
+        res?.data?.trainer_code ??
+        res?.data?.partner_code ??
+        "",
+    });
+
+    toast.success(`Invite sent to ${firstName.trim()} ${lastName.trim()}`);
+    reset();
+  } catch (err) {
+    toast.error(err?.message || "Could not send invite. Please try again.");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const fieldClass =
     "w-full rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5 text-[13px] text-[#252525] placeholder-[#C4C9D4] focus:outline-none focus:border-[#308BF9] transition-colors";
@@ -210,7 +258,7 @@ function InviteForm({ onSent }) {
       className="bg-[#F5F7FA] rounded-[10px] p-5 flex flex-col gap-4"
     >
       <div>
-        <h3 className="text-[#252525] text-[14px] font-bold">Invite a Client</h3>
+        <h3 className="text-[#252525] text-[14px] font-bold">Invite a Trainer</h3>
         <p className="text-[#535359] text-[12px] mt-1">
           They'll receive an email invite. Once they sign up, they'll be linked to
           your trainer account.
@@ -406,6 +454,9 @@ function AcceptedClientsTable({ clients }) {
 function PendingInvitesTable({ invites, onResend, onRevoke, auditLogs }) {
   const [actionInProgress, setActionInProgress] = useState({});
   const [expandedRows, setExpandedRows] = useState({});
+  const [revokeModalInvitation, setRevokeModalInvitation] = useState(null);
+  const [revokeReason, setRevokeReason] = useState("");
+  const [isSubmittingRevokeReason, setIsSubmittingRevokeReason] = useState(false);
 
   const toggleRow = (id) => {
     setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -422,16 +473,49 @@ function PendingInvitesTable({ invites, onResend, onRevoke, auditLogs }) {
   };
 
   const handleRevoke = async (inv) => {
+    if (isInvitationExpired(inv)) {
+      const key = `revoke-${inv.id}`;
+      setActionInProgress((prev) => ({ ...prev, [key]: true }));
+      try {
+        await onRevoke(inv, "");
+      } finally {
+        setActionInProgress((prev) => ({ ...prev, [key]: false }));
+      }
+      return;
+    }
+
+    setRevokeReason("");
+    setRevokeModalInvitation(inv);
+  };
+
+  const closeRevokeModal = () => {
+    if (isSubmittingRevokeReason) return;
+    setRevokeModalInvitation(null);
+    setRevokeReason("");
+  };
+
+  const submitRevokeReason = async () => {
+    const trimmedReason = revokeReason.trim();
+    if (trimmedReason.length === 0) {
+      return toast.error("Please provide a reason for revoking.");
+    }
+
+    const inv = revokeModalInvitation;
     const key = `revoke-${inv.id}`;
+    setIsSubmittingRevokeReason(true);
     setActionInProgress((prev) => ({ ...prev, [key]: true }));
     try {
-      await onRevoke(inv);
+      await onRevoke(inv, trimmedReason);
+      setRevokeModalInvitation(null);
+      setRevokeReason("");
     } finally {
+      setIsSubmittingRevokeReason(false);
       setActionInProgress((prev) => ({ ...prev, [key]: false }));
     }
   };
 
   return (
+    <>
     <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
       <table className="w-full text-[12px]">
         <thead>
@@ -454,8 +538,8 @@ function PendingInvitesTable({ invites, onResend, onRevoke, auditLogs }) {
             const logs = auditLogs[inv.id] || [];
 
             return (
-              <>
-                <tr key={inv.id} className="border-t border-[#F5F7FA]">
+              <Fragment key={inv.id}>
+                <tr className="border-t border-[#F5F7FA]">
                   <td className="py-2.5 px-4">
                     <button
                       type="button"
@@ -487,7 +571,17 @@ function PendingInvitesTable({ invites, onResend, onRevoke, auditLogs }) {
                   </td>
 
                   <td className="py-2.5 px-4">
-                    <span className="inline-flex rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5">
+                    <span
+                      className={`inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${
+                        String(inv.status).toLowerCase() === "expired"
+                          ? "bg-[#FFF4E0] text-[#A66B00]"
+                          : String(inv.status).toLowerCase() === "revoked"
+                          ? "bg-[#FCEAEB] text-[#B5363A]"
+                          : String(inv.status).toLowerCase() === "accepted"
+                          ? "bg-[#E5F6EE] text-[#1F7A4A]"
+                          : "bg-[#EEF4FE] text-[#308BF9]"
+                      }`}
+                    >
                       {inv.status}
                     </span>
                   </td>
@@ -498,28 +592,35 @@ function PendingInvitesTable({ invites, onResend, onRevoke, auditLogs }) {
 
                   <td className="py-2.5 px-4">
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleResend(inv)}
-                        disabled={actionInProgress[resendKey]}
-                        className="rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#d9e8fd] disabled:opacity-60 cursor-pointer"
-                      >
-                        {actionInProgress[resendKey] ? "Sending..." : "Resend"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRevoke(inv)}
-                        disabled={actionInProgress[revokeKey]}
-                        className="rounded-full bg-[#FCEAEB] text-[#B5363A] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#f8d4d5] disabled:opacity-60 cursor-pointer"
-                      >
-                        {actionInProgress[revokeKey] ? "Revoking..." : "Revoke"}
-                      </button>
+                      {inv.can_resend && (
+                        <button
+                          type="button"
+                          onClick={() => handleResend(inv)}
+                          disabled={actionInProgress[resendKey]}
+                          className="rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#d9e8fd] disabled:opacity-60 cursor-pointer"
+                        >
+                          {actionInProgress[resendKey] ? "Sending..." : "Resend"}
+                        </button>
+                      )}
+                      {inv.can_revoke && (
+                        <button
+                          type="button"
+                          onClick={() => handleRevoke(inv)}
+                          disabled={actionInProgress[revokeKey]}
+                          className="rounded-full bg-[#FCEAEB] text-[#B5363A] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#f8d4d5] disabled:opacity-60 cursor-pointer"
+                        >
+                          {actionInProgress[revokeKey] ? "Revoking..." : "Revoke"}
+                        </button>
+                      )}
+                      {!inv.can_resend && !inv.can_revoke && (
+                        <span className="text-[#A1A1A1] text-[11px]">—</span>
+                      )}
                     </div>
                   </td>
                 </tr>
 
                 {isExpanded && (
-                  <tr key={`${inv.id}-audit`} className="bg-[#FAFBFC]">
+                  <tr className="bg-[#FAFBFC]">
                     <td colSpan={7} className="px-4 py-3">
                       <div className="ml-4 border-l-2 border-[#E1E6ED] pl-4">
                         <p className="text-[11px] font-semibold text-[#535359] mb-2">Audit log</p>
@@ -543,7 +644,7 @@ function PendingInvitesTable({ invites, onResend, onRevoke, auditLogs }) {
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             );
           })}
 
@@ -560,6 +661,57 @@ function PendingInvitesTable({ invites, onResend, onRevoke, auditLogs }) {
         </tbody>
       </table>
     </div>
+
+    {revokeModalInvitation && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+        onClick={closeRevokeModal}
+      >
+        <div
+          className="w-full max-w-[420px] rounded-[12px] bg-white p-5 shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-[#252525] text-[15px] font-bold">
+            Revoke invite
+          </h3>
+          <p className="text-[#535359] text-[12px] mt-1">
+            Tell {revokeModalInvitation.first_name || revokeModalInvitation.email || "this user"} why their invite is being revoked.
+          </p>
+
+          <label className="block mt-4 text-[#535359] text-[12px] font-semibold">
+            Reason <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={revokeReason}
+            onChange={(e) => setRevokeReason(e.target.value)}
+            placeholder="e.g. Wrong email"
+            rows={3}
+            disabled={isSubmittingRevokeReason}
+            className="mt-1 w-full rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5 text-[13px] text-[#252525] focus:outline-none focus:border-[#308BF9] resize-none"
+          />
+
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={closeRevokeModal}
+              disabled={isSubmittingRevokeReason}
+              className="rounded-[10px] bg-[#F5F7FA] text-[#535359] text-[12px] font-semibold px-4 py-2 disabled:opacity-60 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submitRevokeReason}
+              disabled={isSubmittingRevokeReason}
+              className="rounded-[10px] bg-[#B5363A] text-white text-[12px] font-semibold px-4 py-2 disabled:opacity-60 cursor-pointer"
+            >
+              {isSubmittingRevokeReason ? "Revoking..." : "Submit"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -572,6 +724,17 @@ export default function TrainerAdminTrainersPage() {
 
   const [acceptedClients, setAcceptedClients] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
+  console.log("pendingInvites726", pendingInvites);
+  const [expiredInvites, setExpiredInvites] = useState([]);
+  const [revokedInvites, setRevokedInvites] = useState([]);
+  const [totals, setTotals] = useState({
+    accepted_count: 0,
+    pending_count: 0,
+    expired_count: 0,
+    revoked_count: 0,
+    total_trainers: 0,
+    total_clients: 0,
+  });
 
   const [auditLogs, setAuditLogs] = useState({});
 
@@ -605,7 +768,11 @@ export default function TrainerAdminTrainersPage() {
         actorUserId,
       });
 
-      const acceptedClientList = Array.isArray(res?.accepted_clients)
+      console.log("fetchTrainerClientInvitesService response770:", res);
+
+      const acceptedClientList = Array.isArray(res?.existing)
+        ? res.existing
+        : Array.isArray(res?.accepted_clients)
         ? res.accepted_clients
         : [];
 
@@ -613,15 +780,22 @@ export default function TrainerAdminTrainersPage() {
         ? res.pending_invites
         : [];
 
-      const failedInviteList = Array.isArray(res?.failed_invites)
-        ? res.failed_invites
+      const expiredInviteList = Array.isArray(res?.expired_invites)
+        ? res.expired_invites
+        : [];
+
+      const revokedInviteList = Array.isArray(res?.revoked_invites)
+        ? res.revoked_invites
         : [];
 
       setAcceptedClients(acceptedClientList.map(normalizeInvite));
+      setPendingInvites(pendingInviteList.map(normalizeInvite));
+      setExpiredInvites(expiredInviteList.map(normalizeInvite));
+      setRevokedInvites(revokedInviteList.map(normalizeInvite));
 
-      setPendingInvites(
-        [...pendingInviteList, ...failedInviteList].map(normalizeInvite)
-      );
+      if (res?.totals && typeof res.totals === "object") {
+        setTotals((prev) => ({ ...prev, ...res.totals }));
+      }
     } catch (err) {
       const message =
         err?.message || "Could not fetch client invites. Please try again.";
@@ -669,39 +843,25 @@ export default function TrainerAdminTrainersPage() {
   };
 
   const handleResendInvite = async (inv) => {
-    const trainerId = getTrainerIdFromCookie();
-    if (!trainerId) {
-      return toast.error("Session expired. Please log in again.");
-    }
-
     try {
-      await resendTrainerClientInviteService({
-        inviteId: inv.id,
-        trainerID: trainerId,
-        clientName: `${inv.first_name} ${inv.last_name}`.trim(),
-        clientMobile: inv.phone,
-        clientEmail: inv.email,
-        plan: inv.plan,
-      });
+      await resendUserInviteService({ inviteId: inv.id });
       addAuditEntry(inv.id, "resent", `to ${inv.email}`);
       toast.success(`Invite resent to ${inv.first_name} ${inv.last_name}`);
+      await loadTrainerClientInvites();
     } catch (error) {
-      const msg = error?.data?.message || error?.message || "";
-      if (msg.toLowerCase().includes("already has a pending invitation")) {
-        addAuditEntry(inv.id, "resent", `to ${inv.email}`);
-        toast.success(`Invite resent to ${inv.first_name} ${inv.last_name}`);
-      } else {
-        toast.error(msg || "Could not resend invite.");
-      }
+      toast.error(
+        error?.data?.message || error?.message || "Could not resend invite."
+      );
     }
   };
 
-  const handleRevokeInvite = async (inv) => {
+  const handleRevokeInvite = async (inv, reason = "") => {
     try {
       await revokeTrainerClientInviteService({
         inviteId: inv.id,
+        reason,
       });
-      addAuditEntry(inv.id, "revoked");
+      addAuditEntry(inv.id, "revoked", reason ? `reason: ${reason}` : null);
       setPendingInvites((prev) => prev.filter((item) => item.id !== inv.id));
       toast.success(`Invite to ${inv.first_name} ${inv.last_name} revoked.`);
     } catch (error) {
@@ -739,10 +899,30 @@ export default function TrainerAdminTrainersPage() {
         </div>
       )}
 
-      {/* Accepted clients */}
+      {/* Totals strip */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+        {[
+          { label: "Trainers", value: totals.total_trainers, color: "text-[#252525]" },
+          { label: "Clients", value: totals.total_clients, color: "text-[#252525]" },
+          { label: "Accepted", value: totals.accepted_count, color: "text-[#1F7A4A]" },
+          { label: "Pending", value: totals.pending_count, color: "text-[#308BF9]" },
+          { label: "Expired", value: totals.expired_count, color: "text-[#A66B00]" },
+          { label: "Revoked", value: totals.revoked_count, color: "text-[#B5363A]" },
+        ].map((tile) => (
+          <div
+            key={tile.label}
+            className="rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5"
+          >
+            <p className="text-[11px] text-[#535359] font-semibold">{tile.label}</p>
+            <p className={`text-[16px] font-bold ${tile.color}`}>{tile.value ?? 0}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Accepted trainers */}
       <div>
         <h3 className="text-[#252525] text-[14px] font-bold mb-3">
-          Accepted clients
+          Accepted trainers
         </h3>
 
         {loadingInvites ? (
@@ -756,6 +936,9 @@ export default function TrainerAdminTrainersPage() {
       <div>
         <h3 className="text-[#252525] text-[14px] font-bold mb-3">
           Pending invites
+          <span className="ml-2 text-[#A1A1A1] text-[12px] font-normal">
+            ({pendingInvites.length})
+          </span>
         </h3>
 
         {loadingInvites ? (
@@ -769,6 +952,44 @@ export default function TrainerAdminTrainersPage() {
           />
         )}
       </div>
+
+      {/* Expired invites */}
+      {expiredInvites.length > 0 && (
+        <div>
+          <h3 className="text-[#252525] text-[14px] font-bold mb-3">
+            Expired invites
+            <span className="ml-2 text-[#A1A1A1] text-[12px] font-normal">
+              ({expiredInvites.length})
+            </span>
+          </h3>
+
+          <PendingInvitesTable
+            invites={expiredInvites}
+            onResend={handleResendInvite}
+            onRevoke={handleRevokeInvite}
+            auditLogs={auditLogs}
+          />
+        </div>
+      )}
+
+      {/* Revoked invites */}
+      {revokedInvites.length > 0 && (
+        <div>
+          <h3 className="text-[#252525] text-[14px] font-bold mb-3">
+            Revoked invites
+            <span className="ml-2 text-[#A1A1A1] text-[12px] font-normal">
+              ({revokedInvites.length})
+            </span>
+          </h3>
+
+          <PendingInvitesTable
+            invites={revokedInvites}
+            onResend={handleResendInvite}
+            onRevoke={handleRevokeInvite}
+            auditLogs={auditLogs}
+          />
+        </div>
+      )}
     </div>
   );
 }

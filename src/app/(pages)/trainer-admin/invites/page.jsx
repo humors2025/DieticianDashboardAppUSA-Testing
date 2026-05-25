@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import Cookies from "js-cookie";
 import {
   inviteTrainerClientService,
-  fetchTrainerClientInvitesService,
+  // fetchTrainerClientInvitesService,
+  fetchTrainerAdminTrainerSummaryService,
   resendUserInviteService,
   revokeTrainerClientInviteService,
 } from "@/services/authService";
@@ -56,15 +57,24 @@ function splitClientName(name = "") {
 }
 
 function normalizeInvite(invite = {}) {
-  const hasExplicitNames = invite.first_name || invite.last_name;
+  // const hasExplicitNames = invite.first_name || invite.last_name;
+  const hasExplicitNames =
+  invite.first_name ||
+  invite.last_name ||
+  invite.name;
   const { first_name: derivedFirst, last_name: derivedLast } = hasExplicitNames
     ? { first_name: invite.first_name ?? "", last_name: invite.last_name ?? "" }
-    : splitClientName(invite.name ?? invite.client_name);
+    :  splitClientName(
+    invite.name ??
+    invite.client_name ??
+    ""
+  );
 
   return {
     id: invite.invitation_id ?? invite.invite_id ?? `${invite.email ?? invite.client_email}-${invite.created_at}`,
-    first_name: derivedFirst,
-    last_name: derivedLast,
+    // first_name: derivedFirst,
+    // last_name: derivedLast,
+    name:invite.name ?? `${derivedFirst} ${derivedLast}`.trim(),
     email: invite.email ?? invite.client_email ?? "",
     phone: invite.phone_no ?? invite.client_mobile ?? "",
     role: invite.role ?? "trainer",
@@ -252,7 +262,7 @@ function AcceptedClientsTable({ clients }) {
     const needle = q.trim().toLowerCase();
     if (!needle) return clients;
     return clients.filter((client) =>
-      `${client.first_name} ${client.last_name}`.toLowerCase().includes(needle) ||
+    client.name?.toLowerCase().includes(needle) ||
       client.email.toLowerCase().includes(needle) ||
       client.phone.toLowerCase().includes(needle) ||
       String(client.acceptedProfileId || "").toLowerCase().includes(needle)
@@ -262,7 +272,7 @@ function AcceptedClientsTable({ clients }) {
   if (clients.length === 0) {
     return (
       <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
-        No accepted clients yet.
+        No accepted trainers yet.
       </div>
     );
   }
@@ -287,7 +297,7 @@ function AcceptedClientsTable({ clients }) {
           <tbody>
             {filtered.map((client) => (
               <tr key={client.id} className="border-t border-[#F5F7FA]">
-                <td className="py-2.5 px-4 text-[#252525] font-semibold">{client.first_name} {client.last_name}</td>
+                <td className="py-2.5 px-4 text-[#252525] font-semibold">{client.name}</td>
                 <td className="py-2.5 px-4 text-[#535359]">{client.email}</td>
                 <td className="py-2.5 px-4 text-[#535359]">{client.phone}</td>
                 <td className="py-2.5 px-4 text-[#535359] font-mono">{client.acceptedProfileId || "-"}</td>
@@ -382,7 +392,7 @@ function PendingInvitesTable({ invites, onResend, onRevoke, auditLogs }) {
                     <td className="py-2.5 px-4">
                       <button type="button" onClick={() => toggleRow(inv.id)} className="flex items-center gap-1.5 text-[#252525] font-semibold hover:text-[#308BF9] cursor-pointer text-left">
                         <span className={`text-[10px] transition-transform ${isExpanded ? "rotate-90" : ""}`}>&#9654;</span>
-                        {inv.first_name} {inv.last_name}
+                        {inv.name}
                         {logs.length > 0 && <span className="text-[10px] text-[#A1A1A1] font-normal">({logs.length})</span>}
                       </button>
                     </td>
@@ -500,32 +510,52 @@ export default function TrainerAdminInvitesPage() {
     }));
   };
 
-  const loadInvites = useCallback(async () => {
-    const actorUserId = getActorUserIdFromCookie();
-    if (!actorUserId) { setInviteListError("Session expired. Please log in again."); return; }
-
+  const loadInvites = useCallback(async (page = 1) => {
     setLoadingInvites(true);
     setInviteListError("");
-
+  
     try {
-      const res = await fetchTrainerClientInvitesService({ actorUserId });
-
-      const acceptedClientList = Array.isArray(res?.existing) ? res.existing : Array.isArray(res?.accepted_clients) ? res.accepted_clients : [];
-      const pendingInviteList = Array.isArray(res?.pending_invites) ? res.pending_invites : [];
-      const expiredInviteList = Array.isArray(res?.expired_invites) ? res.expired_invites : [];
-      const revokedInviteList = Array.isArray(res?.revoked_invites) ? res.revoked_invites : [];
-
-      setAcceptedClients(acceptedClientList.map(normalizeInvite));
+      const res = await fetchTrainerAdminTrainerSummaryService(page);
+  
+      const acceptedTrainerList = Array.isArray(res?.accepted_trainers)
+        ? res.accepted_trainers
+        : [];
+  
+      const pendingInviteList = Array.isArray(res?.pending_invites)
+        ? res.pending_invites
+        : [];
+  
+      const expiredInviteList = Array.isArray(res?.expired_invites)
+        ? res.expired_invites
+        : [];
+  
+      const revokedInviteList = Array.isArray(res?.revoked_invites)
+        ? res.revoked_invites
+        : [];
+  
+      setAcceptedClients(acceptedTrainerList.map(normalizeInvite));
+  
       setPendingInvites(pendingInviteList.map(normalizeInvite));
+  
       setExpiredInvites(expiredInviteList.map(normalizeInvite));
+  
       setRevokedInvites(revokedInviteList.map(normalizeInvite));
-
-      if (res?.totals && typeof res.totals === "object") {
-        setTotals((prev) => ({ ...prev, ...res.totals }));
+  
+      if (res?.summary) {
+        setTotals({
+          accepted_count: res.summary.accepted_count || 0,
+          pending_count: res.summary.pending_count || 0,
+          expired_count: res.summary.expired_count || 0,
+          revoked_count: res.summary.revoked_count || 0,
+        });
       }
+  
     } catch (err) {
-      const message = err?.message || "Could not fetch invites. Please try again.";
+      const message =
+        err?.message || "Could not fetch trainer summary.";
+  
       setInviteListError(message);
+  
       toast.error(message);
     } finally {
       setLoadingInvites(false);
@@ -606,7 +636,7 @@ export default function TrainerAdminInvitesPage() {
 
       {/* Accepted clients */}
       <div>
-        <h3 className="text-[#252525] text-[14px] font-bold mb-3">Accepted clients</h3>
+        <h3 className="text-[#252525] text-[14px] font-bold mb-3">Accepted trainers</h3>
         {loadingInvites ? <div className="text-[#A1A1A1] text-[13px]">Loading&hellip;</div> : <AcceptedClientsTable clients={acceptedClients} />}
       </div>
 

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { id: "overview",     label: "Overview",     href: "/trainer-admin/earnings/overview" },
+  { id: "referrals", label: "Referrals", href: "/trainer/earnings/referrals" },
   { id: "calculator",   label: "Calculator",   href: "/trainer-admin/earnings/calculator" },
   { id: "payout-setup", label: "Payout Setup", href: "/trainer-admin/earnings/payout-setup" },
   { id: "how-to-use",   label: "How to Use",   href: "/trainer-admin/earnings/how-to-use" },

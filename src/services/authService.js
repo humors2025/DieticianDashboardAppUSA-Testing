@@ -914,6 +914,113 @@ export const fetchTrainerClientInvitesService = async ({ actorUserId }) => {
 };
 
 
+export const fetchTrainerAdminTrainerSummaryService = async (page = 1) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.TRAINERADMINTRAINERSUMMARY, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      page: page,
+    }),
+  });
+};
+
+
+
+export const sendTrainerClientInviteService = async ({
+  trainerId,
+  clientName,
+  clientMobile,
+  clientEmail,
+  planCode,
+}) => {
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.SENDTRAINERCLIENTINVITE, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      trainer_id: trainerId,
+      client_name: clientName,
+      client_mobile: clientMobile,
+      client_email: clientEmail,
+      plan_code: planCode,
+    }),
+  });
+};
+
+
+export const fetchReferralClientListService = async (page = 1, limit = 10) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.REFERRALCLIENTLIST, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      page: page,
+      limit: limit,
+    }),
+  });
+};
+
+
+export const revokeClientSubscriptionInviteService = async ({ subscriptionId, reason }) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.REVOKECLIENTSUBSCRIPTIONINVITE, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      subscription_id: subscriptionId,
+      reason: reason || "",
+    }),
+  });
+};
+
+
+export const resendClientSubscriptionInviteService = async ({ subscriptionId }) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.RESENDCLIENTSUBSCRIPTIONINVITE, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      subscription_id: subscriptionId,
+    }),
+  });
+};
+
+
+
 // // services/authService.js
 
 // import { apiFetcher } from "../config/fetcher";

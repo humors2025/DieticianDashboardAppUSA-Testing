@@ -8,7 +8,7 @@ export default function TrainerAdminEarningsLayout({ children }) {
           Earnings
         </h1>
         <p className="text-[#535359] text-[13px] mt-1">
-          Track your override commission, project future earnings, and set up payouts.
+          Track your earnings, project future revenue, and set up payouts.
         </p>
       </div>
 

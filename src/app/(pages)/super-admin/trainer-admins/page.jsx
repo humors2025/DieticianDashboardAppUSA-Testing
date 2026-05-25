@@ -10,6 +10,7 @@ import {
   resendTrainerAdminInviteService,
   revokeTrainerAdminInviteService,
 } from "@/services/authService";
+import { getCurrentUser } from "@/lib/user";
 
 
 const isValidEmail = (emailAddress) =>
@@ -26,14 +27,25 @@ const formatDateTime = (dateTimeValue) => {
 function getActorEmail() {
   try {
     const token = Cookies.get("access_token");
-    if (!token) return "Unknown";
-    const payload = token.split(".")[1];
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const json = decodeURIComponent(
-      atob(base64).split("").map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`).join("")
-    );
-    const decoded = JSON.parse(json);
-    return decoded?.email || decoded?.user_id || "Unknown";
+    if (token && token.split(".").length === 3) {
+      const payload = token.split(".")[1];
+      const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+      const json = decodeURIComponent(
+        atob(base64).split("").map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`).join("")
+      );
+      const decoded = JSON.parse(json);
+      if (decoded?.email || decoded?.user_id) {
+        return decoded.email || decoded.user_id;
+      }
+    }
+
+    const userCookie = Cookies.get("user");
+    if (userCookie) {
+      const user = JSON.parse(userCookie);
+      return user?.email || user?.user_id || "Unknown";
+    }
+
+    return "Unknown";
   } catch {
     return "Unknown";
   }
@@ -273,9 +285,6 @@ function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
               Trainers
             </th>
             <th className="py-2.5 px-4 font-semibold text-right">Clients</th>
-            <th className="py-2.5 px-4 font-semibold text-right">
-              Override / mo
-            </th>
             <th className="py-2.5 px-4 font-semibold">Status</th>
           </tr>
         </thead>
@@ -314,10 +323,6 @@ function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
 
                 <td className="py-2.5 px-4 text-right text-[#252525]">
                   {trainerAdmin.clients_count ?? 0}
-                </td>
-
-                <td className="py-2.5 px-4 text-right text-[#252525] font-semibold">
-                  {formatOverrideMonthly(trainerAdmin.override_monthly)}
                 </td>
 
                 <td className="py-2.5 px-4">
@@ -615,7 +620,31 @@ export default function TrainerAdminsPage() {
     try {
       const trainerAdminsResponse = await fetchTrainerAdminListService();
 
-      setExistingTrainerAdmins(trainerAdminsResponse?.existing || []);
+      const existingFromApi = trainerAdminsResponse?.existing || [];
+
+      const currentUser = getCurrentUser();
+      if (currentUser?.role === "super_admin" && currentUser?.partner_code) {
+        const alreadyInList = existingFromApi.some(
+          (ta) => ta.user_id === currentUser.user_id || ta.partner_code === currentUser.partner_code
+        );
+        if (!alreadyInList) {
+          const taClientsCount = existingFromApi.reduce((sum, ta) => sum + (ta.clients_count ?? 0), 0);
+          const totalClients = trainerAdminsResponse?.totals?.total_clients ?? 0;
+
+          existingFromApi.unshift({
+            role_id: "sa-self",
+            user_id: currentUser.user_id,
+            name: `${currentUser.first_name} ${currentUser.last_name}`.trim() || "Super Admin",
+            email: currentUser.email || currentUser.user_id,
+            partner_code: currentUser.partner_code,
+            trainers_count: existingFromApi.length,
+            clients_count: Math.max(0, totalClients - taClientsCount),
+            status: "active",
+          });
+        }
+      }
+
+      setExistingTrainerAdmins(existingFromApi);
       setPendingAdminInvitations(
         trainerAdminsResponse?.pending_invites || []
       );
@@ -710,7 +739,7 @@ export default function TrainerAdminsPage() {
 
           <p className="text-[#535359] text-[13px] mt-1">
             Invite and manage Trainer Admins. They onboard their own trainers
-            and earn 20% override commission on their network.
+            and earn commission on their network.
           </p>
         </div>
 

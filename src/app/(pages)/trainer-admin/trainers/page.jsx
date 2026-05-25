@@ -36,15 +36,27 @@ function decodeJwt(token) {
 
 function getLoggedInUserFromCookie() {
   const token = Cookies.get("access_token");
-  if (!token) return null;
+  if (token) {
+    const decoded = decodeJwt(token);
+    if (decoded) return decoded;
+  }
 
-  return decodeJwt(token);
+  const userCookie = Cookies.get("user");
+  if (userCookie) {
+    try {
+      return JSON.parse(userCookie);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 function getTrainerIdFromCookie() {
   const decoded = getLoggedInUserFromCookie();
 
-  return decoded?.dietician_id ?? decoded?.sub ?? null;
+  return decoded?.dietician_id ?? decoded?.partner_code ?? decoded?.sub ?? null;
 }
 
 function getActorUserIdFromCookie() {

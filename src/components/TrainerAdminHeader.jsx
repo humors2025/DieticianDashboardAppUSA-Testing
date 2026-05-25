@@ -4,7 +4,9 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cookieManager } from "@/lib/cookies";
+import { ROLES } from "@/lib/user";
 import { toast } from "sonner";
+import RoleSwitcher, { isSwitchedView } from "@/components/RoleSwitcher";
 
 const MonoIcon = ({ src, size = 20, color = "#A1A1A1", alt = "" }) => (
   <span
@@ -72,7 +74,7 @@ export default function TrainerAdminHeader() {
         </span>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
         {MENU.map((m) => {
           const isActive =
             pathname === m.path ||
@@ -94,6 +96,7 @@ export default function TrainerAdminHeader() {
             </Link>
           );
         })}
+        <RoleSwitcher currentRole={ROLES.TRAINER_ADMIN} />
       </div>
 
       <div className="flex items-center gap-3">

@@ -41,8 +41,21 @@ function decodeAccessTokenFromCookie() {
 
 function getActorUserIdFromAccessToken() {
   const decoded = decodeAccessTokenFromCookie();
+  if (decoded?.user_id || decoded?.email) {
+    return decoded.user_id ?? decoded.email;
+  }
 
-  return decoded?.user_id ?? decoded?.email ?? null;
+  const userCookie = Cookies.get("user");
+  if (userCookie) {
+    try {
+      const user = JSON.parse(userCookie);
+      return user?.user_id ?? user?.email ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 
@@ -707,13 +720,55 @@ export const fetchTrainerAdminListService = async () => {
     throw new Error("Access token missing. Please login again.");
   }
 
-  return apiFetcher(API_ENDPOINTS.ADMINPANEL.TRAINERADMINLIST, {
+  const isRealJwt = accessToken.split(".").length === 3;
+
+  if (isRealJwt) {
+    return apiFetcher(API_ENDPOINTS.ADMINPANEL.TRAINERADMINLIST, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  }
+
+  const userCookie = Cookies.get("user");
+  const user = userCookie ? JSON.parse(userCookie) : null;
+  const actorUserId = user?.user_id || user?.email;
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  const res = await fetch("/api/admin/list-users", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    }
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ actor_user_id: actorUserId }),
   });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch users");
+  }
+
+  return res.json();
+};
+
+export const fetchDownstreamUsersService = async (actorUserId) => {
+  if (!actorUserId) {
+    throw new Error("Actor user ID missing.");
+  }
+
+  const res = await fetch("/api/admin/list-users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ actor_user_id: actorUserId }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch downstream users");
+  }
+
+  return res.json();
 };
 
 

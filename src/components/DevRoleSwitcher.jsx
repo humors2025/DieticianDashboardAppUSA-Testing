@@ -13,78 +13,165 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { cookieManager } from "@/lib/cookies";
+import { getCurrentUser } from "@/lib/user";
+
+const ROLE_RANK = { super_admin: 3, trainer_admin: 2, trainer: 1 };
 
 const IDENTITIES = [
   {
-    id: "demo-super",
+    id: "connect@respyr.in",
     role: "super_admin",
-    label: "Super Admin",
+    label: "Super Admin (connect)",
     section: "Super Admin",
     home: "/super-admin/overview",
-    firstName: "Demo",
-    lastName: "SuperAdmin",
-    partnerCode: null,
+    firstName: "Super",
+    lastName: "Admin",
+    partnerCode: "RespyrD01",
     parentUserId: null,
     color: "#252525",
   },
   {
-    id: "ta-evan",
+    id: "connect@respyr.in",
     role: "trainer_admin",
-    label: "Evan Gaudet",
+    label: "Trainer Admin (connect)",
     section: "Trainer Admin",
     home: "/trainer-admin/overview",
-    firstName: "Evan",
-    lastName: "Gaudet",
-    partnerCode: "EVAN2026",
-    parentUserId: "demo-super",
+    firstName: "Super",
+    lastName: "Admin",
+    partnerCode: "RespyrD01",
+    parentUserId: null,
     color: "#308BF9",
   },
   {
-    id: "ta-derek",
-    role: "trainer_admin",
-    label: "Derek Lopez",
-    section: "Trainer Admin",
-    home: "/trainer-admin/overview",
-    firstName: "Derek",
-    lastName: "Lopez",
-    partnerCode: "DEREK2026",
-    parentUserId: "demo-super",
-    color: "#308BF9",
+    id: "connect@respyr.in",
+    role: "trainer",
+    label: "Trainer (connect)",
+    section: "Trainer",
+    home: "/trainer/dashboard",
+    firstName: "Super",
+    lastName: "Admin",
+    partnerCode: "RespyrD01",
+    parentUserId: null,
+    color: "#2EAF6A",
   },
-   {
-    id: "ta-sagar",
+  {
+    id: "sagar@respyr.in",
     role: "trainer_admin",
     label: "Sagar Hosur",
     section: "Trainer Admin",
     home: "/trainer-admin/overview",
     firstName: "Sagar",
     lastName: "Hosur",
-    partnerCode: "SAGAR2026",
-    parentUserId: "demo-super",
+    partnerCode: "RespyrD03",
+    parentUserId: "connect@respyr.in",
     color: "#308BF9",
   },
   {
-    id: "t-001",
+    id: "ishan@respyr.in",
+    role: "trainer_admin",
+    label: "Ishan Sinha",
+    section: "Trainer Admin",
+    home: "/trainer-admin/overview",
+    firstName: "Ishan",
+    lastName: "Sinha",
+    partnerCode: "ADMBWST6GD",
+    parentUserId: "connect@respyr.in",
+    color: "#308BF9",
+  },
+  {
+    id: "chandan@respyr.in",
+    role: "trainer_admin",
+    label: "Chandan Kumar",
+    section: "Trainer Admin",
+    home: "/trainer-admin/overview",
+    firstName: "Chandan",
+    lastName: "Kumar",
+    partnerCode: "ADM6BL3L29",
+    parentUserId: "connect@respyr.in",
+    color: "#308BF9",
+  },
+  {
+    id: "evan.gaudet@gmail.com",
+    role: "trainer_admin",
+    label: "Evan Gaudet",
+    section: "Trainer Admin",
+    home: "/trainer-admin/overview",
+    firstName: "Evan",
+    lastName: "Gaudet",
+    partnerCode: "RespyrD05",
+    parentUserId: "connect@respyr.in",
+    color: "#308BF9",
+  },
+  {
+    id: "derek.lopez88@gmail.com",
+    role: "trainer_admin",
+    label: "Derek Lopez",
+    section: "Trainer Admin",
+    home: "/trainer-admin/overview",
+    firstName: "Derek",
+    lastName: "Lopez",
+    partnerCode: "RESPYRD06",
+    parentUserId: "connect@respyr.in",
+    color: "#308BF9",
+  },
+  {
+    id: "harsh@respyr.in",
+    role: "trainer_admin",
+    label: "Harsh",
+    section: "Trainer Admin",
+    home: "/trainer-admin/overview",
+    firstName: "Harsh",
+    lastName: "",
+    partnerCode: "ADM9JQ4CVZ",
+    parentUserId: "connect@respyr.in",
+    color: "#308BF9",
+  },
+  {
+    id: "sagarhosur814@gmail.com",
     role: "trainer",
-    label: "Marcus Hill (Evan's)",
+    label: "Ankur Jaiswal (Sagar's)",
     section: "Trainer",
     home: "/trainer/dashboard",
-    firstName: "Marcus",
-    lastName: "Hill",
-    partnerCode: "MARCUS01",
-    parentUserId: "ta-evan",
+    firstName: "Ankur",
+    lastName: "Jaiswal",
+    partnerCode: "TRAIN0090",
+    parentUserId: "sagar@respyr.in",
     color: "#2EAF6A",
   },
   {
-    id: "t-005",
+    id: "tanner.l.staton@gmail.com",
     role: "trainer",
-    label: "Kai Nakamura (Derek's)",
+    label: "Tanner Staton (Evan's)",
     section: "Trainer",
     home: "/trainer/dashboard",
-    firstName: "Kai",
-    lastName: "Nakamura",
-    partnerCode: "KAI01",
-    parentUserId: "ta-derek",
+    firstName: "Tanner",
+    lastName: "Staton",
+    partnerCode: "RESPYRD07",
+    parentUserId: "evan.gaudet@gmail.com",
+    color: "#2EAF6A",
+  },
+  {
+    id: "teddy@wunderinteractive.com",
+    role: "trainer",
+    label: "Teddy (Evan's)",
+    section: "Trainer",
+    home: "/trainer/dashboard",
+    firstName: "Teddy",
+    lastName: "",
+    partnerCode: "RESPYRD08",
+    parentUserId: "evan.gaudet@gmail.com",
+    color: "#2EAF6A",
+  },
+  {
+    id: "snutwell@yahoo.com",
+    role: "trainer",
+    label: "Sophia Nutwell (Evan's)",
+    section: "Trainer",
+    home: "/trainer/dashboard",
+    firstName: "Sophia",
+    lastName: "Nutwell",
+    partnerCode: "RESPYRD10",
+    parentUserId: "evan.gaudet@gmail.com",
     color: "#2EAF6A",
   },
 ];
@@ -94,6 +181,10 @@ export default function DevRoleSwitcher() {
   const [isOpen, setIsOpen] = useState(false);
 
   if (process.env.NODE_ENV !== "development") return null;
+
+  const currentUser = getCurrentUser();
+  const currentRole = currentUser?.role || "super_admin";
+  const currentRank = ROLE_RANK[currentRole] ?? 0;
 
   const switchTo = (identity) => {
     const user = {
@@ -117,16 +208,25 @@ export default function DevRoleSwitcher() {
         is_reset_password: 1,
       })
     );
+    cookieManager.remove("original_user");
     setIsOpen(false);
     router.push(identity.home);
     setTimeout(() => router.refresh(), 50);
   };
 
-  // Group identities by section for the dropdown.
-  const sections = IDENTITIES.reduce((acc, ident) => {
+  const visibleIdentities = IDENTITIES.filter(
+    (ident) => (ROLE_RANK[ident.role] ?? 0) <= currentRank
+  );
+
+  const sections = visibleIdentities.reduce((acc, ident) => {
     (acc[ident.section] ||= []).push(ident);
     return acc;
   }, {});
+
+  const isActive = (ident) =>
+    currentUser?.user_id === ident.id && currentRole === ident.role;
+
+  const showReset = currentRole !== "super_admin";
 
   return (
     <div
@@ -145,9 +245,14 @@ export default function DevRoleSwitcher() {
               </div>
               {idents.map((r) => (
                 <button
-                  key={r.id}
+                  key={`${r.id}-${r.role}`}
                   onClick={() => switchTo(r)}
-                  className="w-full flex items-center gap-2 px-2 py-2 rounded-[8px] hover:bg-[#F5F7FA] text-left"
+                  disabled={isActive(r)}
+                  className={`w-full flex items-center gap-2 px-2 py-2 rounded-[8px] text-left ${
+                    isActive(r)
+                      ? "bg-[#EEF4FE] border border-[#308BF9]/30 opacity-70 cursor-default"
+                      : "hover:bg-[#F5F7FA]"
+                  }`}
                 >
                   <span
                     className="w-2 h-2 rounded-full flex-shrink-0"
@@ -156,6 +261,9 @@ export default function DevRoleSwitcher() {
                   />
                   <span className="text-[#252525] text-[12px] font-semibold flex-1">
                     {r.label}
+                    {isActive(r) && (
+                      <span className="text-[#308BF9] text-[10px] font-normal ml-1">(active)</span>
+                    )}
                   </span>
                   {r.partnerCode && (
                     <span className="text-[#A1A1A1] text-[10px] font-mono">
@@ -166,6 +274,19 @@ export default function DevRoleSwitcher() {
               ))}
             </div>
           ))}
+          {showReset && (
+            <div className="mt-2 pt-2 border-t border-[#E1E6ED]">
+              <button
+                onClick={() => switchTo(IDENTITIES[0])}
+                className="w-full flex items-center gap-2 px-2 py-2 rounded-[8px] hover:bg-[#F5F7FA] text-left"
+              >
+                <span className="text-[#A1A1A1] text-[11px]">↩</span>
+                <span className="text-[#A1A1A1] text-[11px]">
+                  Reset to Super Admin (dev)
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       )}
       <button

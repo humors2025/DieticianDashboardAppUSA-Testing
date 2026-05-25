@@ -740,7 +740,7 @@ export const fetchTrainerAdminListService = async () => {
     throw new Error("Session expired. Please login again.");
   }
 
-  const res = await fetch("/api/admin/list-users", {
+  const res = await fetch(API_ENDPOINTS.ADMINPANEL.LISTUSERSINTERNAL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ actor_user_id: actorUserId }),
@@ -758,7 +758,7 @@ export const fetchDownstreamUsersService = async (actorUserId) => {
     throw new Error("Actor user ID missing.");
   }
 
-  const res = await fetch("/api/admin/list-users", {
+  const res = await fetch(API_ENDPOINTS.ADMINPANEL.LISTUSERSINTERNAL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ actor_user_id: actorUserId }),

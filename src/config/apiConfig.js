@@ -90,8 +90,10 @@ ADMINPANEL:{
   REVOKETRAINERCLIENTINVITE:"/dietitian/api/web/revoke-trainer-client-invite.php",
 
   VALIDATEINVITETOKEN:"/dietitian/api/web/validate-invite-token.php",
-  ACCEPTINVITE:"/dietitian/api/web/accept-invite.php"
+  ACCEPTINVITE:"/dietitian/api/web/accept-invite.php",
 
+  // Internal Next.js API routes (relative — not prefixed with API_BASE_URL)
+  LISTUSERSINTERNAL:"/api/admin/list-users"
 }
   
   

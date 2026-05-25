@@ -798,8 +798,23 @@ export const fetchTrainerClientInvitesService = async ({ actorUserId }) => {
 //   });
 // };
 
+export const fetchDownstreamUsersService = async (actorUserId) => {
+  if (!actorUserId) {
+    throw new Error("Actor user ID missing.");
+  }
 
+  const res = await fetch("/api/admin/list-users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ actor_user_id: actorUserId }),
+  });
 
+  if (!res.ok) {
+    throw new Error("Failed to fetch downstream users");
+  }
+
+  return res.json();
+};
 
 
 // export const fetchScoreTrend = async (dieticianId, profileId, mode) => {

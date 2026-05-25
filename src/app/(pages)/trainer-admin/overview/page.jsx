@@ -1,71 +1,62 @@
 "use client";
 
-// Scoped to the currently logged-in Trainer Admin. Shows ONLY their own
-// network: trainers they recruited + clients under those trainers + their
-// override commission. No peer visibility (Evan never sees Derek's data).
-//
-// Today: reads currentUser from cookie, filters synthetic data by id.
-// When backend ships: replace synthetic helpers with GET /api/users/<me>/earnings.
-
-import { useEffect, useState } from "react";
-import {
-  TRAINER_ADMINS,
-  trainersOf,
-  clientsUnderTA,
-  taOverrideThisMonth,
-  fmtUSDCents,
-} from "@/lib/demo-data";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { toast } from "sonner";
 import { getCurrentUser } from "@/lib/user";
+import { fetchDownstreamUsersService } from "@/services/authService";
 
-function KpiCard({ label, value, hint, accent }) {
-  if (accent) {
-    return (
-      <div className="bg-[#308BF9] rounded-[10px] p-5 text-white flex flex-col gap-1">
-        <div className="text-[12px] opacity-80">{label}</div>
-        <div className="text-[28px] font-bold leading-none mt-1">{value}</div>
-        <div className="text-[11px] opacity-80 mt-1">{hint}</div>
+function KpiCard({ label, value, hint, accent, pending, href }) {
+  const content = (
+    <>
+      <div className={accent ? "text-[12px] opacity-80" : "text-[#535359] text-[12px]"}>{label}</div>
+      <div className={`text-[28px] font-bold leading-none mt-1 ${accent ? "" : "text-[#252525]"}`}>
+        {pending ? "—" : value}
       </div>
-    );
-  }
-  return (
-    <div className="bg-white rounded-[10px] p-5 border border-[#E1E6ED] flex flex-col gap-1">
-      <div className="text-[#535359] text-[12px]">{label}</div>
-      <div className="text-[#252525] text-[28px] font-bold leading-none mt-1">{value}</div>
-      <div className="text-[#A1A1A1] text-[11px] mt-1">{hint}</div>
-    </div>
+      <div className={accent ? "text-[11px] opacity-80 mt-1" : "text-[#A1A1A1] text-[11px] mt-1"}>{hint}</div>
+    </>
   );
+
+  const className = accent
+    ? "bg-[#308BF9] rounded-[10px] p-5 text-white flex flex-col gap-1 hover:bg-[#1a76e8] transition-colors"
+    : "bg-white rounded-[10px] p-5 border border-[#E1E6ED] flex flex-col gap-1 hover:border-[#308BF9] transition-colors";
+
+  if (href) {
+    return <Link href={href} className={className}>{content}</Link>;
+  }
+  return <div className={className}>{content}</div>;
 }
 
 export default function TrainerAdminOverview() {
   const [user, setUser] = useState(null);
+  const [totals, setTotals] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setUser(getCurrentUser());
+  const loadData = useCallback(async (currentUser) => {
+    if (!currentUser) return;
+    setLoading(true);
+    try {
+      const res = await fetchDownstreamUsersService(currentUser.user_id);
+      setTotals(res?.totals || {});
+    } catch (err) {
+      toast.error(err?.message || "Failed to load overview");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    const u = getCurrentUser();
+    setUser(u);
+    loadData(u);
+  }, [loadData]);
+
   if (!user) {
-    return <div className="text-[#A1A1A1] text-[13px]">Loading…</div>;
+    return <div className="text-[#A1A1A1] text-[13px]">Loading...</div>;
   }
 
-  const taId = user.user_id;
-  const taProfile = TRAINER_ADMINS.find((t) => t.id === taId);
-  const myTrainers = trainersOf(taId);
-  const myClients = clientsUnderTA(taId);
-  const activeClients = myClients.filter((c) => c.status === "active");
-  const overrideMonth = taOverrideThisMonth(taId);
-
-  const tierMix = {
-    coach: activeClients.filter((c) => c.tier === "coach").length,
-    lease: activeClients.filter((c) => c.tier === "lease").length,
-    owned: activeClients.filter((c) => c.tier === "owned").length,
-  };
-
-  const KPIS = [
-    { label: "My trainers",         value: myTrainers.length.toString(),         hint: `${myTrainers.filter((t) => t.status === "active").length} active`, accent: true },
-    { label: "Clients in network",  value: myClients.length.toString(),          hint: `${activeClients.length} active subscriptions` },
-    // { label: "Override this month", value: fmtUSDCents(overrideMonth),           hint: "20% override on your trainers' clients" },
-    { label: "Override (year est.)",value: fmtUSDCents(overrideMonth * 12),      hint: "Assuming current activity persists" },
-  ];
+  const trainerCount = totals?.total_trainers ?? totals?.accepted_count ?? 0;
+  const clientCount = totals?.total_clients ?? 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -75,45 +66,45 @@ export default function TrainerAdminOverview() {
             Welcome, {user.first_name}!
           </h1>
           <p className="text-[#535359] text-[13px] mt-1">
-            Your network: {myTrainers.length} trainer{myTrainers.length === 1 ? "" : "s"} ·{" "}
-            {myClients.length} client{myClients.length === 1 ? "" : "s"} ·{" "}
-            partner code <span className="font-mono">{taProfile?.partner_code || user.partner_code || "—"}</span>
+            Your network: {trainerCount} trainer
+            {trainerCount === 1 ? "" : "s"} · {clientCount} client
+            {clientCount === 1 ? "" : "s"} · partner code{" "}
+            <span className="font-mono">
+              {user.partner_code || "—"}
+            </span>
           </p>
         </div>
-        <span className="rounded-full bg-[#FFF4E0] text-[#A66B00] text-[11px] font-semibold px-3 py-1">
-          Demo data
-        </span>
+        <button
+          type="button"
+          onClick={() => loadData(user)}
+          disabled={loading}
+          className="rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-3 py-1 disabled:opacity-60 cursor-pointer"
+        >
+          {loading ? "Loading..." : "Refresh"}
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {KPIS.map((k) => <KpiCard key={k.label} {...k} />)}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <KpiCard
+          label="My trainers"
+          value={String(trainerCount)}
+          hint="In your network"
+          accent
+          href="/trainer-admin/trainers"
+        />
+        <KpiCard
+          label="Clients in network"
+          value={String(clientCount)}
+          hint="Total across all trainers"
+          href="/trainer-admin/trainers"
+        />
       </div>
 
-      <div className="bg-[#F5F7FA] rounded-[10px] p-5">
-        <div className="flex items-baseline justify-between mb-4">
-          <h3 className="text-[#252525] text-[14px] font-bold">Tier mix in your network</h3>
-          <span className="text-[#A1A1A1] text-[11px]">Active subscriptions only</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {[
-            { label: "Coach's Device", value: tierMix.coach, color: "#308BF9" },
-            { label: "Lease to Own",   value: tierMix.lease, color: "#2EAF6A" },
-            { label: "Owned",          value: tierMix.owned, color: "#F2A93B" },
-          ].map((t) => (
-            <div key={t.label} className="bg-white rounded-[10px] p-4 border border-[#E1E6ED] flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} aria-hidden />
-                <span className="text-[#535359] text-[12px]">{t.label}</span>
-              </div>
-              <div className="text-[#252525] text-[22px] font-bold">{t.value}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {myTrainers.length === 0 && (
+      {trainerCount === 0 && (
         <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
-          You haven't onboarded any trainers yet. Go to <span className="font-semibold">Trainers</span> to send your first invite.
+          You haven't onboarded any trainers yet. Go to{" "}
+          <span className="font-semibold">Trainers</span> to send your first
+          invite.
         </div>
       )}
     </div>

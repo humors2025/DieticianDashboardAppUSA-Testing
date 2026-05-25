@@ -299,14 +299,15 @@ function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
                 className="border-t border-[#F5F7FA] hover:bg-[#F5F7FA]"
               >
                 <td className="py-2.5 px-4">
-                  <Link
+                  {/* <Link
                     href={`/super-admin/trainer-admins/${
                       trainerAdmin.role_id || trainerAdmin.user_id
                     }`}
                     className="text-[#308BF9] font-semibold hover:underline"
                   >
                     {trainerAdmin.name || "-"}
-                  </Link>
+                  </Link> */}
+                  <p  className="text-[#308BF9] font-semibold "> {trainerAdmin.name || "-"}</p>
 
                   <div className="text-[#A1A1A1] text-[11px]">
                     {trainerAdmin.email || "-"}

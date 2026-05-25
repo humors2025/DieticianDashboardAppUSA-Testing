@@ -720,37 +720,20 @@ export const fetchTrainerAdminListService = async () => {
     throw new Error("Access token missing. Please login again.");
   }
 
-  const isRealJwt = accessToken.split(".").length === 3;
-
-  if (isRealJwt) {
-    return apiFetcher(API_ENDPOINTS.ADMINPANEL.TRAINERADMINLIST, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-  }
-
-  const userCookie = Cookies.get("user");
-  const user = userCookie ? JSON.parse(userCookie) : null;
-  const actorUserId = user?.user_id || user?.email;
+  const actorUserId = getActorUserIdFromAccessToken();
 
   if (!actorUserId) {
     throw new Error("Session expired. Please login again.");
   }
 
-  const res = await fetch(API_ENDPOINTS.ADMINPANEL.LISTUSERSINTERNAL, {
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.TRAINERADMINLIST, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: JSON.stringify({ actor_user_id: actorUserId }),
   });
-
-  if (!res.ok) {
-    throw new Error("Failed to fetch users");
-  }
-
-  return res.json();
 };
 
 export const fetchDownstreamUsersService = async (actorUserId) => {

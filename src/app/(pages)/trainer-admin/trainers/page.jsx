@@ -32,8 +32,8 @@ function getActorUserIdFromCookie() {
 
 export default function TrainerAdminTrainersPage() {
   const [user, setUser] = useState(null);
-  const [inviteOwners, setInviteOwners] = useState([]);
-  const [clientCounts, setClientCounts] = useState({});
+  const [trainers, setTrainers] = useState([]);
+  const [totals, setTotals] = useState({ total_trainers: 0, total_clients: 0 });
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -43,25 +43,11 @@ export default function TrainerAdminTrainersPage() {
     setLoading(true);
     try {
       const res = await fetchTrainerClientInvitesService({ actorUserId });
-      const owners = res?.invite_owners || [];
-      setInviteOwners(owners);
-
-      const counts = {};
-      await Promise.all(
-        owners
-          .filter((o) => o.dietician_id)
-          .map((o) =>
-            fetch("/api/admin/trainer-clients", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ dietician_id: o.dietician_id, page: 1 }),
-            })
-              .then((r) => r.json())
-              .then((d) => { counts[o.dietician_id] = d?.summary?.all_total ?? 0; })
-              .catch(() => { counts[o.dietician_id] = 0; })
-          )
-      );
-      setClientCounts(counts);
+      setTrainers(res?.existing || []);
+      setTotals({
+        total_trainers: res?.totals?.total_trainers ?? 0,
+        total_clients: res?.totals?.total_clients ?? 0,
+      });
     } catch (err) {
       toast.error(err?.message || "Failed to load trainers");
     } finally {
@@ -76,15 +62,15 @@ export default function TrainerAdminTrainersPage() {
 
   if (!user) return <div className="text-[#A1A1A1] text-[13px]">Loading&hellip;</div>;
 
-  const totalTrainers = inviteOwners.length;
-  const totalClients = Object.values(clientCounts).reduce((sum, c) => sum + c, 0);
+  const totalTrainers = totals.total_trainers;
+  const totalClients = totals.total_clients;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
-            Trainers
+            Overview
           </h1>
           <p className="text-[#535359] text-[13px] mt-1">
             Trainers in your network and their client activity.
@@ -117,7 +103,7 @@ export default function TrainerAdminTrainersPage() {
       {/* Trainers table */}
       {loading ? (
         <div className="text-[#A1A1A1] text-[13px]">Loading&hellip;</div>
-      ) : inviteOwners.length === 0 ? (
+      ) : trainers.length === 0 ? (
         <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
           No trainers in your network yet.
         </div>
@@ -134,39 +120,41 @@ export default function TrainerAdminTrainersPage() {
               </tr>
             </thead>
             <tbody>
-              {inviteOwners.map((owner) => {
-                const clients = clientCounts[owner.dietician_id] ?? 0;
+              {trainers.map((t) => {
+                const clients = t.clients_count ?? 0;
+                const roleStr = String(t.actual_role || t.role || "").toLowerCase();
+                const isAdmin = roleStr.includes("admin");
                 return (
                   <tr
-                    key={owner.user_id}
-                    className={`border-t border-[#F5F7FA] ${owner.is_self ? "bg-[#EEF4FE]/50" : ""}`}
+                    key={t.user_id}
+                    className={`border-t border-[#F5F7FA] ${t.is_self ? "bg-[#EEF4FE]/50" : ""}`}
                   >
                     <td className="py-2.5 px-4">
                       <div className="text-[#252525] font-semibold">
-                        {owner.name || owner.user_id}
-                        {owner.is_self && (
+                        {t.name || t.user_id}
+                        {t.is_self && (
                           <span className="text-[#308BF9] text-[10px] font-normal ml-1.5">(you)</span>
                         )}
                       </div>
-                      <div className="text-[#A1A1A1] text-[11px]">{owner.email || owner.user_id}</div>
+                      <div className="text-[#A1A1A1] text-[11px]">{t.email || t.user_id}</div>
                     </td>
                     <td className="py-2.5 px-4 text-[#535359] font-mono">
-                      {owner.dietician_id || owner.partner_code || "-"}
+                      {t.partner_code || t.dietician_id || "-"}
                     </td>
                     <td className="py-2.5 px-4">
                       <span className={`inline-flex rounded-full text-[10px] font-semibold px-2 py-0.5 ${
-                        owner.is_admin_as_trainer || owner.is_super_admin_as_trainer
+                        isAdmin
                           ? "bg-[#EEF4FE] text-[#308BF9]"
                           : "bg-[#E5F6EE] text-[#1F7A4A]"
                       }`}>
-                        {owner.is_self ? "You (Trainer Admin)" : owner.is_admin_as_trainer ? "Trainer Admin" : "Trainer"}
+                        {t.is_self ? "You (Trainer Admin)" : isAdmin ? "Trainer Admin" : "Trainer"}
                       </span>
                     </td>
                     <td className="py-2.5 px-4 text-right text-[#252525] font-semibold">
                       {clients}
                     </td>
                     <td className="py-2.5 px-4 text-right">
-                      {owner.is_self ? (
+                      {t.is_self ? (
                         <Link
                           href="/trainer/dashboard"
                           className="rounded-full bg-[#2EAF6A] text-white text-[11px] font-semibold px-3 py-1 hover:bg-[#259B5C] transition-colors"

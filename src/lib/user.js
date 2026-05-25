@@ -122,8 +122,8 @@ export function landingPathForUser(user) {
       return "/super-admin/overview";
 
     case ROLES.TRAINER_ADMIN:
-     return "/trainer-admin/overview";
-        // return "/trainer/dashboard";   
+     return "/trainer-admin/trainers";
+        // return "/trainer/dashboard";
 
     case ROLES.TRAINER:
       return "/trainer/dashboard";

@@ -28,9 +28,8 @@ const MonoIcon = ({ src, size = 20, color = "#A1A1A1", alt = "" }) => (
 );
 
 const MENU = [
-  { name: "Overview",           icon: "/icons/hugeicons_home-05.svg",     path: "/trainer-admin/overview" },
-  { name: "Trainers",           icon: "/icons/hugeicons_user-group.png",  path: "/trainer-admin/trainers" },
-  { name: "Invites & Referrals", icon: "/icons/hugeicons_award-01.svg",   path: "/trainer-admin/invites" },
+  { name: "Overview",           icon: "/icons/hugeicons_home-05.svg",     path: "/trainer-admin/trainers" },
+  { name: "Invites Trainer", icon: "/icons/hugeicons_award-01.svg",   path: "/trainer-admin/invites" },
   { name: "Earnings",           icon: "/icons/hugeicons_award-01.svg",    path: "/trainer-admin/earnings" },
   { name: "Settings",           icon: "/icons/hugeicons_settings-03.svg", path: "/trainer-admin/settings" },
 ];
@@ -63,7 +62,7 @@ export default function TrainerAdminHeader() {
   return (
     <div className="flex justify-between bg-[#F5F7FA] p-4">
       <div className="flex items-center gap-3">
-        <Link href="/trainer-admin/overview">
+        <Link href="/trainer-admin/trainers">
           <div className="flex flex-col items-center">
             <img src="/icons/logorespyr.png" alt="logo" width={50} height={50} />
           </div>

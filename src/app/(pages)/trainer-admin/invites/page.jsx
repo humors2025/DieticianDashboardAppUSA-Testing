@@ -184,7 +184,7 @@ function InviteForm({ onSent }) {
   return (
     <form onSubmit={onSubmit} className="bg-[#F5F7FA] rounded-[10px] p-5 flex flex-col gap-4">
       <div>
-        <h3 className="text-[#252525] text-[14px] font-bold">Invite a Client</h3>
+        <h3 className="text-[#252525] text-[14px] font-bold">Invite a Trainer</h3>
         <p className="text-[#535359] text-[12px] mt-1">
           They&apos;ll receive an email invite. Once they sign up, they&apos;ll be linked to your trainer account.
         </p>
@@ -209,7 +209,7 @@ function InviteForm({ onSent }) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      {/* <div className="flex flex-col gap-1.5">
         <label className={labelClass}>Plan <span className="text-red-500">*</span></label>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {PLANS.map((plan) => (
@@ -228,7 +228,7 @@ function InviteForm({ onSent }) {
             </button>
           ))}
         </div>
-      </div>
+      </div> */}
 
       <div className="flex items-center gap-3">
         <button type="submit" disabled={submitting} className="rounded-[10px] bg-[#308BF9] text-white text-[13px] font-semibold px-5 py-2.5 disabled:opacity-60 hover:bg-[#1a76e8] transition-colors cursor-pointer">
@@ -576,7 +576,7 @@ export default function TrainerAdminInvitesPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
-          Invites & Referrals
+          Invites Trainer & Referrals
         </h1>
         <p className="text-[#535359] text-[13px] mt-1">
           Send client invites and track their status.

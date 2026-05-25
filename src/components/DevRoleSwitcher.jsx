@@ -289,12 +289,12 @@ export default function DevRoleSwitcher() {
           )}
         </div>
       )}
-      <button
+      {/* <button
         onClick={() => setIsOpen((v) => !v)}
         className="bg-[#252525] text-white text-[11px] font-semibold rounded-full px-4 py-2 shadow-lg hover:bg-[#404040]"
       >
         {isOpen ? "Close" : "Switch role"}
-      </button>
+      </button> */}
     </div>
   );
 }

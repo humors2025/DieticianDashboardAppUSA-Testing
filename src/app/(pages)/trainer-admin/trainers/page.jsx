@@ -1,958 +1,142 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
-import {
-  inviteTrainerClientService,
-  fetchTrainerClientInvitesService,
-  resendTrainerClientInviteService,
-  resendUserInviteService,
-  revokeTrainerClientInviteService,
-} from "@/services/authService";
-
-// ---------------------------------------------------------------------------
-// JWT helpers
-// ---------------------------------------------------------------------------
-function decodeJwt(token) {
-  try {
-    const payload = token.split(".")[1];
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((char) => {
-          return `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`;
-        })
-        .join("")
-    );
-
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
-}
+import { fetchTrainerClientInvitesService } from "@/services/authService";
 
 function getLoggedInUserFromCookie() {
   const token = Cookies.get("access_token");
   if (token) {
-    const decoded = decodeJwt(token);
-    if (decoded) return decoded;
+    try {
+      const payload = token.split(".")[1];
+      const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64).split("").map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`).join("")
+      );
+      return JSON.parse(jsonPayload);
+    } catch { /* fall through */ }
   }
-
   const userCookie = Cookies.get("user");
   if (userCookie) {
-    try {
-      return JSON.parse(userCookie);
-    } catch {
-      return null;
-    }
+    try { return JSON.parse(userCookie); } catch { return null; }
   }
-
   return null;
-}
-
-function getTrainerIdFromCookie() {
-  const decoded = getLoggedInUserFromCookie();
-
-  return decoded?.dietician_id ?? decoded?.partner_code ?? decoded?.sub ?? null;
 }
 
 function getActorUserIdFromCookie() {
   const decoded = getLoggedInUserFromCookie();
-
   return decoded?.user_id ?? decoded?.email ?? null;
 }
 
-// ---------------------------------------------------------------------------
-// Data normalizers
-// ---------------------------------------------------------------------------
-function splitClientName(name = "") {
-  const parts = String(name).trim().split(/\s+/).filter(Boolean);
-
-  return {
-    first_name: parts[0] ?? "",
-    last_name: parts.slice(1).join(" "),
-  };
-}
-
-function normalizeInvite(invite = {}) {
-  const hasExplicitNames = invite.first_name || invite.last_name;
-  const { first_name: derivedFirst, last_name: derivedLast } = hasExplicitNames
-    ? { first_name: invite.first_name ?? "", last_name: invite.last_name ?? "" }
-    : splitClientName(invite.name ?? invite.client_name);
-
-  return {
-    id:
-      invite.invitation_id ??
-      invite.invite_id ??
-      `${invite.email ?? invite.client_email}-${invite.created_at}`,
-    first_name: derivedFirst,
-    last_name: derivedLast,
-    email: invite.email ?? invite.client_email ?? "",
-    phone: invite.phone_no ?? invite.client_mobile ?? "",
-    role: invite.role ?? "trainer",
-    plan: invite.plan ?? null,
-    status: invite.status ?? "pending",
-    sentAt:
-      invite.sent_at ??
-      invite.created_at ??
-      invite.updated_at ??
-      new Date().toISOString(),
-    expires_at: invite.expires_at ?? null,
-    acceptedAt: invite.accepted_at ?? null,
-    acceptedProfileId:
-      invite.accepted_profile_id ?? invite.partner_code ?? null,
-    trainer_name:
-      invite.trainer_name ??
-      [invite.first_name, invite.last_name].filter(Boolean).join(" ") ??
-      "",
-    trainer_code: invite.partner_code ?? invite.trainer_code ?? "",
-    invited_by_user_id: invite.invited_by_user_id ?? null,
-    parent_user_id: invite.parent_user_id ?? null,
-    can_resend: invite.can_resend ?? true,
-    can_revoke: invite.can_revoke ?? true,
-  };
-}
-
-function isInvitationExpired(invitation) {
-  if (String(invitation?.status || "").toLowerCase() === "expired") return true;
-  if (!invitation?.expires_at) return false;
-  const expiresAt = new Date(String(invitation.expires_at).replace(" ", "T"));
-  if (Number.isNaN(expiresAt.getTime())) return false;
-  return expiresAt.getTime() < Date.now();
-}
-
-function formatInviteDate(dateValue) {
-  if (!dateValue) return "-";
-
-  const normalized =
-    typeof dateValue === "string" ? dateValue.replace(" ", "T") : dateValue;
-
-  const date = new Date(normalized);
-
-  if (Number.isNaN(date.getTime())) {
-    return String(dateValue);
-  }
-
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Validators
-// ---------------------------------------------------------------------------
-const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-const isValidPhone = (p) => /^\+?[0-9\s\-()]{7,}$/.test(p);
-
-const AUDIT_ACTION_STYLES = {
-  invited: "bg-[#E5F6EE] text-[#1F7A4A]",
-  resent: "bg-[#EEF4FE] text-[#308BF9]",
-  revoked: "bg-[#FCEAEB] text-[#B5363A]",
-  rejected: "bg-[#FFF4E0] text-[#A66B00]",
-  "accepted (email)": "bg-[#E5F6EE] text-[#1F7A4A]",
-  "accepted (phone)": "bg-[#E5F6EE] text-[#1F7A4A]",
-};
-
-function formatAuditTimestamp(dateValue) {
-  if (!dateValue) return "";
-  const d = new Date(dateValue);
-  if (Number.isNaN(d.getTime())) return String(dateValue);
-  return d.toLocaleString("en-US", {
-    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-  });
-}
-
-// ---------------------------------------------------------------------------
-// InviteForm — calls send_trainer_client_invite API
-// ---------------------------------------------------------------------------
-const PLANS = [
-  { id: "free_trial",  label: "Free Trial",           price: "$0",   badge: "Free",  badgeColor: "bg-[#E5F6EE] text-[#1F7A4A]" },
-  { id: "monthly",     label: "Monthly Plan",         price: "$50",  badge: "$50/mo", badgeColor: "bg-[#EEF4FE] text-[#308BF9]" },
-  { id: "lease",       label: "Lease (Quarterly)",    price: "$150", badge: "$150",   badgeColor: "bg-[#FFF4E0] text-[#A66B00]" },
-  { id: "yearly",      label: "Yearly Plan",          price: "$300", badge: "$300/yr", badgeColor: "bg-[#F3EEFE] text-[#6B45BC]" },
-];
-
-function InviteForm({ onSent }) {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [selectedPlan, setSelectedPlan] = useState("free_trial");
-  const [submitting, setSubmitting] = useState(false);
-
-  const reset = () => {
-    setFirstName("");
-    setLastName("");
-    setEmail("");
-    setPhone("");
-    setSelectedPlan("free_trial");
-  };
-
-const onSubmit = async (e) => {
-  e.preventDefault();
-
-  if (firstName.trim().length < 2) return toast.error("First name required.");
-  if (lastName.trim().length < 1) return toast.error("Last name required.");
-  if (!isValidEmail(email)) return toast.error("Valid email required.");
-  if (!isValidPhone(phone)) return toast.error("Valid phone required.");
-
-  setSubmitting(true);
-
-  try {
-    const res = await inviteTrainerClientService({
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-    });
-
-    await onSent({
-      invite_id:
-        res?.data?.invite_id ??
-        res?.data?.invitation_id ??
-        `invite-${Date.now()}`,
-
-      client_name:
-        res?.data?.client_name ??
-        res?.data?.invited_name ??
-        `${firstName.trim()} ${lastName.trim()}`,
-
-      client_mobile:
-        res?.data?.client_mobile ??
-        res?.data?.invited_phone ??
-        phone.trim(),
-
-      client_email:
-        res?.data?.client_email ??
-        res?.data?.invited_email ??
-        email.trim(),
-
-      plan: res?.data?.plan ?? selectedPlan,
-
-      status:
-        res?.data?.invite_status ??
-        res?.data?.status ??
-        "pending",
-
-      created_at:
-        res?.data?.created_at ??
-        new Date().toISOString(),
-
-      trainer_name: res?.data?.trainer_name ?? "",
-      trainer_code:
-        res?.data?.trainer_code ??
-        res?.data?.partner_code ??
-        "",
-    });
-
-    toast.success(`Invite sent to ${firstName.trim()} ${lastName.trim()}`);
-    reset();
-  } catch (err) {
-    toast.error(err?.message || "Could not send invite. Please try again.");
-  } finally {
-    setSubmitting(false);
-  }
-};
-
-  const fieldClass =
-    "w-full rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5 text-[13px] text-[#252525] placeholder-[#C4C9D4] focus:outline-none focus:border-[#308BF9] transition-colors";
-  const labelClass = "text-[#535359] text-[12px] font-semibold";
-
-  return (
-    <form
-      onSubmit={onSubmit}
-      className="bg-[#F5F7FA] rounded-[10px] p-5 flex flex-col gap-4"
-    >
-      <div>
-        <h3 className="text-[#252525] text-[14px] font-bold">Invite a Trainer</h3>
-        <p className="text-[#535359] text-[12px] mt-1">
-          They'll receive an email invite. Once they sign up, they'll be linked to
-          your trainer account.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1">
-          <label className={labelClass}>First name <span className="text-red-500">*</span></label>
-          <input
-            className={fieldClass}
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            placeholder="Marcus"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className={labelClass}>Last name <span className="text-red-500">*</span></label>
-          <input
-            className={fieldClass}
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            placeholder="Hill"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className={labelClass}>Email <span className="text-red-500">*</span></label>
-          <input
-            className={fieldClass}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="marcus@example.com"
-            inputMode="email"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className={labelClass}>Phone <span className="text-red-500">*</span></label>
-          <input
-            className={fieldClass}
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+1 555 123 4567"
-            inputMode="tel"
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className={labelClass}>Plan <span className="text-red-500">*</span></label>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {PLANS.map((plan) => (
-            <button
-              key={plan.id}
-              type="button"
-              onClick={() => setSelectedPlan(plan.id)}
-              className={`rounded-[10px] border px-3 py-2.5 text-left transition-all cursor-pointer ${
-                selectedPlan === plan.id
-                  ? "border-[#308BF9] bg-[#EEF4FE] ring-1 ring-[#308BF9]"
-                  : "border-[#E1E6ED] bg-white hover:border-[#C4C9D4]"
-              }`}
-            >
-              <span className={`inline-flex rounded-full text-[10px] font-semibold px-2 py-0.5 mb-1.5 ${plan.badgeColor}`}>
-                {plan.badge}
-              </span>
-              <p className="text-[12px] font-semibold text-[#252525]">{plan.label}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-[10px] bg-[#308BF9] text-white text-[13px] font-semibold px-5 py-2.5 disabled:opacity-60 hover:bg-[#1a76e8] transition-colors cursor-pointer"
-        >
-          {submitting ? "Sending…" : "Send invite"}
-        </button>
-        <span className="text-[#A1A1A1] text-[11px]">
-          {PLANS.find((p) => p.id === selectedPlan)?.label} — client will receive a code for this plan.
-        </span>
-      </div>
-    </form>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// AcceptedClientsTable
-// ---------------------------------------------------------------------------
-function AcceptedClientsTable({ clients }) {
-  const [q, setQ] = useState("");
-
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-
-    if (!needle) return clients;
-
-    return clients.filter((client) => {
-      return (
-        `${client.first_name} ${client.last_name}`
-          .toLowerCase()
-          .includes(needle) ||
-        client.email.toLowerCase().includes(needle) ||
-        client.phone.toLowerCase().includes(needle) ||
-        String(client.acceptedProfileId || "").toLowerCase().includes(needle)
-      );
-    });
-  }, [clients, q]);
-
-  if (clients.length === 0) {
-    return (
-      <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
-        No accepted clients yet.
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="flex flex-wrap gap-3 items-center mb-3">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search name, email, phone, or profile"
-          className="rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2 text-[12px] flex-1 min-w-[200px] focus:outline-none focus:border-[#308BF9] transition-colors"
-        />
-      </div>
-
-      <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
-        <table className="w-full text-[12px]">
-          <thead>
-            <tr className="bg-[#F5F7FA] text-[#535359] text-left">
-              <th className="py-2.5 px-4 font-semibold">Name</th>
-              <th className="py-2.5 px-4 font-semibold">Email</th>
-              <th className="py-2.5 px-4 font-semibold">Phone</th>
-              <th className="py-2.5 px-4 font-semibold">Profile ID</th>
-              <th className="py-2.5 px-4 font-semibold">Status</th>
-              <th className="py-2.5 px-4 font-semibold">Accepted</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filtered.map((client) => (
-              <tr key={client.id} className="border-t border-[#F5F7FA]">
-                <td className="py-2.5 px-4 text-[#252525] font-semibold">
-                  {client.first_name} {client.last_name}
-                </td>
-
-                <td className="py-2.5 px-4 text-[#535359]">{client.email}</td>
-
-                <td className="py-2.5 px-4 text-[#535359]">{client.phone}</td>
-
-                <td className="py-2.5 px-4 text-[#535359] font-mono">
-                  {client.acceptedProfileId || "-"}
-                </td>
-
-                <td className="py-2.5 px-4">
-                  <span className="inline-flex rounded-full bg-[#E5F6EE] text-[#1F7A4A] text-[11px] font-semibold px-2.5 py-0.5">
-                    {client.status}
-                  </span>
-                </td>
-
-                <td className="py-2.5 px-4 text-[#A1A1A1]">
-                  {formatInviteDate(client.acceptedAt)}
-                </td>
-              </tr>
-            ))}
-
-            {filtered.length === 0 && (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="py-8 px-4 text-center text-[#A1A1A1] text-[12px]"
-                >
-                  No clients match your search.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// PendingInvitesTable
-// Same UI is used for pending_invites and failed_invites
-// ---------------------------------------------------------------------------
-function PendingInvitesTable({ invites, onResend, onRevoke, auditLogs }) {
-  const [actionInProgress, setActionInProgress] = useState({});
-  const [expandedRows, setExpandedRows] = useState({});
-  const [revokeModalInvitation, setRevokeModalInvitation] = useState(null);
-  const [revokeReason, setRevokeReason] = useState("");
-  const [isSubmittingRevokeReason, setIsSubmittingRevokeReason] = useState(false);
-
-  const toggleRow = (id) => {
-    setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const handleResend = async (inv) => {
-    const key = `resend-${inv.id}`;
-    setActionInProgress((prev) => ({ ...prev, [key]: true }));
-    try {
-      await onResend(inv);
-    } finally {
-      setActionInProgress((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const handleRevoke = async (inv) => {
-    if (isInvitationExpired(inv)) {
-      const key = `revoke-${inv.id}`;
-      setActionInProgress((prev) => ({ ...prev, [key]: true }));
-      try {
-        await onRevoke(inv, "");
-      } finally {
-        setActionInProgress((prev) => ({ ...prev, [key]: false }));
-      }
-      return;
-    }
-
-    setRevokeReason("");
-    setRevokeModalInvitation(inv);
-  };
-
-  const closeRevokeModal = () => {
-    if (isSubmittingRevokeReason) return;
-    setRevokeModalInvitation(null);
-    setRevokeReason("");
-  };
-
-  const submitRevokeReason = async () => {
-    const trimmedReason = revokeReason.trim();
-    if (trimmedReason.length === 0) {
-      return toast.error("Please provide a reason for revoking.");
-    }
-
-    const inv = revokeModalInvitation;
-    const key = `revoke-${inv.id}`;
-    setIsSubmittingRevokeReason(true);
-    setActionInProgress((prev) => ({ ...prev, [key]: true }));
-    try {
-      await onRevoke(inv, trimmedReason);
-      setRevokeModalInvitation(null);
-      setRevokeReason("");
-    } finally {
-      setIsSubmittingRevokeReason(false);
-      setActionInProgress((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  return (
-    <>
-    <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
-      <table className="w-full text-[12px]">
-        <thead>
-          <tr className="bg-[#F5F7FA] text-[#535359] text-left">
-            <th className="py-2.5 px-4 font-semibold">Name</th>
-            <th className="py-2.5 px-4 font-semibold">Email</th>
-            <th className="py-2.5 px-4 font-semibold">Phone</th>
-            <th className="py-2.5 px-4 font-semibold">Plan</th>
-            <th className="py-2.5 px-4 font-semibold">Status</th>
-            <th className="py-2.5 px-4 font-semibold">Sent</th>
-            <th className="py-2.5 px-4 font-semibold">Actions</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {invites.map((inv) => {
-            const resendKey = `resend-${inv.id}`;
-            const revokeKey = `revoke-${inv.id}`;
-            const isExpanded = expandedRows[inv.id];
-            const logs = auditLogs[inv.id] || [];
-
-            return (
-              <Fragment key={inv.id}>
-                <tr className="border-t border-[#F5F7FA]">
-                  <td className="py-2.5 px-4">
-                    <button
-                      type="button"
-                      onClick={() => toggleRow(inv.id)}
-                      className="flex items-center gap-1.5 text-[#252525] font-semibold hover:text-[#308BF9] cursor-pointer text-left"
-                    >
-                      <span className={`text-[10px] transition-transform ${isExpanded ? "rotate-90" : ""}`}>&#9654;</span>
-                      {inv.first_name} {inv.last_name}
-                      {logs.length > 0 && (
-                        <span className="text-[10px] text-[#A1A1A1] font-normal">({logs.length})</span>
-                      )}
-                    </button>
-                  </td>
-
-                  <td className="py-2.5 px-4 text-[#535359]">{inv.email}</td>
-
-                  <td className="py-2.5 px-4 text-[#535359]">{inv.phone}</td>
-
-                  <td className="py-2.5 px-4">
-                    {inv.plan ? (
-                      <span className={`inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${
-                        PLANS.find((p) => p.id === inv.plan)?.badgeColor || "bg-[#F5F7FA] text-[#535359]"
-                      }`}>
-                        {PLANS.find((p) => p.id === inv.plan)?.badge || inv.plan}
-                      </span>
-                    ) : (
-                      <span className="text-[#A1A1A1]">-</span>
-                    )}
-                  </td>
-
-                  <td className="py-2.5 px-4">
-                    <span
-                      className={`inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${
-                        String(inv.status).toLowerCase() === "expired"
-                          ? "bg-[#FFF4E0] text-[#A66B00]"
-                          : String(inv.status).toLowerCase() === "revoked"
-                          ? "bg-[#FCEAEB] text-[#B5363A]"
-                          : String(inv.status).toLowerCase() === "accepted"
-                          ? "bg-[#E5F6EE] text-[#1F7A4A]"
-                          : "bg-[#EEF4FE] text-[#308BF9]"
-                      }`}
-                    >
-                      {inv.status}
-                    </span>
-                  </td>
-
-                  <td className="py-2.5 px-4 text-[#A1A1A1]">
-                    {formatInviteDate(inv.sentAt)}
-                  </td>
-
-                  <td className="py-2.5 px-4">
-                    <div className="flex items-center gap-2">
-                      {inv.can_resend && (
-                        <button
-                          type="button"
-                          onClick={() => handleResend(inv)}
-                          disabled={actionInProgress[resendKey]}
-                          className="rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#d9e8fd] disabled:opacity-60 cursor-pointer"
-                        >
-                          {actionInProgress[resendKey] ? "Sending..." : "Resend"}
-                        </button>
-                      )}
-                      {inv.can_revoke && (
-                        <button
-                          type="button"
-                          onClick={() => handleRevoke(inv)}
-                          disabled={actionInProgress[revokeKey]}
-                          className="rounded-full bg-[#FCEAEB] text-[#B5363A] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#f8d4d5] disabled:opacity-60 cursor-pointer"
-                        >
-                          {actionInProgress[revokeKey] ? "Revoking..." : "Revoke"}
-                        </button>
-                      )}
-                      {!inv.can_resend && !inv.can_revoke && (
-                        <span className="text-[#A1A1A1] text-[11px]">—</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-
-                {isExpanded && (
-                  <tr className="bg-[#FAFBFC]">
-                    <td colSpan={7} className="px-4 py-3">
-                      <div className="ml-4 border-l-2 border-[#E1E6ED] pl-4">
-                        <p className="text-[11px] font-semibold text-[#535359] mb-2">Audit log</p>
-                        {logs.length === 0 ? (
-                          <p className="text-[11px] text-[#A1A1A1]">No activity recorded yet.</p>
-                        ) : (
-                          <div className="flex flex-col gap-1.5">
-                            {logs.map((log, idx) => (
-                              <div key={idx} className="flex items-center gap-2 text-[11px]">
-                                <span className={`inline-flex rounded-full font-semibold px-2 py-0.5 ${AUDIT_ACTION_STYLES[log.action] || "bg-[#F5F7FA] text-[#535359]"}`}>
-                                  {log.action}
-                                </span>
-                                <span className="text-[#535359]">by <span className="font-semibold">{log.actor}</span></span>
-                                {log.detail && <span className="text-[#535359] italic">{log.detail}</span>}
-                                <span className="text-[#A1A1A1]">{formatAuditTimestamp(log.timestamp)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            );
-          })}
-
-          {invites.length === 0 && (
-            <tr>
-              <td
-                colSpan={7}
-                className="py-8 px-4 text-center text-[#A1A1A1] text-[12px]"
-              >
-                No pending invites found.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-
-    {revokeModalInvitation && (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-        onClick={closeRevokeModal}
-      >
-        <div
-          className="w-full max-w-[420px] rounded-[12px] bg-white p-5 shadow-xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <h3 className="text-[#252525] text-[15px] font-bold">
-            Revoke invite
-          </h3>
-          <p className="text-[#535359] text-[12px] mt-1">
-            Tell {revokeModalInvitation.first_name || revokeModalInvitation.email || "this user"} why their invite is being revoked.
-          </p>
-
-          <label className="block mt-4 text-[#535359] text-[12px] font-semibold">
-            Reason <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            value={revokeReason}
-            onChange={(e) => setRevokeReason(e.target.value)}
-            placeholder="e.g. Wrong email"
-            rows={3}
-            disabled={isSubmittingRevokeReason}
-            className="mt-1 w-full rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5 text-[13px] text-[#252525] focus:outline-none focus:border-[#308BF9] resize-none"
-          />
-
-          <div className="mt-4 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={closeRevokeModal}
-              disabled={isSubmittingRevokeReason}
-              className="rounded-[10px] bg-[#F5F7FA] text-[#535359] text-[12px] font-semibold px-4 py-2 disabled:opacity-60 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={submitRevokeReason}
-              disabled={isSubmittingRevokeReason}
-              className="rounded-[10px] bg-[#B5363A] text-white text-[12px] font-semibold px-4 py-2 disabled:opacity-60 cursor-pointer"
-            >
-              {isSubmittingRevokeReason ? "Revoking..." : "Submit"}
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 export default function TrainerAdminTrainersPage() {
   const [user, setUser] = useState(null);
-  const [checkingSession, setCheckingSession] = useState(true);
-
-  const [acceptedClients, setAcceptedClients] = useState([]);
-  const [pendingInvites, setPendingInvites] = useState([]);
-  console.log("pendingInvites726", pendingInvites);
-  const [expiredInvites, setExpiredInvites] = useState([]);
-  const [revokedInvites, setRevokedInvites] = useState([]);
-  const [totals, setTotals] = useState({
-    accepted_count: 0,
-    pending_count: 0,
-    expired_count: 0,
-    revoked_count: 0,
-    total_trainers: 0,
-    total_clients: 0,
-  });
-
   const [inviteOwners, setInviteOwners] = useState([]);
+  const [clientCounts, setClientCounts] = useState({});
+  const [loading, setLoading] = useState(true);
 
-  const [auditLogs, setAuditLogs] = useState({});
-
-  const [loadingInvites, setLoadingInvites] = useState(false);
-  const [inviteListError, setInviteListError] = useState("");
-
-  const addAuditEntry = (inviteId, action, detail = null) => {
-    const actor = user?.email || user?.user_id || "Unknown";
-    setAuditLogs((prev) => ({
-      ...prev,
-      [inviteId]: [
-        ...(prev[inviteId] || []),
-        { action, actor, timestamp: new Date().toISOString(), detail },
-      ],
-    }));
-  };
-
-  const loadTrainerClientInvites = useCallback(async () => {
+  const loadData = useCallback(async () => {
     const actorUserId = getActorUserIdFromCookie();
+    if (!actorUserId) return;
 
-    if (!actorUserId) {
-      setInviteListError("Session expired. Please log in again.");
-      return;
-    }
-
-    setLoadingInvites(true);
-    setInviteListError("");
-
+    setLoading(true);
     try {
-      const res = await fetchTrainerClientInvitesService({
-        actorUserId,
-      });
+      const res = await fetchTrainerClientInvitesService({ actorUserId });
+      const owners = res?.invite_owners || [];
+      setInviteOwners(owners);
 
-      setInviteOwners(res?.invite_owners || []);
-
-      const acceptedClientList = Array.isArray(res?.existing)
-        ? res.existing
-        : Array.isArray(res?.accepted_clients)
-        ? res.accepted_clients
-        : [];
-
-      const pendingInviteList = Array.isArray(res?.pending_invites)
-        ? res.pending_invites
-        : [];
-
-      const expiredInviteList = Array.isArray(res?.expired_invites)
-        ? res.expired_invites
-        : [];
-
-      const revokedInviteList = Array.isArray(res?.revoked_invites)
-        ? res.revoked_invites
-        : [];
-
-      setAcceptedClients(acceptedClientList.map(normalizeInvite));
-      setPendingInvites(pendingInviteList.map(normalizeInvite));
-      setExpiredInvites(expiredInviteList.map(normalizeInvite));
-      setRevokedInvites(revokedInviteList.map(normalizeInvite));
-
-      if (res?.totals && typeof res.totals === "object") {
-        setTotals((prev) => ({ ...prev, ...res.totals }));
-      }
+      const counts = {};
+      await Promise.all(
+        owners
+          .filter((o) => o.dietician_id)
+          .map((o) =>
+            fetch("/api/admin/trainer-clients", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ dietician_id: o.dietician_id, page: 1 }),
+            })
+              .then((r) => r.json())
+              .then((d) => { counts[o.dietician_id] = d?.summary?.all_total ?? 0; })
+              .catch(() => { counts[o.dietician_id] = 0; })
+          )
+      );
+      setClientCounts(counts);
     } catch (err) {
-      const message =
-        err?.message || "Could not fetch client invites. Please try again.";
-
-      setInviteListError(message);
-      toast.error(message);
+      toast.error(err?.message || "Failed to load trainers");
     } finally {
-      setLoadingInvites(false);
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const loggedInUser = getLoggedInUserFromCookie();
+    setUser(getLoggedInUserFromCookie());
+    loadData();
+  }, [loadData]);
 
-    setUser(loggedInUser);
-    setCheckingSession(false);
+  if (!user) return <div className="text-[#A1A1A1] text-[13px]">Loading&hellip;</div>;
 
-    loadTrainerClientInvites();
-  }, [loadTrainerClientInvites]);
-
-  if (checkingSession) {
-    return <div className="text-[#A1A1A1] text-[13px]">Loading…</div>;
-  }
-
-  if (!user) {
-    return (
-      <div className="text-[#A1A1A1] text-[13px]">
-        Session expired. Please log in again.
-      </div>
-    );
-  }
-
-  const handleInviteSent = async (invite) => {
-    const normalizedInvite = normalizeInvite(invite);
-
-    setPendingInvites((prev) => [
-      normalizedInvite,
-      ...prev.filter((item) => item.id !== normalizedInvite.id),
-    ]);
-
-    const planLabel = PLANS.find((p) => p.id === normalizedInvite.plan)?.label || normalizedInvite.plan;
-    addAuditEntry(normalizedInvite.id, "invited", `to ${normalizedInvite.email} — ${planLabel}`);
-
-    await loadTrainerClientInvites();
-  };
-
-  const handleResendInvite = async (inv) => {
-    try {
-      await resendUserInviteService({ inviteId: inv.id });
-      addAuditEntry(inv.id, "resent", `to ${inv.email}`);
-      toast.success(`Invite resent to ${inv.first_name} ${inv.last_name}`);
-      await loadTrainerClientInvites();
-    } catch (error) {
-      toast.error(
-        error?.data?.message || error?.message || "Could not resend invite."
-      );
-    }
-  };
-
-  const handleRevokeInvite = async (inv, reason = "") => {
-    try {
-      await revokeTrainerClientInviteService({
-        inviteId: inv.id,
-        reason,
-      });
-      addAuditEntry(inv.id, "revoked", reason ? `reason: ${reason}` : null);
-      setPendingInvites((prev) => prev.filter((item) => item.id !== inv.id));
-      toast.success(`Invite to ${inv.first_name} ${inv.last_name} revoked.`);
-    } catch (error) {
-      toast.error(
-        error?.message || "Could not revoke invite."
-      );
-    }
-  };
+  const totalTrainers = inviteOwners.length;
+  const totalClients = Object.values(clientCounts).reduce((sum, c) => sum + c, 0);
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
             Trainers
           </h1>
           <p className="text-[#535359] text-[13px] mt-1">
-            Trainers in your network. Manage client invites and track your team.
+            Trainers in your network and their client activity.
           </p>
         </div>
-
-        <span className="rounded-full bg-[#FFF4E0] text-[#A66B00] text-[11px] font-semibold px-3 py-1">
-          Demo data
-        </span>
+        <button
+          type="button"
+          onClick={loadData}
+          disabled={loading}
+          className="rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-3 py-1 disabled:opacity-60 cursor-pointer"
+        >
+          {loading ? "Loading..." : "Refresh"}
+        </button>
       </div>
 
-      {/* Invite form */}
-      <InviteForm onSent={handleInviteSent} />
-
-      {inviteListError && (
-        <div className="rounded-[10px] border border-[#FCEAEB] bg-[#FFF7F7] text-[#B5363A] text-[12px] p-3">
-          {inviteListError}
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-[#308BF9] rounded-[10px] p-5 text-white flex flex-col gap-1">
+          <div className="text-[12px] opacity-80">Trainers in network</div>
+          <div className="text-[28px] font-bold">{totalTrainers}</div>
+          <div className="text-[11px] opacity-80">Including yourself</div>
         </div>
-      )}
-
-      {/* Totals strip */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-        {[
-          { label: "Trainers", value: totals.total_trainers, color: "text-[#252525]" },
-          { label: "Clients", value: totals.total_clients, color: "text-[#252525]" },
-          { label: "Accepted", value: totals.accepted_count, color: "text-[#1F7A4A]" },
-          { label: "Pending", value: totals.pending_count, color: "text-[#308BF9]" },
-          { label: "Expired", value: totals.expired_count, color: "text-[#A66B00]" },
-          { label: "Revoked", value: totals.revoked_count, color: "text-[#B5363A]" },
-        ].map((tile) => (
-          <div
-            key={tile.label}
-            className="rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5"
-          >
-            <p className="text-[11px] text-[#535359] font-semibold">{tile.label}</p>
-            <p className={`text-[16px] font-bold ${tile.color}`}>{tile.value ?? 0}</p>
-          </div>
-        ))}
+        <div className="bg-white rounded-[10px] p-5 border border-[#E1E6ED] flex flex-col gap-1">
+          <div className="text-[#535359] text-[12px]">Total clients</div>
+          <div className="text-[#252525] text-[28px] font-bold">{totalClients}</div>
+          <div className="text-[#A1A1A1] text-[11px]">Across all trainers</div>
+        </div>
       </div>
 
-      {/* Trainers in your network */}
-      {inviteOwners.length > 0 && (
-        <div>
-          <h3 className="text-[#252525] text-[14px] font-bold mb-3">
-            Trainers in your network
-            <span className="ml-2 text-[#A1A1A1] text-[12px] font-normal">
-              ({inviteOwners.length})
-            </span>
-          </h3>
-          <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="bg-[#F5F7FA] text-[#535359] text-left">
-                  <th className="py-2.5 px-4 font-semibold">Name</th>
-                  <th className="py-2.5 px-4 font-semibold">Partner code</th>
-                  <th className="py-2.5 px-4 font-semibold">Role</th>
-                  <th className="py-2.5 px-4 font-semibold text-right">Can invite clients</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inviteOwners.map((owner) => (
+      {/* Trainers table */}
+      {loading ? (
+        <div className="text-[#A1A1A1] text-[13px]">Loading&hellip;</div>
+      ) : inviteOwners.length === 0 ? (
+        <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
+          No trainers in your network yet.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="bg-[#F5F7FA] text-[#535359] text-left">
+                <th className="py-2.5 px-4 font-semibold">Name</th>
+                <th className="py-2.5 px-4 font-semibold">Partner code</th>
+                <th className="py-2.5 px-4 font-semibold">Role</th>
+                <th className="py-2.5 px-4 font-semibold text-right">Clients</th>
+                <th className="py-2.5 px-4 font-semibold"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {inviteOwners.map((owner) => {
+                const clients = clientCounts[owner.dietician_id] ?? 0;
+                return (
                   <tr
                     key={owner.user_id}
                     className={`border-t border-[#F5F7FA] ${owner.is_self ? "bg-[#EEF4FE]/50" : ""}`}
@@ -978,355 +162,30 @@ export default function TrainerAdminTrainersPage() {
                         {owner.is_self ? "You (Trainer Admin)" : owner.is_admin_as_trainer ? "Trainer Admin" : "Trainer"}
                       </span>
                     </td>
+                    <td className="py-2.5 px-4 text-right text-[#252525] font-semibold">
+                      {clients}
+                    </td>
                     <td className="py-2.5 px-4 text-right">
-                      {owner.can_invite_clients ? (
-                        <span className="text-[#1F7A4A] text-[11px]">Yes</span>
+                      {owner.is_self ? (
+                        <Link
+                          href="/trainer/dashboard"
+                          className="rounded-full bg-[#2EAF6A] text-white text-[11px] font-semibold px-3 py-1 hover:bg-[#259B5C] transition-colors"
+                        >
+                          View my clients
+                        </Link>
                       ) : (
-                        <span className="text-[#A1A1A1] text-[11px]">No</span>
+                        <span className="text-[#A1A1A1] text-[11px]">
+                          {clients} client{clients === 1 ? "" : "s"} referred
+                        </span>
                       )}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Accepted trainers */}
-      <div>
-        <h3 className="text-[#252525] text-[14px] font-bold mb-3">
-          Accepted trainers
-        </h3>
-
-        {loadingInvites ? (
-          <div className="text-[#A1A1A1] text-[13px]">Loading…</div>
-        ) : (
-          <AcceptedClientsTable clients={acceptedClients} />
-        )}
-      </div>
-
-      {/* Pending invites */}
-      <div>
-        <h3 className="text-[#252525] text-[14px] font-bold mb-3">
-          Pending invites
-          <span className="ml-2 text-[#A1A1A1] text-[12px] font-normal">
-            ({pendingInvites.length})
-          </span>
-        </h3>
-
-        {loadingInvites ? (
-          <div className="text-[#A1A1A1] text-[13px]">Loading…</div>
-        ) : (
-          <PendingInvitesTable
-            invites={pendingInvites}
-            onResend={handleResendInvite}
-            onRevoke={handleRevokeInvite}
-            auditLogs={auditLogs}
-          />
-        )}
-      </div>
-
-      {/* Expired invites */}
-      {expiredInvites.length > 0 && (
-        <div>
-          <h3 className="text-[#252525] text-[14px] font-bold mb-3">
-            Expired invites
-            <span className="ml-2 text-[#A1A1A1] text-[12px] font-normal">
-              ({expiredInvites.length})
-            </span>
-          </h3>
-
-          <PendingInvitesTable
-            invites={expiredInvites}
-            onResend={handleResendInvite}
-            onRevoke={handleRevokeInvite}
-            auditLogs={auditLogs}
-          />
-        </div>
-      )}
-
-      {/* Revoked invites */}
-      {revokedInvites.length > 0 && (
-        <div>
-          <h3 className="text-[#252525] text-[14px] font-bold mb-3">
-            Revoked invites
-            <span className="ml-2 text-[#A1A1A1] text-[12px] font-normal">
-              ({revokedInvites.length})
-            </span>
-          </h3>
-
-          <PendingInvitesTable
-            invites={revokedInvites}
-            onResend={handleResendInvite}
-            onRevoke={handleRevokeInvite}
-            auditLogs={auditLogs}
-          />
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
 }
-
-
-
-
-
-// "use client";
-
-// // Trainer Admin's view of THEIR trainers only. Filtered by parent_user_id ===
-// // currentUser.user_id so Evan never sees Derek's trainers (and vice versa).
-// //
-// // Backend equivalent: GET /api/users?role=trainer (server scopes to caller's
-// // downstream; UI doesn't pass any filter — the auth context does the work).
-
-// import { useEffect, useMemo, useState } from "react";
-// import { toast } from "sonner";
-// import {
-//   trainersOf,
-//   clientsOf,
-//   trainerCommissionThisMonth,
-//   fmtUSDCents,
-// } from "@/lib/demo-data";
-// import { getCurrentUser } from "@/lib/user";
-
-// async function inviteTrainer({ firstName, lastName, email, phone, taId }) {
-//   // STUB. When backend ships:
-//   //   POST /api/invites { role: 'trainer', first_name, last_name, email, phone }
-//   //   inviter_user_id is set server-side from the auth context (= taId).
-//   await new Promise((r) => setTimeout(r, 400));
-//   return {
-//     ok: true,
-//     invite: {
-//       id: `local-${Date.now()}`,
-//       first_name: firstName,
-//       last_name: lastName,
-//       email,
-//       phone,
-//       taId,
-//       status: "Sent",
-//       sentAt: new Date().toISOString(),
-//     },
-//   };
-// }
-
-// const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-// const isValidPhone = (p) => /^\+?[0-9\s\-()]{7,}$/.test(p);
-
-// function InviteForm({ taId, onSent }) {
-//   const [firstName, setFirstName] = useState("");
-//   const [lastName, setLastName] = useState("");
-//   const [email, setEmail] = useState("");
-//   const [phone, setPhone] = useState("");
-//   const [submitting, setSubmitting] = useState(false);
-
-//   const reset = () => { setFirstName(""); setLastName(""); setEmail(""); setPhone(""); };
-
-//   const onSubmit = async (e) => {
-//     e.preventDefault();
-//     if (firstName.trim().length < 2) return toast.error("First name required.");
-//     if (lastName.trim().length < 1)  return toast.error("Last name required.");
-//     if (!isValidEmail(email))         return toast.error("Valid email required.");
-//     if (!isValidPhone(phone))         return toast.error("Valid phone required.");
-
-//     setSubmitting(true);
-//     try {
-//       const res = await inviteTrainer({
-//         firstName: firstName.trim(), lastName: lastName.trim(),
-//         email: email.trim(), phone: phone.trim(), taId,
-//       });
-//       if (!res.ok) throw new Error("Failed");
-//       onSent(res.invite);
-//       toast.success(`Invite sent to ${res.invite.first_name} ${res.invite.last_name}`);
-//       reset();
-//     } catch {
-//       toast.error("Could not send invite. Please try again.");
-//     } finally {
-//       setSubmitting(false);
-//     }
-//   };
-
-//   const fieldClass = "w-full rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5 text-[13px] text-[#252525] focus:outline-none focus:border-[#308BF9]";
-//   const labelClass = "text-[#535359] text-[12px] font-semibold";
-
-//   return (
-//     <form onSubmit={onSubmit} className="bg-[#F5F7FA] rounded-[10px] p-5 flex flex-col gap-4">
-//       <div>
-//         <h3 className="text-[#252525] text-[14px] font-bold">Invite a Trainer</h3>
-//         <p className="text-[#535359] text-[12px] mt-1">
-//           They'll get an email with a verification link. Once they sign up, you'll
-//           earn 20% override on every client they onboard.
-//         </p>
-//       </div>
-
-//       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-//         <div className="flex flex-col gap-1"><label className={labelClass}>First name</label><input className={fieldClass} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Marcus" /></div>
-//         <div className="flex flex-col gap-1"><label className={labelClass}>Last name</label><input className={fieldClass} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Hill" /></div>
-//         <div className="flex flex-col gap-1"><label className={labelClass}>Email</label><input className={fieldClass} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="marcus@example.com" inputMode="email" /></div>
-//         <div className="flex flex-col gap-1"><label className={labelClass}>Phone</label><input className={fieldClass} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 555 123 4567" inputMode="tel" /></div>
-//       </div>
-
-//       <div className="flex items-center gap-3">
-//         <button type="submit" disabled={submitting} className="rounded-[10px] bg-[#308BF9] text-white text-[13px] font-semibold px-5 py-2.5 disabled:opacity-60">
-//           {submitting ? "Sending..." : "Send invite"}
-//         </button>
-//         <span className="text-[#A1A1A1] text-[11px]">Backend wiring (Resend email + verification flow) is pending.</span>
-//       </div>
-//     </form>
-//   );
-// }
-
-// function TrainersTable({ trainers }) {
-//   const [q, setQ] = useState("");
-//   const [statusFilter, setStatusFilter] = useState("all");
-
-//   const filtered = useMemo(() => {
-//     const needle = q.trim().toLowerCase();
-//     return trainers.filter((t) => {
-//       if (statusFilter !== "all" && t.status !== statusFilter) return false;
-//       if (!needle) return true;
-//       return (
-//         `${t.first_name} ${t.last_name}`.toLowerCase().includes(needle) ||
-//         t.email.toLowerCase().includes(needle) ||
-//         (t.partner_code || "").toLowerCase().includes(needle)
-//       );
-//     });
-//   }, [trainers, q, statusFilter]);
-
-//   if (trainers.length === 0) {
-//     return (
-//       <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
-//         You haven't onboarded any trainers yet. Use the form above to invite your first one.
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <>
-//       <div className="flex flex-wrap gap-3 items-center mb-3">
-//         <input
-//           value={q}
-//           onChange={(e) => setQ(e.target.value)}
-//           placeholder="Search name, email, or code"
-//           className="rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2 text-[12px] flex-1 min-w-[200px] focus:outline-none focus:border-[#308BF9]"
-//         />
-//         <select
-//           value={statusFilter}
-//           onChange={(e) => setStatusFilter(e.target.value)}
-//           className="rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2 text-[12px]"
-//         >
-//           <option value="all">All statuses</option>
-//           <option value="active">Active</option>
-//           <option value="suspended">Suspended</option>
-//         </select>
-//       </div>
-
-//       <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
-//         <table className="w-full text-[12px]">
-//           <thead>
-//             <tr className="bg-[#F5F7FA] text-[#535359] text-left">
-//               <th className="py-2.5 px-4 font-semibold">Name</th>
-//               <th className="py-2.5 px-4 font-semibold">Partner code</th>
-//               <th className="py-2.5 px-4 font-semibold text-right">Clients</th>
-//               <th className="py-2.5 px-4 font-semibold text-right">Their commission / mo</th>
-//               <th className="py-2.5 px-4 font-semibold">Status</th>
-//             </tr>
-//           </thead>
-//           <tbody>
-//             {filtered.map((t) => (
-//               <tr key={t.id} className="border-t border-[#F5F7FA]">
-//                 <td className="py-2.5 px-4">
-//                   <div className="text-[#252525] font-semibold">{t.first_name} {t.last_name}</div>
-//                   <div className="text-[#A1A1A1] text-[11px]">{t.email}</div>
-//                 </td>
-//                 <td className="py-2.5 px-4 text-[#535359] font-mono">{t.partner_code}</td>
-//                 <td className="py-2.5 px-4 text-right text-[#252525]">{clientsOf(t.id).length}</td>
-//                 <td className="py-2.5 px-4 text-right text-[#252525] font-semibold">{fmtUSDCents(trainerCommissionThisMonth(t.id))}</td>
-//                 <td className="py-2.5 px-4">
-//                   <span className={`inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${t.status === "active" ? "bg-[#E5F6EE] text-[#1F7A4A]" : "bg-[#FCEAEB] text-[#B5363A]"}`}>
-//                     {t.status}
-//                   </span>
-//                 </td>
-//               </tr>
-//             ))}
-//             {filtered.length === 0 && (
-//               <tr><td colSpan={5} className="py-8 px-4 text-center text-[#A1A1A1] text-[12px]">No trainers match your filters.</td></tr>
-//             )}
-//           </tbody>
-//         </table>
-//       </div>
-//     </>
-//   );
-// }
-
-// export default function TrainerAdminTrainersPage() {
-//   const [user, setUser] = useState(null);
-//   const [pendingInvites, setPendingInvites] = useState([]);
-
-//   useEffect(() => {
-//     setUser(getCurrentUser());
-//   }, []);
-
-//   if (!user) {
-//     return <div className="text-[#A1A1A1] text-[13px]">Loading…</div>;
-//   }
-
-//   const myTrainers = trainersOf(user.user_id);
-
-//   return (
-//     <div className="flex flex-col gap-6">
-//       <div className="flex items-start justify-between gap-4 flex-wrap">
-//         <div>
-//           <h1 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
-//             Trainers
-//           </h1>
-//           <p className="text-[#535359] text-[13px] mt-1">
-//             Trainers you've recruited into the Respyr program. You earn 20% override on
-//             every active subscription their clients hold.
-//           </p>
-//         </div>
-//         <span className="rounded-full bg-[#FFF4E0] text-[#A66B00] text-[11px] font-semibold px-3 py-1">Demo data</span>
-//       </div>
-
-//       <InviteForm
-//         taId={user.user_id}
-//         onSent={(inv) => setPendingInvites((list) => [inv, ...list])}
-//       />
-
-//       <div>
-//         <h3 className="text-[#252525] text-[14px] font-bold mb-3">Your trainers</h3>
-//         <TrainersTable trainers={myTrainers} />
-//       </div>
-
-//       {pendingInvites.length > 0 && (
-//         <div>
-//           <h3 className="text-[#252525] text-[14px] font-bold mb-3">Pending invites</h3>
-//           <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
-//             <table className="w-full text-[12px]">
-//               <thead>
-//                 <tr className="bg-[#F5F7FA] text-[#535359] text-left">
-//                   <th className="py-2.5 px-4 font-semibold">Name</th>
-//                   <th className="py-2.5 px-4 font-semibold">Email</th>
-//                   <th className="py-2.5 px-4 font-semibold">Phone</th>
-//                   <th className="py-2.5 px-4 font-semibold">Status</th>
-//                   <th className="py-2.5 px-4 font-semibold">Sent</th>
-//                 </tr>
-//               </thead>
-//               <tbody>
-//                 {pendingInvites.map((inv) => (
-//                   <tr key={inv.id} className="border-t border-[#F5F7FA]">
-//                     <td className="py-2.5 px-4 text-[#252525] font-semibold">{inv.first_name} {inv.last_name}</td>
-//                     <td className="py-2.5 px-4 text-[#535359]">{inv.email}</td>
-//                     <td className="py-2.5 px-4 text-[#535359]">{inv.phone}</td>
-//                     <td className="py-2.5 px-4"><span className="inline-flex rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5">{inv.status}</span></td>
-//                     <td className="py-2.5 px-4 text-[#A1A1A1]">{new Date(inv.sentAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
-//                   </tr>
-//                 ))}
-//               </tbody>
-//             </table>
-//           </div>
-//         </div>
-//       )}
-//     </div>
-//   );
-// }

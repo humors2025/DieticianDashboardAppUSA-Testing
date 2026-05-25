@@ -86,7 +86,7 @@ ADMINPANEL:{
   REVOKEUSERINVITE:"/dietitian/api/web/revoke-user-invite.php",
 
   INVITETRAINER:"/dietitian/api/web/admin-invite-trainer.php",
-  TRAINERLISTINVITES:"/dietitian/api/web/list-admin-trainer-users.php",
+  TRAINERLISTINVITES:"/dietitian/api/web/list-trainer-client-invites.php",
   REVOKETRAINERCLIENTINVITE:"/dietitian/api/web/revoke-trainer-client-invite.php",
 
   VALIDATEINVITETOKEN:"/dietitian/api/web/validate-invite-token.php",

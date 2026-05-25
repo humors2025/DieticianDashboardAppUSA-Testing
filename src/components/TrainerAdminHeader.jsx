@@ -4,9 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cookieManager } from "@/lib/cookies";
-import { ROLES } from "@/lib/user";
 import { toast } from "sonner";
-import RoleSwitcher, { isSwitchedView } from "@/components/RoleSwitcher";
 
 const MonoIcon = ({ src, size = 20, color = "#A1A1A1", alt = "" }) => (
   <span
@@ -30,10 +28,11 @@ const MonoIcon = ({ src, size = 20, color = "#A1A1A1", alt = "" }) => (
 );
 
 const MENU = [
-  { name: "Overview", icon: "/icons/hugeicons_home-05.svg",     path: "/trainer-admin/overview" },
-  { name: "Trainers", icon: "/icons/hugeicons_user-group.png",  path: "/trainer-admin/trainers" },
-  { name: "Earnings", icon: "/icons/hugeicons_award-01.svg",    path: "/trainer-admin/earnings" },
-  { name: "Settings", icon: "/icons/hugeicons_settings-03.svg", path: "/trainer-admin/settings" },
+  { name: "Overview",           icon: "/icons/hugeicons_home-05.svg",     path: "/trainer-admin/overview" },
+  { name: "Trainers",           icon: "/icons/hugeicons_user-group.png",  path: "/trainer-admin/trainers" },
+  { name: "Invites & Referrals", icon: "/icons/hugeicons_award-01.svg",   path: "/trainer-admin/invites" },
+  { name: "Earnings",           icon: "/icons/hugeicons_award-01.svg",    path: "/trainer-admin/earnings" },
+  { name: "Settings",           icon: "/icons/hugeicons_settings-03.svg", path: "/trainer-admin/settings" },
 ];
 
 export default function TrainerAdminHeader() {
@@ -96,7 +95,6 @@ export default function TrainerAdminHeader() {
             </Link>
           );
         })}
-        <RoleSwitcher currentRole={ROLES.TRAINER_ADMIN} />
       </div>
 
       <div className="flex items-center gap-3">

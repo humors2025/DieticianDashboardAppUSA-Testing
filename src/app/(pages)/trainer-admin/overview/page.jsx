@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { getCurrentUser } from "@/lib/user";
-import { fetchDownstreamUsersService } from "@/services/authService";
+import Cookies from "js-cookie";
+import { fetchTrainerClientInvitesService } from "@/services/authService";
 
 function KpiCard({ label, value, hint, accent, pending, href }) {
   const content = (
@@ -27,17 +27,44 @@ function KpiCard({ label, value, hint, accent, pending, href }) {
   return <div className={className}>{content}</div>;
 }
 
+function getUserFromCookie() {
+  const userCookie = Cookies.get("user");
+  if (userCookie) {
+    try { return JSON.parse(userCookie); } catch { return null; }
+  }
+  return null;
+}
+
 export default function TrainerAdminOverview() {
   const [user, setUser] = useState(null);
-  const [totals, setTotals] = useState(null);
+  const [trainerCount, setTrainerCount] = useState(0);
+  const [clientCount, setClientCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async (currentUser) => {
     if (!currentUser) return;
     setLoading(true);
     try {
-      const res = await fetchDownstreamUsersService(currentUser.user_id);
-      setTotals(res?.totals || {});
+      const actorUserId = currentUser.user_id || currentUser.email;
+      const res = await fetchTrainerClientInvitesService({ actorUserId });
+      const owners = res?.invite_owners || [];
+      setTrainerCount(owners.length);
+
+      const counts = await Promise.all(
+        owners
+          .filter((o) => o.dietician_id)
+          .map((o) =>
+            fetch("/api/admin/trainer-clients", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ dietician_id: o.dietician_id, page: 1 }),
+            })
+              .then((r) => r.json())
+              .then((d) => d?.summary?.all_total ?? 0)
+              .catch(() => 0)
+          )
+      );
+      setClientCount(counts.reduce((sum, c) => sum + c, 0));
     } catch (err) {
       toast.error(err?.message || "Failed to load overview");
     } finally {
@@ -46,7 +73,7 @@ export default function TrainerAdminOverview() {
   }, []);
 
   useEffect(() => {
-    const u = getCurrentUser();
+    const u = getUserFromCookie();
     setUser(u);
     loadData(u);
   }, [loadData]);
@@ -54,9 +81,6 @@ export default function TrainerAdminOverview() {
   if (!user) {
     return <div className="text-[#A1A1A1] text-[13px]">Loading...</div>;
   }
-
-  const trainerCount = totals?.total_trainers ?? totals?.accepted_count ?? 0;
-  const clientCount = totals?.total_clients ?? 0;
 
   return (
     <div className="flex flex-col gap-6">

@@ -41,8 +41,21 @@ function decodeAccessTokenFromCookie() {
 
 function getActorUserIdFromAccessToken() {
   const decoded = decodeAccessTokenFromCookie();
+  if (decoded?.user_id || decoded?.email) {
+    return decoded.user_id ?? decoded.email;
+  }
 
-  return decoded?.user_id ?? decoded?.email ?? null;
+  const userCookie = Cookies.get("user");
+  if (userCookie) {
+    try {
+      const user = JSON.parse(userCookie);
+      return user?.user_id ?? user?.email ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 
@@ -592,6 +605,21 @@ export const fetchHabitsMonitoringData = async (profileId, dietitianId) => {
 };
 
 
+export const fetchHabitDetail = async (profileId, dietitianId, selectedHabitId) => {
+  return apiFetcher(API_ENDPOINTS.HABITMONITORING.GETHABITDETAIL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      dietitian_id: dietitianId,
+      profile_id: profileId,
+      selected_habit_id: selectedHabitId,
+    }),
+  });
+};
+
+
 export const updatePerformanceLevel = async (dietitianId, profileId, levelType) => {
   return apiFetcher(API_ENDPOINTS.LEVELUPDATE.LEVEL, {
     method: "POST",
@@ -692,18 +720,145 @@ export const fetchTrainerAdminListService = async () => {
     throw new Error("Access token missing. Please login again.");
   }
 
-  return apiFetcher(API_ENDPOINTS.ADMINPANEL.TRAINERADMINLIST, {
+  const isRealJwt = accessToken.split(".").length === 3;
+
+  if (isRealJwt) {
+    return apiFetcher(API_ENDPOINTS.ADMINPANEL.TRAINERADMINLIST, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  }
+
+  const userCookie = Cookies.get("user");
+  const user = userCookie ? JSON.parse(userCookie) : null;
+  const actorUserId = user?.user_id || user?.email;
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  const res = await fetch("/api/admin/list-users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ actor_user_id: actorUserId }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch users");
+  }
+
+  return res.json();
+};
+
+export const fetchDownstreamUsersService = async (actorUserId) => {
+  if (!actorUserId) {
+    throw new Error("Actor user ID missing.");
+  }
+
+  const res = await fetch("/api/admin/list-users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ actor_user_id: actorUserId }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch downstream users");
+  }
+
+  return res.json();
+};
+
+
+export const inviteTrainerClientService = async ({
+  firstName,
+  lastName,
+  email,
+  phone,
+}) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.INVITETRAINER, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    }
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      first_name: firstName,
+      last_name: lastName,
+      email: email,
+      phone: phone,
+    }),
   });
 };
 
 
+export const resendTrainerAdminInviteService = async ({ invitationId }) => {
+  const actorUserId = getActorUserIdFromAccessToken();
 
-export const inviteTrainerClientService = async ({ trainerID, clientName, clientMobile, clientEmail }) => {
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.RESENDUSERINVITE, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      invite_id: invitationId,
+    }),
+  });
+};
+
+export const resendUserInviteService = async ({ inviteId }) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.RESENDUSERINVITE, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      invite_id: inviteId,
+    }),
+  });
+};
+
+export const revokeTrainerAdminInviteService = async ({ invitationId, reason }) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.REVOKEUSERINVITE, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      invite_id: invitationId,
+      reason: reason ?? "",
+    }),
+  });
+};
+
+export const resendTrainerClientInviteService = async ({ inviteId, trainerID, clientName, clientMobile, clientEmail, plan }) => {
   return apiFetcher(API_ENDPOINTS.ADMINPANEL.INVITETRAINER, {
     method: "POST",
     headers: {
@@ -714,11 +869,50 @@ export const inviteTrainerClientService = async ({ trainerID, clientName, client
       client_name: clientName,
       client_mobile: clientMobile,
       client_email: clientEmail,
+      plan: plan,
+      resend: true,
     }),
   });
 };
 
+export const revokeTrainerClientInviteService = async ({ inviteId, reason }) => {
+  const actorUserId = getActorUserIdFromAccessToken();
 
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.REVOKEUSERINVITE, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      invite_id: inviteId,
+      reason: reason ?? "",
+    }),
+  });
+};
+
+export const validateInviteTokenService = async (token) => {
+  return apiFetcher(`${API_ENDPOINTS.ADMINPANEL.VALIDATEINVITETOKEN}?token=${encodeURIComponent(token)}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+};
+
+export const acceptInviteService = async (payload) => {
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.ACCEPTINVITE, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+};
 
 export const fetchTrainerClientInvitesService = async ({ actorUserId }) => {
   if (!actorUserId) {
@@ -798,23 +992,8 @@ export const fetchTrainerClientInvitesService = async ({ actorUserId }) => {
 //   });
 // };
 
-export const fetchDownstreamUsersService = async (actorUserId) => {
-  if (!actorUserId) {
-    throw new Error("Actor user ID missing.");
-  }
 
-  const res = await fetch("/api/admin/list-users", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ actor_user_id: actorUserId }),
-  });
 
-  if (!res.ok) {
-    throw new Error("Failed to fetch downstream users");
-  }
-
-  return res.json();
-};
 
 
 // export const fetchScoreTrend = async (dieticianId, profileId, mode) => {

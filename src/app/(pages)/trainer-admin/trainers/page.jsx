@@ -748,6 +748,8 @@ export default function TrainerAdminTrainersPage() {
     total_clients: 0,
   });
 
+  const [inviteOwners, setInviteOwners] = useState([]);
+
   const [auditLogs, setAuditLogs] = useState({});
 
   const [loadingInvites, setLoadingInvites] = useState(false);
@@ -780,7 +782,7 @@ export default function TrainerAdminTrainersPage() {
         actorUserId,
       });
 
-      console.log("fetchTrainerClientInvitesService response770:", res);
+      setInviteOwners(res?.invite_owners || []);
 
       const acceptedClientList = Array.isArray(res?.existing)
         ? res.existing
@@ -892,8 +894,7 @@ export default function TrainerAdminTrainersPage() {
             Trainers
           </h1>
           <p className="text-[#535359] text-[13px] mt-1">
-            Trainers you've recruited into the Respyr program. You earn 20%
-            override on every active subscription their clients hold.
+            Trainers in your network. Manage client invites and track your team.
           </p>
         </div>
 
@@ -930,6 +931,67 @@ export default function TrainerAdminTrainersPage() {
           </div>
         ))}
       </div>
+
+      {/* Trainers in your network */}
+      {inviteOwners.length > 0 && (
+        <div>
+          <h3 className="text-[#252525] text-[14px] font-bold mb-3">
+            Trainers in your network
+            <span className="ml-2 text-[#A1A1A1] text-[12px] font-normal">
+              ({inviteOwners.length})
+            </span>
+          </h3>
+          <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="bg-[#F5F7FA] text-[#535359] text-left">
+                  <th className="py-2.5 px-4 font-semibold">Name</th>
+                  <th className="py-2.5 px-4 font-semibold">Partner code</th>
+                  <th className="py-2.5 px-4 font-semibold">Role</th>
+                  <th className="py-2.5 px-4 font-semibold text-right">Can invite clients</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inviteOwners.map((owner) => (
+                  <tr
+                    key={owner.user_id}
+                    className={`border-t border-[#F5F7FA] ${owner.is_self ? "bg-[#EEF4FE]/50" : ""}`}
+                  >
+                    <td className="py-2.5 px-4">
+                      <div className="text-[#252525] font-semibold">
+                        {owner.name || owner.user_id}
+                        {owner.is_self && (
+                          <span className="text-[#308BF9] text-[10px] font-normal ml-1.5">(you)</span>
+                        )}
+                      </div>
+                      <div className="text-[#A1A1A1] text-[11px]">{owner.email || owner.user_id}</div>
+                    </td>
+                    <td className="py-2.5 px-4 text-[#535359] font-mono">
+                      {owner.dietician_id || owner.partner_code || "-"}
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <span className={`inline-flex rounded-full text-[10px] font-semibold px-2 py-0.5 ${
+                        owner.is_admin_as_trainer || owner.is_super_admin_as_trainer
+                          ? "bg-[#EEF4FE] text-[#308BF9]"
+                          : "bg-[#E5F6EE] text-[#1F7A4A]"
+                      }`}>
+                        {owner.is_self ? "You (Trainer Admin)" : owner.is_admin_as_trainer ? "Trainer Admin" : "Trainer"}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      {owner.can_invite_clients ? (
+                        <span className="text-[#1F7A4A] text-[11px]">Yes</span>
+                      ) : (
+                        <span className="text-[#A1A1A1] text-[11px]">No</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Accepted trainers */}
       <div>

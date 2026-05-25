@@ -19,17 +19,6 @@ const formatDateTime = (dateTimeValue) => {
   return dateTimeValue;
 };
 
-const formatOverrideMonthly = (overrideMonthly) => {
-  if (overrideMonthly === null || overrideMonthly === undefined) return "-";
-
-  const numericOverride = Number(overrideMonthly);
-
-  if (Number.isNaN(numericOverride)) {
-    return String(overrideMonthly);
-  }
-
-  return numericOverride.toLocaleString("en-US");
-};
 
 function InviteForm({ onInvitationSent }) {
   const [firstName, setFirstName] = useState("");
@@ -227,9 +216,6 @@ function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
               Trainers
             </th>
             <th className="py-2.5 px-4 font-semibold text-right">Clients</th>
-            <th className="py-2.5 px-4 font-semibold text-right">
-              Override / mo
-            </th>
             <th className="py-2.5 px-4 font-semibold">Status</th>
           </tr>
         </thead>
@@ -268,10 +254,6 @@ function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
 
                 <td className="py-2.5 px-4 text-right text-[#252525]">
                   {trainerAdmin.clients_count ?? 0}
-                </td>
-
-                <td className="py-2.5 px-4 text-right text-[#252525] font-semibold">
-                  {formatOverrideMonthly(trainerAdmin.override_monthly)}
                 </td>
 
                 <td className="py-2.5 px-4">
@@ -430,7 +412,7 @@ export default function TrainerAdminsPage() {
 
           <p className="text-[#535359] text-[13px] mt-1">
             Invite and manage Trainer Admins. They onboard their own trainers
-            and earn 20% override commission on their network.
+            and earn commission on their network.
           </p>
         </div>
 

@@ -98,7 +98,7 @@ export default function TrainerAdminDetailPage({ params }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-[10px] p-5 border border-[#E1E6ED] flex flex-col gap-1">
           <div className="text-[#535359] text-[12px]">Trainers in network</div>
           <div className="text-[#252525] text-[28px] font-bold">{myTrainers.length}</div>
@@ -108,11 +108,6 @@ export default function TrainerAdminDetailPage({ params }) {
           <div className="text-[#535359] text-[12px]">Clients under network</div>
           <div className="text-[#252525] text-[28px] font-bold">{myClients.length}</div>
           <div className="text-[#A1A1A1] text-[11px]">{myClients.filter((c) => c.status === "active").length} active subscriptions</div>
-        </div>
-        <div className="bg-[#308BF9] rounded-[10px] p-5 text-white flex flex-col gap-1">
-          <div className="text-[12px] opacity-80">Override this month</div>
-          <div className="text-[28px] font-bold">{fmtUSDCents(overrideMonth)}</div>
-          <div className="text-[11px] opacity-80">20% of network revenue</div>
         </div>
       </div>
 

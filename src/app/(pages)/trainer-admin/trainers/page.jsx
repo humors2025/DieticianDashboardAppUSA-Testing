@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
 import { fetchTrainerClientInvitesService } from "@/services/authService";
@@ -194,18 +193,9 @@ export default function TrainerAdminTrainersPage() {
                       {clients}
                     </td>
                     <td className="py-2.5 px-4 text-right">
-                      {t.is_self ? (
-                        <Link
-                          href="/trainer/dashboard"
-                          className="rounded-full bg-[#2EAF6A] text-white text-[11px] font-semibold px-3 py-1 hover:bg-[#259B5C] transition-colors"
-                        >
-                          View my clients
-                        </Link>
-                      ) : (
-                        <span className="text-[#A1A1A1] text-[11px]">
-                          {clients} client{clients !== 1 ? "s" : ""} referred
-                        </span>
-                      )}
+                      <span className="text-[#A1A1A1] text-[11px]">
+                        {clients} client{clients !== 1 ? "s" : ""} referred
+                      </span>
                     </td>
                   </tr>
                 );

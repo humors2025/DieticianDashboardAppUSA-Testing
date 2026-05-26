@@ -15,6 +15,7 @@ import macroSummaryReducer from "./macroSummarySlice";
 import habitMonitoringReducer from "./habitMonitoringSlice";
 import habitDetailReducer from "./habitDetailSlice";
 import trainerDirectionReducer from "./trainerDirectionSlice";
+import superAdminOverviewReducer from "./superAdminOverviewSlice";
 
 
 export const store = configureStore({
@@ -34,6 +35,7 @@ export const store = configureStore({
       habitMonitoring: habitMonitoringReducer,
       habitDetail: habitDetailReducer,
       trainerDirection: trainerDirectionReducer,
+      superAdminOverview: superAdminOverviewReducer,
   },
 
   middleware: (getDefaultMiddleware) =>

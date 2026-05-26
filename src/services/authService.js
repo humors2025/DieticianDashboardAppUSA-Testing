@@ -736,6 +736,30 @@ export const fetchTrainerAdminListService = async () => {
   });
 };
 
+
+export const fetchSuperAdminOverviewService = async () => {
+  const accessToken = Cookies.get("access_token");
+
+  if (!accessToken) {
+    throw new Error("Access token missing. Please login again.");
+  }
+
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.SUPERADMINOVERVIEW, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ actor_user_id: actorUserId }),
+  });
+};
+
 export const fetchDownstreamUsersService = async (actorUserId) => {
   if (!actorUserId) {
     throw new Error("Actor user ID missing.");
@@ -884,6 +908,16 @@ export const validateInviteTokenService = async (token) => {
     headers: {
       "Content-Type": "application/json",
     },
+  });
+};
+
+export const previewInviteService = async (token) => {
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.INVITEPREVIEW, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ token }),
   });
 };
 

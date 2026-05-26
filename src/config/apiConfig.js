@@ -80,6 +80,7 @@ TRAINER:{
 },
 ADMINPANEL:{
   INVITETRAINERADMIN:"/dietitian/api/web/super-admin-invite-admin.php",
+  SUPERADMINOVERVIEW:"/dietitian/api/web/super-admin-overview.php",
   TRAINERADMINLIST:"/dietitian/api/web/list-admin-trainer-users.php",
   REVOKETRAINERADMININVITE:"/dietitian/api/web/revoke-admin-invite.php",
   RESENDUSERINVITE:"/dietitian/api/web/resend-user-invite.php",
@@ -97,6 +98,7 @@ RESENDCLIENTSUBSCRIPTIONINVITE:"/dietitian/api/web/resend-client-subscription-in
 
   VALIDATEINVITETOKEN:"/dietitian/api/web/validate-invite-token.php",
   ACCEPTINVITE:"/dietitian/api/web/accept-invite.php",
+  INVITEPREVIEW:"/dietitian/api/web/invite-preview.php",
 
   // Internal Next.js API routes (relative — not prefixed with API_BASE_URL)
   LISTUSERSINTERNAL:"/api/admin/list-users"

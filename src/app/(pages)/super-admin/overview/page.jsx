@@ -1,10 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { fetchTrainerAdminListService } from "@/services/authService";
-import { getCurrentUser } from "@/lib/user";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  getSuperAdminOverview,
+  selectSuperAdminActor,
+  selectSuperAdminOverview,
+  selectSuperAdminNetwork,
+  selectSuperAdminOverviewTitle,
+  selectSuperAdminOverviewLoading,
+  selectSuperAdminOverviewError,
+} from "@/store/superAdminOverviewSlice";
 
 function KpiCard({ label, value, hint, accent, pending, href }) {
   const content = (
@@ -32,43 +40,64 @@ function KpiCard({ label, value, hint, accent, pending, href }) {
   return <div className={className}>{content}</div>;
 }
 
-export default function SuperAdminOverview() {
-  const [totals, setTotals] = useState(null);
-  const [loading, setLoading] = useState(true);
+function StatTile({ label, value, tone = "default" }) {
+  const toneClass =
+    tone === "success"
+      ? "text-[#10B981]"
+      : tone === "warning"
+      ? "text-[#F59E0B]"
+      : tone === "danger"
+      ? "text-[#EF4444]"
+      : "text-[#252525]";
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetchTrainerAdminListService();
-      setTotals(res?.totals || {});
-    } catch (err) {
-      toast.error(err?.message || "Failed to load overview");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  return (
+    <div className="bg-white rounded-[10px] p-4 border border-[#E1E6ED] flex flex-col gap-1">
+      <div className="text-[#A1A1A1] text-[11px] font-semibold uppercase tracking-wide">
+        {label}
+      </div>
+      <div className={`text-[22px] font-bold mt-1 ${toneClass}`}>{value ?? "—"}</div>
+    </div>
+  );
+}
+
+export default function SuperAdminOverview() {
+  const dispatch = useDispatch();
+  const actor = useSelector(selectSuperAdminActor);
+  const overview = useSelector(selectSuperAdminOverview);
+
+
+  const loading = useSelector(selectSuperAdminOverviewLoading);
+  const error = useSelector(selectSuperAdminOverviewError);
+
+  const loadData = useCallback(() => {
+    dispatch(getSuperAdminOverview())
+      .unwrap()
+      .catch((err) => {
+        toast.error(err || "Failed to load overview");
+      });
+  }, [dispatch]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const currentUser = getCurrentUser();
-  const saIsAlsoTA = currentUser?.role === "super_admin" && currentUser?.partner_code;
-  const taCount = (totals?.accepted_count ?? 0) + (saIsAlsoTA ? 1 : 0);
-  const trainerCount = totals?.total_trainers ?? 0;
-  const clientCount = totals?.total_clients ?? 0;
+  const totalAdmins = overview?.total_admins ?? 0;
+  const totalTrainers = overview?.total_trainers_in_network ?? 0;
+  const totalClients = overview?.total_clients_in_network ?? 0;
+  const ownClients = overview?.own_clients_count ?? 0;
+
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
-            Overview
+        Overview
           </h1>
           <p className="text-[#535359] text-[13px] mt-1">
-            A full-network snapshot — trainer admins, trainers, clients, and
-            revenue.
+            A full-network snapshot — trainer admins, trainers, clients, and invites.
           </p>
+    
         </div>
         <button
           type="button"
@@ -80,26 +109,44 @@ export default function SuperAdminOverview() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {error && (
+        <div className="bg-[#FEF2F2] border border-[#FCA5A5] text-[#B91C1C] rounded-[10px] p-3 text-[12px]">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Trainer Admins"
-          value={String(taCount)}
+          value={String(totalAdmins)}
           hint="Active in the network"
           accent
+          pending={loading && !overview}
           href="/super-admin/trainer-admins"
         />
         <KpiCard
           label="Trainers"
-          value={String(trainerCount)}
+          value={String(totalTrainers)}
           hint="Across all Trainer Admins"
+          pending={loading && !overview}
           href="/super-admin/trainers"
         />
+
+         <KpiCard
+          label="Own Clients"
+          value={String(ownClients)}
+          hint="Directly onboarded by you"
+          pending={loading && !overview}
+        />
+
         <KpiCard
           label="Clients"
-          value={String(clientCount)}
+          value={String(totalClients)}
           hint="Total in network"
+          pending={loading && !overview}
           href="/super-admin/clients"
         />
+       
       </div>
 
       <div className="bg-[#F5F7FA] rounded-[10px] p-5">
@@ -113,9 +160,21 @@ export default function SuperAdminOverview() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {[
-            { label: "Trainer Admins", value: String(taCount), href: "/super-admin/trainer-admins" },
-            { label: "Trainers onboarded", value: String(trainerCount), href: "/super-admin/trainers" },
-            { label: "Clients onboarded", value: String(clientCount), href: "/super-admin/clients" },
+            {
+              label: "Trainer Admins",
+              value: String(totalAdmins),
+              href: "/super-admin/trainer-admins",
+            },
+            {
+              label: "Trainers onboarded",
+              value: String(totalTrainers),
+              href: "/super-admin/trainers",
+            },
+            {
+              label: "Clients onboarded",
+              value: String(totalClients),
+              href: "/super-admin/clients",
+            },
           ].map((s, i) => {
             const inner = (
               <>
@@ -124,11 +183,7 @@ export default function SuperAdminOverview() {
                 </div>
                 <div className="text-[#535359] text-[12px]">{s.label}</div>
                 <div className="text-[#252525] text-[22px] font-bold mt-1">
-                  {s.pending ? (
-                    <span className="text-[#A1A1A1]">—</span>
-                  ) : (
-                    s.value
-                  )}
+                  {s.value}
                 </div>
               </>
             );
@@ -153,17 +208,6 @@ export default function SuperAdminOverview() {
         </div>
       </div>
 
-      <div className="bg-[#F5F7FA] rounded-[10px] p-5">
-        <div className="flex items-baseline justify-between mb-4">
-          <h3 className="text-[#252525] text-[14px] font-bold">
-            Client mix by tier
-          </h3>
-          <span className="text-[#A1A1A1] text-[11px]">API pending</span>
-        </div>
-        <div className="rounded-[10px] border border-dashed border-[#E1E6ED] bg-white p-6 text-[#A1A1A1] text-[12px] text-center">
-          Tier breakdown requires a dedicated aggregation API.
-        </div>
-      </div>
     </div>
   );
 }

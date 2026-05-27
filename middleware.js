@@ -46,7 +46,8 @@ export function middleware(request) {
   const isProtectedRoute =
     pathname.startsWith('/trainer') ||
     pathname.startsWith('/trainer-admin') ||
-    pathname.startsWith('/super-admin');
+    pathname.startsWith('/super-admin') ||
+    pathname.startsWith('/superadmin-trainer');
 
   // 🔒 Not logged in and visiting protected route → send to login.
   if (isProtectedRoute && !token) {
@@ -58,6 +59,9 @@ export function middleware(request) {
     const role = readRole(request);
 
     if (pathname.startsWith('/super-admin') && role !== 'super_admin') {
+      return NextResponse.redirect(new URL(homeForRole(role), request.url));
+    }
+    if (pathname.startsWith('/superadmin-trainer') && role !== 'super_admin') {
       return NextResponse.redirect(new URL(homeForRole(role), request.url));
     }
     if (pathname.startsWith('/trainer-admin') && role !== 'trainer_admin') {
@@ -94,5 +98,6 @@ export const config = {
     '/trainer/:path*',
     '/trainer-admin/:path*',
     '/super-admin/:path*',
+    '/superadmin-trainer/:path*',
   ],
 };

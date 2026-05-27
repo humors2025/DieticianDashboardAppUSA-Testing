@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { IoChevronBackOutline, IoChevronForwardOutline } from "react-icons/io5";
 import { useDispatch, useSelector } from "react-redux";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 import TestAnalysis from "./test-analysis";
 import DietAnalysis from "./diet-analysis";
 import MacrosAnalysis from "./macros-analysis";
@@ -34,9 +34,27 @@ import {
 
 import { cookieManager } from "../lib/cookies";
 
+function decodeJwt(token) {
+  try {
+    const payload = token.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
 export default function ClientDetails() {
   const dispatch = useDispatch();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const isMaskingRoute = pathname?.startsWith("/superadmin-trainer");
 
   const individualProfileData = useSelector(selectClientIndividualProfileData);
 
@@ -57,6 +75,18 @@ export default function ClientDetails() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [startIndex, setStartIndex] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [roleChecked, setRoleChecked] = useState(false);
+
+  useEffect(() => {
+    const token = cookieManager.get("access_token");
+    const decoded = token ? decodeJwt(token) : null;
+    setIsSuperAdmin(decoded?.role === "super_admin");
+    setRoleChecked(true);
+  }, []);
+
+  const showWhenNotSuperAdmin = roleChecked && !isSuperAdmin;
+  // const showProfileInfo = roleChecked && (!isSuperAdmin || isMaskingRoute);
 
   const profileId = searchParams.get("profile_id");
   const dietitianData = cookieManager.getJSON("dietician");
@@ -161,6 +191,7 @@ const transformDatesToDisplay = () => {
                 profileId,
                 date: dates[0].date,
                 dietitianId: dietitianId,
+                masking: isMaskingRoute,
               })
             );
           }
@@ -179,7 +210,7 @@ const transformDatesToDisplay = () => {
     if (dietitianId) {
       loadProfileDates();
     }
-  }, [profileId, dispatch, dietitianId]);
+  }, [profileId, dispatch, dietitianId, isMaskingRoute]);
 
   useEffect(() => {
     const loadWeeklyDates = async () => {
@@ -329,6 +360,7 @@ const transformDatesToDisplay = () => {
           profileId,
           date: selectedDate.rawDate,
           dietitianId: dietitianId,
+          masking: isMaskingRoute,
         })
       );
 
@@ -469,31 +501,35 @@ const transformDatesToDisplay = () => {
         >
           <div className="flex justify-between items-center pb-[22px] border-b border-[#E1E6ED]">
             <div className="flex gap-[15px]">
-              <div className="rounded-full w-12 h-12 flex items-center justify-center overflow-hidden">
-                {profileDetails?.profile_image &&
-                  profileDetails?.profile_image !== "NA" ? (
-                  <Image
-                    src={profileDetails.profile_image}
-                    alt={profileDetails?.profile_name || "user"}
-                    width={48}
-                    height={48}
-                    className="rounded-full object-cover w-[48px] h-[48px]"
-                  />
-                ) : (
-                  <Image
-                    src="/icons/hugeicons_user-circle-02.svg"
-                    alt="user"
-                    width={48}
-                    height={48}
-                  />
-                )}
-              </div>
+             
+                <div className="rounded-full w-12 h-12 flex items-center justify-center overflow-hidden">
+                  {profileDetails?.profile_image &&
+                    profileDetails?.profile_image !== "NA" ? (
+                    <Image
+                      src={profileDetails.profile_image}
+                      alt={profileDetails?.profile_name || "user"}
+                      width={48}
+                      height={48}
+                      className="rounded-full object-cover w-[48px] h-[48px]"
+                    />
+                  ) : (
+                    <Image
+                      src="/icons/hugeicons_user-circle-02.svg"
+                      alt="user"
+                      width={48}
+                      height={48}
+                    />
+                  )}
+                </div>
+            
 
               <div className="flex flex-col gap-3">
                 <div className="flex gap-3 items-center">
-                  <p className="text-[#252525] text-[20px] font-semibold tracking-[-0.4px] leading-[110%]">
-                    {profileDetails?.profile_name || "NA"}
-                  </p>
+                
+                    <p className="text-[#252525] text-[20px] font-semibold tracking-[-0.4px] leading-[110%]">
+                      {profileDetails?.profile_name || "NA"}
+                    </p>
+                 
                   {profileDetails?.level_type && profileDetails?.level_type !== "NA" && (
                     <div
                       className="flex items-center px-2.5 py-2 rounded-[5px]"
@@ -533,10 +569,12 @@ const transformDatesToDisplay = () => {
                 </div>
 
                 <div className="flex gap-1.5 items-center">
-                  <p className="text-[#535359] text-[12px] font-normal leading-normal tracking-[-0.24px]">
-                    {profileDetails?.age || "NA"} years,{" "}
-                    {profileDetails?.gender || "NA"}
-                  </p>
+                
+                    <p className="text-[#535359] text-[12px] font-normal leading-normal tracking-[-0.24px]">
+                      {profileDetails?.age || "NA"} years,{" "}
+                      {profileDetails?.gender || "NA"}
+                    </p>
+                
 
                   <div className="mx-1.5">
                     <Image
@@ -554,25 +592,27 @@ const transformDatesToDisplay = () => {
               </div>
             </div>
 
-            <div className="flex gap-[30px]">
-              <Image
-                src="/icons/hugeicons_file-export.svg"
-                width={26}
-                height={26}
-                alt="export"
-                className="cursor-pointer hover:opacity-70 transition-opacity"
-                onClick={handleExportPDF}
-              />
+            {showWhenNotSuperAdmin && (
+              <div className="flex gap-[30px]">
+                <Image
+                  src="/icons/hugeicons_file-export.svg"
+                  width={26}
+                  height={26}
+                  alt="export"
+                  className="cursor-pointer hover:opacity-70 transition-opacity"
+                  onClick={handleExportPDF}
+                />
 
-              <Image
-                src="/icons/right button.svg"
-                width={26}
-                height={26}
-                alt="right"
-                className="cursor-pointer"
-                onClick={() => setIsSidebarOpen(true)}
-              />
-            </div>
+                <Image
+                  src="/icons/right button.svg"
+                  width={26}
+                  height={26}
+                  alt="right"
+                  className="cursor-pointer"
+                  onClick={() => setIsSidebarOpen(true)}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex py-[11px] pl-[5px]">

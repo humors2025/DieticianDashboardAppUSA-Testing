@@ -1,16 +1,35 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { UserProfile } from "./user-profile";
 import { fetchClientsDashboard } from "../services/authService";
 import { cookieManager } from "../lib/cookies";
 
+function decodeJwt(token) {
+  try {
+    const payload = token.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
 export default function ClientLists() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const profileIdFromUrl = searchParams.get("profile_id");
+  const partnerCodeFromUrl = searchParams.get("partner_code");
+  const isMaskingRoute = pathname?.startsWith("/superadmin-trainer");
 
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState(null);
@@ -67,8 +86,20 @@ export default function ClientLists() {
 
       setLoading(true);
 
-      const dietician = cookieManager.getJSON("dietician");
-      const dieticianId = dietician?.dietician_id;
+      let dieticianId;
+      let useMasking = false;
+
+      if (isMaskingRoute) {
+        const token = cookieManager.get("access_token");
+        const decoded = token ? decodeJwt(token) : null;
+        if (decoded?.role !== "super_admin") return;
+        if (!partnerCodeFromUrl) return;
+        dieticianId = partnerCodeFromUrl;
+        useMasking = true;
+      } else {
+        const dietician = cookieManager.getJSON("dietician");
+        dieticianId = dietician?.dietician_id;
+      }
 
       if (!dieticianId) return;
 
@@ -78,7 +109,8 @@ export default function ClientLists() {
         dieticianId,
         "all",
         pageNumber,
-        today
+        today,
+        { masking: useMasking }
       );
 
       if (res?.status) {
@@ -149,7 +181,13 @@ export default function ClientLists() {
 
   const handleClientClick = (index, profileId) => {
     setActiveIndex(index);
-    router.push(`/trainer/clients-profile?profile_id=${profileId}`);
+    if (isMaskingRoute) {
+      const params = new URLSearchParams({ profile_id: profileId });
+      if (partnerCodeFromUrl) params.set("partner_code", partnerCodeFromUrl);
+      router.push(`/superadmin-trainer/clients-profile?${params.toString()}`);
+    } else {
+      router.push(`/trainer/clients-profile?profile_id=${profileId}`);
+    }
   };
 
   const handleSearchResults = (results) => {
@@ -194,19 +232,25 @@ export default function ClientLists() {
     <>
       <div className=" bg-white rounded-[15px]  px-[5px]">
         <div className="flex flex-col gap-6 mb-[22px]">
-          <div className="flex gap-1.5 items-center pt-[22px] pl-[15px]">
-            <Image
-              src="/icons/Frame 383.svg"
-              alt="Frame 383"
-              width={32}
-              height={32}
-              className="cursor-pointer"
-              onClick={() => router.push("/trainer/dashboard")}
-            />
-            <p className="text-[#252525] text-[12px] font-semibold leading-[126%] tracking-[-0.24px]">
-              Go to Dashboard
-            </p>
-          </div>
+        
+            <div className="flex gap-1.5 items-center pt-[22px] pl-[15px]">
+              {!isMaskingRoute && (
+                <>
+                  <Image
+                    src="/icons/Frame 383.svg"
+                    alt="Frame 383"
+                    width={32}
+                    height={32}
+                    className="cursor-pointer"
+                    onClick={() => router.push("/trainer/dashboard")}
+                  />
+                  <p className="text-[#252525] text-[12px] font-semibold leading-[126%] tracking-[-0.24px]">
+                    Go to Dashboard
+                  </p>
+                </>
+              )}
+            </div>
+        
 
           <p className="pl-5 text-[#252525] text-[25px] font-semibold leading-normal tracking-[-1px]">
             Clients ({totalCount})

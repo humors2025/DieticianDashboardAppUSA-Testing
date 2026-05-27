@@ -121,6 +121,17 @@ export default function RoleSwitcher({ currentRole }) {
     }
   };
 
+  const handleMouseEnter = () => {
+    setIsOpen(true);
+    if (!isSwitched) {
+      fetchDownstream();
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsOpen(false);
+  };
+
   const switchToUser = (target) => {
     if (!isSwitched) {
       saveOriginalUser(currentUser);
@@ -213,20 +224,23 @@ export default function RoleSwitcher({ currentRole }) {
   const badgeColor = isSwitched ? "#E97F0F" : "#A1A1A1";
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div
+      className="relative"
+      ref={dropdownRef}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <button
         onClick={handleToggle}
-        className={`flex items-center gap-1.5 cursor-pointer rounded-[15px] px-[16px] py-[12px] bg-white ${
-          isSwitched ? "border border-[#E97F0F]/30" : ""
-        }`}
-        title={switchLabel}
+        className="flex items-center gap-1.5 cursor-pointer rounded-[15px] px-[16px] py-[12px] bg-white"
+        title="Switch view"
       >
         <svg
           width="16"
           height="16"
           viewBox="0 0 24 24"
           fill="none"
-          stroke={isSwitched ? "#E97F0F" : "#A1A1A1"}
+          stroke="#A1A1A1"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -236,127 +250,30 @@ export default function RoleSwitcher({ currentRole }) {
           <path d="M21 3l-9 9" />
           <path d="M3 21l9-9" />
         </svg>
-        <span
-          className="font-semibold text-[12px]"
-          style={{ color: isSwitched ? "#E97F0F" : "#A1A1A1" }}
-        >
-          {isSwitched ? `Viewing as ${currentUser?.first_name || "User"}` : "Switch"}
+        <span className="font-semibold text-[12px]" style={{ color: "#A1A1A1" }}>
+          Switch
         </span>
-        {isSwitched && (
-          <span
-            className="w-2 h-2 rounded-full flex-shrink-0"
-            style={{ backgroundColor: "#E97F0F" }}
-          />
-        )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 w-[280px] bg-white rounded-[12px] shadow-2xl border border-[#E1E6ED] p-2 z-50 max-h-[400px] overflow-y-auto">
+        <div className="absolute right-0 top-full w-[280px] bg-white rounded-[12px] shadow-2xl border border-[#E1E6ED] p-2 z-50 max-h-[400px] overflow-y-auto">
           <div className="text-[#A1A1A1] text-[10px] uppercase tracking-wide font-semibold px-2 pt-1 pb-2">
             Switch view
           </div>
 
-          {isSwitched && (
+          {(currentRole === ROLES.SUPER_ADMIN || (currentRole === ROLES.TRAINER_ADMIN && hasClients)) && (
             <button
-              onClick={switchBack}
-              className="w-full flex items-center gap-2 px-2 py-2.5 rounded-[8px] hover:bg-[#FFF4E0] text-left mb-1 border border-[#E97F0F]/20 bg-[#FFF9F0]"
+              onClick={() => switchToMyView(ROLES.TRAINER)}
+              className="w-full flex items-center gap-2 px-2 py-2 rounded-[8px] hover:bg-[#F5F7FA] text-left"
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#E97F0F"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M19 12H5" />
-                <path d="M12 19l-7-7 7-7" />
-              </svg>
-              <span className="text-[#E97F0F] text-[12px] font-semibold flex-1">
-                Back to {ROLE_LABELS[originalUser.role] || "Admin"}
+              <span
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: ROLE_COLORS[ROLES.TRAINER] }}
+              />
+              <span className="text-[#252525] text-[12px] font-semibold flex-1">
+                View as Trainer
               </span>
             </button>
-          )}
-
-          {!isSwitched && (
-            <>
-              {(currentRole === ROLES.SUPER_ADMIN || (currentRole === ROLES.TRAINER_ADMIN && hasClients)) && (
-                <div className="mb-2">
-                  <div className="text-[#252525] text-[10px] font-bold uppercase tracking-wide px-2 py-1">
-                    My Views
-                  </div>
-                  {currentRole === ROLES.SUPER_ADMIN && (
-                    <button
-                      onClick={() => switchToMyView(ROLES.TRAINER_ADMIN)}
-                      className="w-full flex items-center gap-2 px-2 py-2 rounded-[8px] hover:bg-[#F5F7FA] text-left"
-                    >
-                      <span
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: ROLE_COLORS[ROLES.TRAINER_ADMIN] }}
-                      />
-                      <span className="text-[#252525] text-[12px] font-semibold flex-1">
-                        My Trainer Admin View
-                      </span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => switchToMyView(ROLES.TRAINER)}
-                    className="w-full flex items-center gap-2 px-2 py-2 rounded-[8px] hover:bg-[#F5F7FA] text-left"
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: ROLE_COLORS[ROLES.TRAINER] }}
-                    />
-                    <span className="text-[#252525] text-[12px] font-semibold flex-1">
-                      My Trainer View
-                    </span>
-                  </button>
-                </div>
-              )}
-
-              {loading && (
-                <div className="px-2 py-3 text-[#A1A1A1] text-[11px]">
-                  Loading downstream users...
-                </div>
-              )}
-
-              {error && (
-                <div className="px-2 py-2 text-[#B5363A] text-[11px]">
-                  {error}
-                </div>
-              )}
-
-              {Object.entries(sections).map(([section, users]) => (
-                <div key={section} className="mb-2 last:mb-0">
-                  <div className="text-[#252525] text-[10px] font-bold uppercase tracking-wide px-2 py-1">
-                    {section}
-                  </div>
-                  {users.map((u) => (
-                    <button
-                      key={u.id}
-                      onClick={() => switchToUser(u)}
-                      className="w-full flex items-center gap-2 px-2 py-2 rounded-[8px] hover:bg-[#F5F7FA] text-left"
-                    >
-                      <span
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: ROLE_COLORS[u.role] || "#A1A1A1" }}
-                      />
-                      <span className="text-[#252525] text-[12px] font-semibold flex-1">
-                        {u.name || u.email}
-                      </span>
-                      {u.partner_code && (
-                        <span className="text-[#A1A1A1] text-[10px] font-mono">
-                          {u.partner_code}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ))}
-
-            </>
           )}
         </div>
       )}

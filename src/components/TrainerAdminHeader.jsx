@@ -28,11 +28,12 @@ const MonoIcon = ({ src, size = 20, color = "#A1A1A1", alt = "" }) => (
 );
 
 const MENU = [
-  { name: "Overview",         icon: "/icons/hugeicons_home-05.svg",     path: "/trainer-admin/trainers" },
-  { name: "View my clients",  icon: "/icons/hugeicons_user-group.png",  path: "/trainer/dashboard" },
-  { name: "Invites Trainer",  icon: "/icons/hugeicons_award-01.svg",    path: "/trainer-admin/invites" },
-  { name: "Earnings",         icon: "/icons/hugeicons_award-01.svg",    path: "/trainer-admin/earnings" },
-  { name: "Settings",         icon: "/icons/hugeicons_settings-03.svg", path: "/trainer-admin/settings" },
+  { name: "Overview",         icon: "/icons/hugeicons_home-05.svg",        path: "/trainer-admin/trainers" },
+  { name: "View my clients",  icon: "/icons/hugeicons_user-group.png",     path: "/trainer/dashboard" },
+  { name: "Client Directory", icon: "/icons/hugeicons_user-circle-02.svg", path: "/trainer/client-directory" },
+  { name: "Invites Trainer",  icon: "/icons/hugeicons_award-01.svg",       path: "/trainer-admin/invites" },
+  { name: "Earnings",         icon: "/icons/hugeicons_award-01.svg",       path: "/trainer-admin/earnings" },
+  { name: "Settings",         icon: "/icons/hugeicons_settings-03.svg",    path: "/trainer-admin/settings" },
 ];
 
 export default function TrainerAdminHeader() {

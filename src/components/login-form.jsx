@@ -288,12 +288,12 @@ const handleSubmit = async (e) => {
             {loading ? "Continue in..." : "Continue"}
           </button>
 
-          <p className="text-[#535359] text-[12px] text-center mt-3">
+          {/* <p className="text-[#535359] text-[12px] text-center mt-3">
             Have an invite?{" "}
             <Link href="/signup" className="text-[#308BF9] font-semibold hover:underline">
               Sign up here
             </Link>
-          </p>
+          </p> */}
         </form>
       </div>
     </div>

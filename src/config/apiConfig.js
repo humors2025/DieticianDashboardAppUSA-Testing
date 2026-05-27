@@ -17,6 +17,8 @@ export const API_ENDPOINTS = {
   CLIENT:{
     CLIENTTABLE:"/dietitian/api/web/get_clients_with_diet_plan.php",
      CLIENTS_DASHBOARD:"/dietitian/api/web/get-clients-data-total-missed-test.php",
+     CLIENTS_DASHBOARD_MASKED:"/dietitian/api/web/get-clients-data-total-missed-test-masked.php",
+     TRAINERADMINCLIENTSLISTDIR:"/dietitian/api/web/trainer-admin-clients-list-dir.php",
   },
   CALENDER:{
 CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
@@ -35,6 +37,7 @@ CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
     CLIENTPROFILEDATA:"/dietitian/api/web/get_client_data.php",
     CLIENTPROFILEDETAILS:"/dietitian/api/web/get-graph-all-seven-trends-graph.php",
     CLIENTINDIVIDUALPROFILE:"/dietitian/api/web/get-data-points-score-all-ranges-coach.php",
+    CLIENTINDIVIDUALPROFILEMASKING:"/dietitian/api/web/get-data-points-score-all-ranges-coach-masking.php",
     CLIENTPROFILEDATESLIST:"/dietitian/api/web/get-profile-details-dates-taken.php",
     CLIENTWEEKLYDATES:"/dietitian/api/web/get-weekly-tab-list.php",
     GETCLIENTPROFILEDETAILS:"/dietitian/api/web/get_client_profile_details.php"
@@ -82,6 +85,8 @@ ADMINPANEL:{
   INVITETRAINERADMIN:"/dietitian/api/web/super-admin-invite-admin.php",
   SUPERADMINOVERVIEW:"/dietitian/api/web/super-admin-overview.php",
   TRAINERADMINLIST:"/dietitian/api/web/list-admin-trainer-users.php",
+  LISTALLTRAINERSFORSUPERADMIN:"/dietitian/api/web/list-all-trainers-for-super-admin.php",
+  TRAINERCLIENTSOVERVIEWFORSUPERADMIN:"/dietitian/api/web/trainer-clients-overview-for-super-admin.php",
   REVOKETRAINERADMININVITE:"/dietitian/api/web/revoke-admin-invite.php",
   RESENDUSERINVITE:"/dietitian/api/web/resend-user-invite.php",
   REVOKEUSERINVITE:"/dietitian/api/web/revoke-user-invite.php",

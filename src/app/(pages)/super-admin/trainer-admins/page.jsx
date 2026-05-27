@@ -11,6 +11,7 @@ import {
   revokeTrainerAdminInviteService,
 } from "@/services/authService";
 import { getCurrentUser } from "@/lib/user";
+import TrainersList from "@/components/super-admin/TrainersList";
 
 
 const isValidEmail = (emailAddress) =>
@@ -265,7 +266,7 @@ function InviteForm({ onInvitationSent }) {
   );
 }
 
-function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
+function ExistingTrainerAdminsTable({ existingTrainerAdmins, onSelectTrainerAdmin }) {
   if (existingTrainerAdmins.length === 0) {
     return (
       <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
@@ -299,15 +300,13 @@ function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
                 className="border-t border-[#F5F7FA] hover:bg-[#F5F7FA]"
               >
                 <td className="py-2.5 px-4">
-                  {/* <Link
-                    href={`/super-admin/trainer-admins/${
-                      trainerAdmin.role_id || trainerAdmin.user_id
-                    }`}
-                    className="text-[#308BF9] font-semibold hover:underline"
+                  <button
+                    type="button"
+                    onClick={() => onSelectTrainerAdmin(trainerAdmin)}
+                    className="text-[#308BF9] font-semibold hover:underline cursor-pointer text-left"
                   >
                     {trainerAdmin.name || "-"}
-                  </Link> */}
-                  <p  className="text-[#308BF9] font-semibold "> {trainerAdmin.name || "-"}</p>
+                  </button>
 
                   <div className="text-[#A1A1A1] text-[11px]">
                     {trainerAdmin.email || "-"}
@@ -604,6 +603,8 @@ export default function TrainerAdminsPage() {
   const [trainerAdminsErrorMessage, setTrainerAdminsErrorMessage] =
     useState("");
 
+  const [selectedTrainerAdmin, setSelectedTrainerAdmin] = useState(null);
+
   const addAuditEntry = (invitationId, action, detail = null) => {
     setAuditLogs((prev) => ({
       ...prev,
@@ -730,6 +731,15 @@ export default function TrainerAdminsPage() {
     }
   };
 
+  if (selectedTrainerAdmin) {
+    return (
+      <TrainersList
+        trainerAdmin={selectedTrainerAdmin}
+        onBack={() => setSelectedTrainerAdmin(null)}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -812,6 +822,7 @@ export default function TrainerAdminsPage() {
         ) : (
           <ExistingTrainerAdminsTable
             existingTrainerAdmins={existingTrainerAdmins}
+            onSelectTrainerAdmin={setSelectedTrainerAdmin}
           />
         )}
       </div>

@@ -328,7 +328,7 @@ const hideHeaderPaths = [
     <>
       <div className="flex justify-between bg-[#F5F7FA] p-4">
       <div className="flex">
-  <Link href="/trainer/dashboard">
+  <Link href={userRole === "super_admin" ? "/super-admin/overview" : "/trainer/dashboard"}>
     <div className="flex flex-col items-center">
       <img src="/icons/logorespyr.png" alt="logo" width={50} height={50} />
       {/* <p className="text-[#252525] text-[12px] font-normal">Beta 1.0</p> */}
@@ -366,7 +366,7 @@ const hideHeaderPaths = [
             >
               <ArrowLeftRight size={18} color="#308BF9" />
               <span className="font-semibold text-[12px]" style={{ color: "#308BF9" }}>
-                View my trainers
+                Admin Panel
               </span>
             </button>
           )}

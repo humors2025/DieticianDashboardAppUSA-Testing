@@ -42,7 +42,7 @@ function PartnerCodeSync({ isSuperAdmin }) {
     return null;
 }
 
-export default function ClientsProfile() {
+export default function SuperAdminTrainerClientsProfile() {
     const [roleChecked, setRoleChecked] = useState(false);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 

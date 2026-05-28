@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { cookieManager } from "@/lib/cookies";
 import { getCurrentUser, ROLES } from "@/lib/user";
 import { fetchTrainerAdminListService } from "@/services/authService";
+import { ArrowLeftRight } from "lucide-react";
 
 const ROLE_LABELS = {
   [ROLES.SUPER_ADMIN]: "Super Admin",
@@ -235,21 +236,7 @@ export default function RoleSwitcher({ currentRole }) {
         className="flex items-center gap-1.5 cursor-pointer rounded-[15px] px-[16px] py-[12px] bg-white"
         title="Switch view"
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#A1A1A1"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M16 3h5v5" />
-          <path d="M8 21H3v-5" />
-          <path d="M21 3l-9 9" />
-          <path d="M3 21l9-9" />
-        </svg>
+        <ArrowLeftRight size={18} color="#A1A1A1" />
         <span className="font-semibold text-[12px]" style={{ color: "#A1A1A1" }}>
           Switch
         </span>

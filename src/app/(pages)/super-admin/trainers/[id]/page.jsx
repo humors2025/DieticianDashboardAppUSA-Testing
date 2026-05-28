@@ -1,7 +1,6 @@
 "use client";
 
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
@@ -157,12 +156,13 @@ export default function TrainerDetailPage({ params }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        href="/super-admin/trainers"
-        className="text-[#308BF9] text-[12px] font-semibold inline-flex items-center gap-1"
+      <button
+        type="button"
+        onClick={() => router.back()}
+        className="text-[#308BF9] text-[12px] font-semibold inline-flex items-center gap-1 cursor-pointer w-fit"
       >
-        &larr; Back to Trainers
-      </Link>
+        &larr; Back
+      </button>
 
       <div className="bg-white rounded-[12px] border border-[#E1E6ED] p-6 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div className="flex flex-col gap-2">

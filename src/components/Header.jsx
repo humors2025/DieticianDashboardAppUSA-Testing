@@ -364,7 +364,7 @@ const hideHeaderPaths = [
               onClick={handleSwitchClick}
               className="flex items-center gap-1.5 cursor-pointer rounded-[15px] px-[20px] py-[15px] bg-white"
             >
-              <ArrowLeftRight size={18} color="#308BF9" />
+              <ArrowLeftRight size={18} color="#308BF9" /> 
               <span className="font-semibold text-[12px]" style={{ color: "#308BF9" }}>
                 Admin Panel
               </span>

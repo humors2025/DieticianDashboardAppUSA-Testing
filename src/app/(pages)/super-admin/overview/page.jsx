@@ -140,11 +140,11 @@ export default function SuperAdminOverview() {
         />
 
         <KpiCard
-          label="Clients"
+          label="All Clients in network"
           value={String(totalClients)}
           hint="Total in network"
           pending={loading && !overview}
-          href="/super-admin/clients"
+          // href="/super-admin/clients"
         />
        
       </div>
@@ -154,26 +154,26 @@ export default function SuperAdminOverview() {
           <h3 className="text-[#252525] text-[14px] font-bold">
             Conversion funnel
           </h3>
-          <span className="text-[#A1A1A1] text-[11px]">
+          {/* <span className="text-[#A1A1A1] text-[11px]">
             Trainer Admin → Trainer → Client
-          </span>
+          </span> */}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {[
             {
               label: "Trainer Admins",
               value: String(totalAdmins),
-              href: "/super-admin/trainer-admins",
+              // href: "/super-admin/trainer-admins",
             },
             {
               label: "Trainers onboarded",
               value: String(totalTrainers),
-              href: "/super-admin/trainers",
+              // href: "/super-admin/trainers",
             },
             {
               label: "Clients onboarded",
               value: String(totalClients),
-              href: "/super-admin/clients",
+              // href: "/super-admin/clients",
             },
           ].map((s, i) => {
             const inner = (

@@ -145,13 +145,13 @@ export default function TrainersList({ trainerAdmin, onBack }) {
                     className="border-t border-[#F5F7FA] hover:bg-[#F5F7FA]"
                   >
                     <td className="py-2.5 px-4">
-                      {/* <Link
-                        href={`/super-admin/trainers/${t.role_id || encodeURIComponent(t.user_id)}?dietician_id=${encodeURIComponent(t.dietician_id || t.partner_code || "")}&name=${encodeURIComponent(t.name || t.user_id)}`}
+                    <Link
+                        href={`/super-admin/trainers/${encodeURIComponent(t.partner_code)}`}
                         className="text-[#308BF9] font-semibold hover:underline"
                       >
                         {t.name || t.user_id}
-                      </Link> */}
-                      <p className="text-[#308BF9] font-semibold hover:underline"> {t.name || t.user_id}</p>
+                      </Link> 
+                      {/* <p className="text-[#308BF9] font-semibold hover:underline"> {t.name || t.user_id}</p> */}
                       <div className="text-[#A1A1A1] text-[11px]">
                         {t.email || t.user_id}
                       </div>

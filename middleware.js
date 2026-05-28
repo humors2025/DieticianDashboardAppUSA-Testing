@@ -46,7 +46,8 @@ export function middleware(request) {
   const isProtectedRoute =
     pathname.startsWith('/trainer') ||
     pathname.startsWith('/trainer-admin') ||
-    pathname.startsWith('/super-admin');
+    pathname.startsWith('/super-admin') ||
+    pathname.startsWith('/superadmin-trainer');
 
   // 🔒 Not logged in and visiting protected route → send to login.
   if (isProtectedRoute && !token) {
@@ -60,6 +61,9 @@ export function middleware(request) {
     if (pathname.startsWith('/super-admin') && role !== 'super_admin') {
       return NextResponse.redirect(new URL(homeForRole(role), request.url));
     }
+    if (pathname.startsWith('/superadmin-trainer') && role !== 'super_admin') {
+      return NextResponse.redirect(new URL(homeForRole(role), request.url));
+    }
     if (pathname.startsWith('/trainer-admin') && role !== 'trainer_admin') {
       return NextResponse.redirect(new URL(homeForRole(role), request.url));
     }
@@ -67,6 +71,11 @@ export function middleware(request) {
     if (pathname.startsWith('/trainer/') && role !== 'trainer') {
       return NextResponse.redirect(new URL(homeForRole(role), request.url));
     }
+  }
+
+  // Allow accept-invite and signup through even if logged in
+  if (pathname === '/accept-invite' || pathname === '/signup') {
+    return NextResponse.next();
   }
 
   // 🔓 Logged in and visiting public auth page → bounce to role-appropriate home.
@@ -84,8 +93,11 @@ export const config = {
     '/',
     '/login',
     '/register',
+    '/accept-invite',
+    '/signup',
     '/trainer/:path*',
     '/trainer-admin/:path*',
     '/super-admin/:path*',
+    '/superadmin-trainer/:path*',
   ],
 };

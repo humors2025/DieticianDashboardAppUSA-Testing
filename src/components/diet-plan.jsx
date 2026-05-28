@@ -15,6 +15,22 @@ import {
 import { approveDietPlanService } from "../services/authService";
 import { cookieManager } from "../lib/cookies";
 
+function decodeJwt(token) {
+  try {
+    const payload = token.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
 export default function DietPlan() {
   const [activeDay, setActiveDay] = useState(1);
   const [activeMeal, setActiveMeal] = useState("Breakfast");
@@ -22,6 +38,13 @@ export default function DietPlan() {
   const [showApprovePopup, setShowApprovePopup] = useState(false);
   const [isApproved, setIsApproved] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    const token = cookieManager.get("access_token");
+    const decoded = token ? decodeJwt(token) : null;
+    setIsSuperAdmin(decoded?.role === "super_admin");
+  }, []);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -341,47 +364,49 @@ export default function DietPlan() {
             </div>
           </div>
 
-          <div className="flex gap-2.5 justify-end mt-2">
-            {!isApproved && (
-              <p className="py-[11px] text-[#535359] text-[10px] xl:text-[11px] 2xl:text-[12px] font-normal leading-normal tracking-[-0.2px]">
-                Auto-approved if not reviewed within 24 hours
-              </p>
-            )}
+          {!isSuperAdmin && (
+            <div className="flex gap-2.5 justify-end mt-2">
+              {!isApproved && (
+                <p className="py-[11px] text-[#535359] text-[10px] xl:text-[11px] 2xl:text-[12px] font-normal leading-normal tracking-[-0.2px]">
+                  Auto-approved if not reviewed within 24 hours
+                </p>
+              )}
 
-            <div className="flex gap-2.5">
-              <div
-                onClick={() => {
-                  if (!isApproved && !isApproving) {
-                    setShowApprovePopup(true);
-                  }
-                }}
-                aria-disabled={isApproved || isApproving}
-                className={[
-                  "flex items-center gap-[5px] justify-center px-[11px] py-1 rounded-[4px]",
-                  isApproved || isApproving
-                    ? "bg-[#E1E6ED] cursor-not-allowed"
-                    : "bg-[#308BF9] cursor-pointer",
-                ].join(" ")}
-              >
-                <Image
-                  src="/icons/hugeicons_tick-0236.svg"
-                  alt="approve-icon"
-                  width={20}
-                  height={20}
-                  className={`xl:w-[22px] xl:h-[22px] 2xl:w-[24px] 2xl:h-[24px] ${isApproved || isApproving ? "opacity-50 grayscale" : ""}`}
-                />
-
-                <span
+              <div className="flex gap-2.5">
+                <div
+                  onClick={() => {
+                    if (!isApproved && !isApproving) {
+                      setShowApprovePopup(true);
+                    }
+                  }}
+                  aria-disabled={isApproved || isApproving}
                   className={[
-                    "text-[12px] xl:text-[13px] 2xl:text-[14px] font-semibold leading-normal tracking-[-0.24px]",
-                    isApproved || isApproving ? "text-[#738298]" : "text-white",
+                    "flex items-center gap-[5px] justify-center px-[11px] py-1 rounded-[4px]",
+                    isApproved || isApproving
+                      ? "bg-[#E1E6ED] cursor-not-allowed"
+                      : "bg-[#308BF9] cursor-pointer",
                   ].join(" ")}
                 >
-                  {isApproved ? "Approved" : isApproving ? "Approving..." : "Approve"}
-                </span>
+                  <Image
+                    src="/icons/hugeicons_tick-0236.svg"
+                    alt="approve-icon"
+                    width={20}
+                    height={20}
+                    className={`xl:w-[22px] xl:h-[22px] 2xl:w-[24px] 2xl:h-[24px] ${isApproved || isApproving ? "opacity-50 grayscale" : ""}`}
+                  />
+
+                  <span
+                    className={[
+                      "text-[12px] xl:text-[13px] 2xl:text-[14px] font-semibold leading-normal tracking-[-0.24px]",
+                      isApproved || isApproving ? "text-[#738298]" : "text-white",
+                    ].join(" ")}
+                  >
+                    {isApproved ? "Approved" : isApproving ? "Approving..." : "Approve"}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

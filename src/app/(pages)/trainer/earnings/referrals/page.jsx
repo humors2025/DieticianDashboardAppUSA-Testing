@@ -1,37 +1,161 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { cookieManager } from "@/lib/cookies";
+import {
+  sendTrainerClientInviteService,
+  resendTrainerClientInviteService,
+  revokeTrainerClientInviteService,
+  fetchReferralClientListService,
+  revokeClientSubscriptionInviteService,
+  resendClientSubscriptionInviteService,
+} from "@/services/authService";
+import Cookies from "js-cookie";
 
-// Until backend adds a dedicated `partner_code` column, we use the
-// existing `dietician_id` as the partner code. When backend ships a
-// vanity code, swap this resolver and the rest of the page works as-is.
+function decodeJwt(token) {
+  try {
+    const payload = token.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64).split("").map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`).join("")
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function getTrainerIdFromCookie() {
+  const token = Cookies.get("access_token");
+  if (!token) return null;
+  const decoded = decodeJwt(token);
+  return decoded?.dietician_id ?? decoded?.sub ?? null;
+}
+
 function resolvePartnerCode(dietician) {
   return dietician?.partner_code || dietician?.dietician_id || "";
 }
 
-// Stub for the future backend call. Today: returns a fake invite record so
-// we can exercise the form + pending-list UI. When backend lands, replace
-// the body with a POST to the invite endpoint.
-async function sendInvite({ name, mobile, email, partnerCode }) {
-  await new Promise((r) => setTimeout(r, 400));
-  return {
-    ok: true,
-    invite: {
-      id: `local-${Date.now()}`,
-      name,
-      mobile,
-      email,
-      partnerCode,
-      status: "Sent",
-      sentAt: new Date().toISOString(),
-    },
-  };
-}
-
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const isValidMobile = (m) => /^\+?[0-9\s\-()]{7,}$/.test(m);
+
+const PLANS = [
+  {
+    id: "free_trial",
+    apiValue: "free_trial",
+    label: "Free Trial",
+    price: "$0",
+    badge: "Free",
+    badgeColor: "bg-[#E5F6EE] text-[#1F7A4A]",
+  },
+  {
+    id: "monthly",
+    apiValue: "monthly",
+    label: "Monthly Plan",
+    price: "$50",
+    badge: "$50/mo",
+    badgeColor: "bg-[#EEF4FE] text-[#308BF9]",
+  },
+  {
+    id: "lease_quarterly",
+    apiValue: "lease_quarterly",
+    label: "Lease (Quarterly)",
+    price: "$150",
+    badge: "$150",
+    badgeColor: "bg-[#FFF4E0] text-[#A66B00]",
+  },
+  {
+    id: "yearly",
+    apiValue: "yearly",
+    label: "Yearly Plan",
+    price: "$300",
+    badge: "$300/yr",
+    badgeColor: "bg-[#F3EEFE] text-[#6B45BC]",
+  },
+];
+
+// Revoke Confirmation Modal
+function RevokeModal({ isOpen, onClose, onConfirm, clientName, isLoading }) {
+  const [reason, setReason] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onConfirm(reason);
+  };
+
+  const handleClose = () => {
+    setReason("");
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={handleClose}
+      />
+      
+      {/* Modal */}
+      <div className="relative bg-white rounded-[16px] w-full max-w-md mx-4 p-6 shadow-xl">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[#252525] text-[16px] font-bold">Revoke Invitation</h3>
+            <button
+              onClick={handleClose}
+              className="text-[#A1A1A1] hover:text-[#535359] transition-colors cursor-pointer"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <p className="text-[#535359] text-[13px]">
+            You are about to revoke the invitation for <span className="font-semibold text-[#252525]">{clientName}</span>. 
+            This action cannot be undone. Please provide a reason for revocation.
+          </p>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[#535359] text-[12px] font-semibold">
+                Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g., Wrong email address, Client requested cancellation, etc."
+                rows={3}
+                className="w-full rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5 text-[13px] text-[#252525] focus:outline-none focus:border-[#308BF9] transition-colors resize-none"
+                required
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={isLoading || !reason.trim()}
+                className="flex-1 rounded-[10px] bg-[#B5363A] text-white text-[13px] font-semibold px-5 py-2.5 disabled:opacity-60 hover:bg-[#9a2e32] transition-colors cursor-pointer"
+              >
+                {isLoading ? "Revoking..." : "Confirm Revoke"}
+              </button>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="flex-1 rounded-[10px] border border-[#E1E6ED] bg-white text-[#535359] text-[13px] font-semibold px-5 py-2.5 hover:bg-[#F5F7FA] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PartnerCodeCard({ code, name }) {
   const [copied, setCopied] = useState(false);
@@ -63,37 +187,34 @@ function PartnerCodeCard({ code, name }) {
       <div className="flex flex-wrap items-center gap-3">
         <div className="bg-white rounded-[10px] px-4 py-3 border border-[#E1E6ED]">
           <span className="text-[#252525] text-[20px] font-bold tracking-wide">
-            {code || "—"}
+            {code || "\u2014"}
           </span>
         </div>
         <button
           type="button"
           onClick={onCopy}
           disabled={!code}
-          className="rounded-[10px] bg-[#308BF9] text-white text-[12px] font-semibold px-4 py-3 disabled:opacity-50"
+          className="rounded-[10px] bg-[#308BF9] text-white text-[12px] font-semibold px-4 py-3 disabled:opacity-50 cursor-pointer"
         >
           {copied ? "Copied" : "Copy code"}
         </button>
       </div>
-
-      <p className="text-[#A1A1A1] text-[11px]">
-        Branded vanity codes (e.g. <span className="font-semibold">EVAN2026</span>)
-        are coming. For now this is your trainer ID.
-      </p>
     </div>
   );
 }
 
-function InviteForm({ partnerCode, onSent }) {
+function InviteForm({ partnerCode, onInviteSent }) {
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState("free_trial");
   const [submitting, setSubmitting] = useState(false);
 
   const reset = () => {
     setName("");
     setMobile("");
     setEmail("");
+    setSelectedPlan("free_trial");
   };
 
   const onSubmit = async (e) => {
@@ -116,27 +237,43 @@ function InviteForm({ partnerCode, onSent }) {
       return;
     }
 
+    const trainerId = partnerCode;
+
+    if (!trainerId) {
+      return toast.error("Trainer code not found.");
+    }
+
     setSubmitting(true);
+
     try {
-      const res = await sendInvite({
-        name: name.trim(),
-        mobile: mobile.trim(),
-        email: email.trim(),
-        partnerCode,
+      await sendTrainerClientInviteService({
+        trainerId: trainerId,
+        clientName: name.trim(),
+        clientMobile: mobile.trim(),
+        clientEmail: email.trim(),
+        planCode: selectedPlan,
       });
-      if (!res.ok) throw new Error("Failed to send");
-      onSent(res.invite);
-      toast.success(`Invite sent to ${res.invite.name}`);
+
+      const planObj = PLANS.find((p) => p.id === selectedPlan);
+      toast.success(`Invite sent to ${name.trim()} — ${planObj?.label}`);
       reset();
-    } catch {
-      toast.error("Could not send invite. Please try again.");
+      onInviteSent();
+    } catch (err) {
+      const msg = err?.data?.message || err?.message || "";
+      if (msg.toLowerCase().includes("already has a pending invitation")) {
+        toast.success(`Invite sent to ${name.trim()}`);
+        reset();
+        onInviteSent();
+      } else {
+        toast.error(msg || "Could not send invite. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
   const fieldClass =
-    "w-full rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5 text-[13px] text-[#252525] focus:outline-none focus:border-[#308BF9]";
+    "w-full rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5 text-[13px] text-[#252525] focus:outline-none focus:border-[#308BF9] transition-colors";
   const labelClass = "text-[#535359] text-[12px] font-semibold";
 
   return (
@@ -144,14 +281,14 @@ function InviteForm({ partnerCode, onSent }) {
       <div className="flex flex-col gap-1">
         <h3 className="text-[#252525] text-[14px] font-bold">Invite a client</h3>
         <p className="text-[#535359] text-[12px]">
-          We'll send an automated WhatsApp + Email with a deep link. Your
-          partner code is attached automatically.
+          Send an invite with a deep link. Your partner code is attached
+          automatically. The client receives a code based on the plan you select.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>Name</label>
+          <label className={labelClass}>Name <span className="text-red-500">*</span></label>
           <input
             className={fieldClass}
             value={name}
@@ -160,7 +297,7 @@ function InviteForm({ partnerCode, onSent }) {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>Mobile</label>
+          <label className={labelClass}>Mobile <span className="text-red-500">*</span></label>
           <input
             className={fieldClass}
             value={mobile}
@@ -170,7 +307,7 @@ function InviteForm({ partnerCode, onSent }) {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>Email</label>
+          <label className={labelClass}>Email <span className="text-red-500">*</span></label>
           <input
             className={fieldClass}
             value={email}
@@ -181,83 +318,398 @@ function InviteForm({ partnerCode, onSent }) {
         </div>
       </div>
 
+      <div className="flex flex-col gap-1.5">
+        <label className={labelClass}>Select plan <span className="text-red-500">*</span></label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {PLANS.map((plan) => (
+            <button
+              key={plan.id}
+              type="button"
+              onClick={() => setSelectedPlan(plan.id)}
+              className={`rounded-[10px] border px-3 py-2.5 text-left transition-all cursor-pointer ${
+                selectedPlan === plan.id
+                  ? "border-[#308BF9] bg-[#EEF4FE] ring-1 ring-[#308BF9]"
+                  : "border-[#E1E6ED] bg-white hover:border-[#C4C9D4]"
+              }`}
+            >
+              <span className={`inline-flex rounded-full text-[10px] font-semibold px-2 py-0.5 mb-1.5 ${plan.badgeColor}`}>
+                {plan.badge}
+              </span>
+              <p className="text-[12px] font-semibold text-[#252525]">{plan.label}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-[10px] bg-[#308BF9] text-white text-[13px] font-semibold px-5 py-2.5 disabled:opacity-60"
+          className="rounded-[10px] bg-[#308BF9] text-white text-[13px] font-semibold px-5 py-2.5 disabled:opacity-60 hover:bg-[#1a76e8] transition-colors cursor-pointer"
         >
           {submitting ? "Sending..." : "Send invite"}
         </button>
         <span className="text-[#A1A1A1] text-[11px]">
-          Backend wiring (WhatsApp + Email + deep link) is pending — invites
-          appear in the list below for now.
+          Client will receive a code for the {PLANS.find((p) => p.id === selectedPlan)?.label}.
         </span>
       </div>
     </form>
   );
 }
 
-function PendingInvites({ invites }) {
-  if (invites.length === 0) {
+function PendingInvites({ 
+  invites, 
+  onResend, 
+  onRevoke, 
+  isLoading, 
+  onPageChange, 
+  pagination, 
+  summary,
+  onSubscriptionRevoke,
+  onSubscriptionResend 
+}) {
+  const [actionInProgress, setActionInProgress] = useState({});
+  const [revokeModal, setRevokeModal] = useState({ isOpen: false, client: null });
+
+  const getUniqueKey = (inv, index) => {
+    if (inv.subscription_id) {
+      return `sub-${inv.subscription_id}-${inv.invite_id || 'no-invite'}`;
+    }
+    if (inv.invite_id) {
+      return `inv-${inv.invite_id}`;
+    }
+    return `item-${index}`;
+  };
+
+  const handleResendClick = (inv, index) => {
+    // Check if it's a subscription-based invite
+    if (inv.subscription_id && inv.source === "trainer_client_plan_subscriptions") {
+      handleSubscriptionResend(inv, index);
+    } else {
+      // For regular invites, use the existing resend function
+      handleResend(inv, index);
+    }
+  };
+
+  const handleResend = async (inv, index) => {
+    const uniqueKey = getUniqueKey(inv, index);
+    setActionInProgress((prev) => ({ ...prev, [`resend-${uniqueKey}`]: true }));
+    try { 
+      await onResend(inv); 
+    } finally {
+      setActionInProgress((prev) => ({ ...prev, [`resend-${uniqueKey}`]: false }));
+    }
+  };
+
+  const handleSubscriptionResend = async (inv, index) => {
+    const uniqueKey = getUniqueKey(inv, index);
+    setActionInProgress((prev) => ({ ...prev, [`resend-${uniqueKey}`]: true }));
+    try { 
+      await onSubscriptionResend(inv); 
+    } finally {
+      setActionInProgress((prev) => ({ ...prev, [`resend-${uniqueKey}`]: false }));
+    }
+  };
+
+  const handleRevokeClick = (inv) => {
+    // Check if it's a subscription-based invite
+    if (inv.subscription_id && inv.source === "trainer_client_plan_subscriptions") {
+      setRevokeModal({ isOpen: true, client: inv });
+    } else {
+      // For regular invites, use the existing revoke function
+      handleRevoke(inv, inv.invite_id || inv.subscription_id);
+    }
+  };
+
+  const handleRevoke = async (inv) => {
+    const uniqueKey = getUniqueKey(inv);
+    setActionInProgress((prev) => ({ ...prev, [`revoke-${uniqueKey}`]: true }));
+    try { 
+      await onRevoke(inv); 
+    } finally {
+      setActionInProgress((prev) => ({ ...prev, [`revoke-${uniqueKey}`]: false }));
+    }
+  };
+
+  const handleSubscriptionRevokeConfirm = async (reason) => {
+    if (!revokeModal.client) return;
+    
+    const uniqueKey = getUniqueKey(revokeModal.client);
+    setActionInProgress((prev) => ({ ...prev, [`revoke-${uniqueKey}`]: true }));
+    
+    try {
+      await onSubscriptionRevoke(revokeModal.client, reason);
+      setRevokeModal({ isOpen: false, client: null });
+    } catch (error) {
+      // Error handling is done in the parent component
+    } finally {
+      setActionInProgress((prev) => ({ ...prev, [`revoke-${uniqueKey}`]: false }));
+    }
+  };
+
+  if (isLoading) {
     return (
       <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
-        No invites sent yet. Use the form above to invite your first client.
+        Loading clients...
       </div>
     );
   }
 
+  if (!invites || invites.length === 0) {
+    return (
+      <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
+        No clients found. Use the form above to invite your first client.
+      </div>
+    );
+  }
+
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      accepted: { bg: "bg-[#E5F6EE]", text: "text-[#1F7A4A]", label: "Accepted" },
+      pending: { bg: "bg-[#FFF4E0]", text: "text-[#A66B00]", label: "Pending" },
+      failed: { bg: "bg-[#FCEAEB]", text: "text-[#B5363A]", label: "Failed" },
+      cancelled: { bg: "bg-[#F3EEFE]", text: "text-[#6B45BC]", label: "Cancelled" },
+    };
+    
+    const config = statusConfig[status] || statusConfig.pending;
+    
+    return (
+      <span className={`inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${config.bg} ${config.text}`}>
+        {config.label}
+      </span>
+    );
+  };
+
   return (
-    <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
-      <table className="w-full text-[12px]">
-        <thead>
-          <tr className="bg-[#F5F7FA] text-[#535359] text-left">
-            <th className="py-2.5 px-4 font-semibold">Name</th>
-            <th className="py-2.5 px-4 font-semibold">Mobile</th>
-            <th className="py-2.5 px-4 font-semibold">Email</th>
-            <th className="py-2.5 px-4 font-semibold">Status</th>
-            <th className="py-2.5 px-4 font-semibold">Sent</th>
-          </tr>
-        </thead>
-        <tbody>
-          {invites.map((inv) => (
-            <tr key={inv.id} className="border-t border-[#F5F7FA]">
-              <td className="py-2.5 px-4 text-[#252525] font-semibold">{inv.name}</td>
-              <td className="py-2.5 px-4 text-[#535359]">{inv.mobile}</td>
-              <td className="py-2.5 px-4 text-[#535359]">{inv.email}</td>
-              <td className="py-2.5 px-4">
-                <span className="inline-flex rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5">
-                  {inv.status}
-                </span>
-              </td>
-              <td className="py-2.5 px-4 text-[#A1A1A1]">
-                {new Date(inv.sentAt).toLocaleString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div>
+        <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="bg-[#F5F7FA] text-[#535359] text-left">
+                <th className="py-2.5 px-4 font-semibold">Name</th>
+                <th className="py-2.5 px-4 font-semibold">Mobile</th>
+                <th className="py-2.5 px-4 font-semibold">Email</th>
+                <th className="py-2.5 px-4 font-semibold">Plan</th>
+                <th className="py-2.5 px-4 font-semibold">Status</th>
+                <th className="py-2.5 px-4 font-semibold">Sent</th>
+                <th className="py-2.5 px-4 font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invites.map((inv, index) => {
+                const uniqueKey = getUniqueKey(inv, index);
+                const planCode = inv.plan?.plan_code;
+                const planObj = PLANS.find((p) => p.apiValue === planCode);
+                
+                return (
+                  <tr key={uniqueKey} className="border-t border-[#F5F7FA]">
+                    <td className="py-2.5 px-4 text-[#252525] font-semibold">{inv.name}</td>
+                    <td className="py-2.5 px-4 text-[#535359]">{inv.phone || "NA"}</td>
+                    <td className="py-2.5 px-4 text-[#535359]">{inv.email}</td>
+                    <td className="py-2.5 px-4">
+                      {planObj ? (
+                        <span className={`inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${planObj.badgeColor}`}>
+                          {planObj.badge}
+                        </span>
+                      ) : (
+                        <span className="text-[#A1A1A1]">
+                          {inv.plan?.plan_name || inv.plan?.plan_code || "-"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-4">
+                      {getStatusBadge(inv.status)}
+                    </td>
+                    <td className="py-2.5 px-4 text-[#A1A1A1]">
+                      {inv.sent_on_date ? new Date(inv.sent_on_date).toLocaleString("en-US", {
+                        month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+                      }) : "-"}
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <div className="flex items-center gap-2">
+                        {inv.actions?.can_resend && (
+                          <button
+                            type="button"
+                            onClick={() => handleResendClick(inv, index)}
+                            disabled={actionInProgress[`resend-${uniqueKey}`]}
+                            className="rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#d9e8fd] disabled:opacity-60 cursor-pointer"
+                          >
+                            {actionInProgress[`resend-${uniqueKey}`] ? "Sending..." : "Resend"}
+                          </button>
+                        )}
+                        {inv.actions?.can_revoke && (
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeClick(inv)}
+                            disabled={actionInProgress[`revoke-${uniqueKey}`]}
+                            className="rounded-full bg-[#FCEAEB] text-[#B5363A] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#f8d4d5] disabled:opacity-60 cursor-pointer"
+                          >
+                            {actionInProgress[`revoke-${uniqueKey}`] ? "Revoking..." : "Revoke"}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Controls */}
+        {pagination && (
+          <div className="flex items-center justify-between mt-4 px-2">
+            <div className="text-[#A1A1A1] text-[12px]">
+              Page {pagination.page} of {Math.ceil((summary?.total_count || 0) / pagination.limit)}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onPageChange(pagination.page - 1)}
+                disabled={pagination.page <= 1}
+                className="rounded-[8px] border border-[#E1E6ED] px-3 py-1.5 text-[12px] font-semibold text-[#535359] disabled:opacity-40 hover:bg-[#F5F7FA] transition-colors cursor-pointer"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => onPageChange(pagination.page + 1)}
+                disabled={!pagination.has_more}
+                className="rounded-[8px] border border-[#E1E6ED] px-3 py-1.5 text-[12px] font-semibold text-[#535359] disabled:opacity-40 hover:bg-[#F5F7FA] transition-colors cursor-pointer"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Revoke Modal */}
+      <RevokeModal
+        isOpen={revokeModal.isOpen}
+        onClose={() => setRevokeModal({ isOpen: false, client: null })}
+        onConfirm={handleSubscriptionRevokeConfirm}
+        clientName={revokeModal.client?.name || ""}
+        isLoading={actionInProgress[`revoke-${getUniqueKey(revokeModal.client || {}, 0)}`]}
+      />
+    </>
   );
 }
 
 export default function ReferralsPage() {
   const [dietician, setDietician] = useState(null);
   const [invites, setInvites] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [pagination, setPagination] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const limit = 10;
 
   useEffect(() => {
     setDietician(cookieManager.getJSON("dietician"));
   }, []);
 
+  const fetchReferralList = useCallback(async (page = 1) => {
+    setIsLoading(true);
+    try {
+      const response = await fetchReferralClientListService(page, limit);
+      
+      if (response?.status || response?.ok) {
+        setInvites(response.data || []);
+        setSummary(response.summary || null);
+        setPagination(response.pagination || null);
+      } else {
+        toast.error(response?.message || "Failed to fetch clients");
+      }
+    } catch (error) {
+      const msg = error?.data?.message || error?.message || "Failed to fetch referral list";
+      toast.error(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchReferralList(currentPage);
+  }, [currentPage, fetchReferralList]);
+
   const partnerCode = resolvePartnerCode(dietician);
   const name = dietician?.name || "";
 
-  const onSent = (invite) => setInvites((list) => [invite, ...list]);
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
+
+  const handleInviteSent = () => {
+    setCurrentPage(1);
+    fetchReferralList(1);
+  };
+
+  const handleResend = async (inv) => {
+    const trainerId = inv.trainer_id || partnerCode;
+    if (!trainerId) return toast.error("Session expired. Please log in again.");
+
+    try {
+      await resendTrainerClientInviteService({
+        inviteId: inv.invite_id || inv.subscription_id,
+        trainerID: trainerId,
+        clientName: inv.name,
+        clientMobile: inv.phone,
+        clientEmail: inv.email,
+        plan: inv.plan?.plan_code,
+      });
+      toast.success(`Invite resent to ${inv.name}`);
+      fetchReferralList(currentPage);
+    } catch (err) {
+      const msg = err?.data?.message || err?.message || "";
+      if (msg.toLowerCase().includes("already has a pending invitation")) {
+        toast.success(`Invite resent to ${inv.name}`);
+        fetchReferralList(currentPage);
+      } else {
+        toast.error(msg || "Could not resend invite.");
+      }
+    }
+  };
+
+  const handleSubscriptionResend = async (inv) => {
+    try {
+      await resendClientSubscriptionInviteService({
+        subscriptionId: inv.subscription_id,
+      });
+      toast.success(`Subscription invitation for ${inv.name} resent successfully.`);
+      fetchReferralList(currentPage);
+    } catch (err) {
+      toast.error(err?.data?.message || err?.message || "Could not resend subscription invite.");
+      throw err; // Re-throw to handle in the UI
+    }
+  };
+
+  const handleRevoke = async (inv) => {
+    try {
+      await revokeTrainerClientInviteService({ 
+        inviteId: inv.invite_id || inv.subscription_id 
+      });
+      toast.success(`Invite to ${inv.name} revoked.`);
+      fetchReferralList(currentPage);
+    } catch (err) {
+      toast.error(err?.data?.message || err?.message || "Could not revoke invite.");
+    }
+  };
+
+  const handleSubscriptionRevoke = async (inv, reason) => {
+    try {
+      await revokeClientSubscriptionInviteService({
+        subscriptionId: inv.subscription_id,
+        reason: reason,
+      });
+      toast.success(`Subscription invitation for ${inv.name} revoked successfully.`);
+      fetchReferralList(currentPage);
+    } catch (err) {
+      toast.error(err?.data?.message || err?.message || "Could not revoke subscription invite.");
+      throw err; // Re-throw to handle in the modal
+    }
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -265,19 +717,29 @@ export default function ReferralsPage() {
         <h2 className="text-[#252525] text-[16px] font-bold">Referrals</h2>
         <p className="text-[#535359] text-[13px] mt-1">
           Share your partner code, send invites, and track which clients have
-          been invited.
+          been invited. Select a plan and the client receives a code for that plan.
         </p>
       </div>
 
       <PartnerCodeCard code={partnerCode} name={name} />
 
-      <InviteForm partnerCode={partnerCode} onSent={onSent} />
+      <InviteForm partnerCode={partnerCode} onInviteSent={handleInviteSent} />
 
       <div>
         <h3 className="text-[#252525] text-[14px] font-bold mb-3">
-          Pending invites
+          All Clients ({summary?.total_count || 0})
         </h3>
-        <PendingInvites invites={invites} />
+        <PendingInvites
+          invites={invites}
+          onResend={handleResend}
+          onRevoke={handleRevoke}
+          isLoading={isLoading}
+          onPageChange={handlePageChange}
+          pagination={pagination}
+          summary={summary}
+          onSubscriptionRevoke={handleSubscriptionRevoke}
+          onSubscriptionResend={handleSubscriptionResend}
+        />
       </div>
     </div>
   );

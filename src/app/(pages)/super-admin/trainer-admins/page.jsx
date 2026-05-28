@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import Cookies from "js-cookie";
 import {
   fetchTrainerAdminListService,
   inviteTrainerAdminService,
+  resendTrainerAdminInviteService,
+  revokeTrainerAdminInviteService,
 } from "@/services/authService";
+import { getCurrentUser } from "@/lib/user";
+import TrainersList from "@/components/super-admin/TrainersList";
+
 
 const isValidEmail = (emailAddress) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress);
@@ -18,6 +24,59 @@ const formatDateTime = (dateTimeValue) => {
   if (!dateTimeValue) return "-";
   return dateTimeValue;
 };
+
+function getActorEmail() {
+  try {
+    const token = Cookies.get("access_token");
+    if (token && token.split(".").length === 3) {
+      const payload = token.split(".")[1];
+      const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+      const json = decodeURIComponent(
+        atob(base64).split("").map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`).join("")
+      );
+      const decoded = JSON.parse(json);
+      if (decoded?.email || decoded?.user_id) {
+        return decoded.email || decoded.user_id;
+      }
+    }
+
+    const userCookie = Cookies.get("user");
+    if (userCookie) {
+      const user = JSON.parse(userCookie);
+      return user?.email || user?.user_id || "Unknown";
+    }
+
+    return "Unknown";
+  } catch {
+    return "Unknown";
+  }
+}
+
+function formatAuditDate(dateValue) {
+  if (!dateValue) return "";
+  const d = new Date(dateValue);
+  if (Number.isNaN(d.getTime())) return String(dateValue);
+  return d.toLocaleString("en-US", {
+    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+  });
+}
+
+const AUDIT_ACTION_STYLES = {
+  invited: "bg-[#E5F6EE] text-[#1F7A4A]",
+  resent: "bg-[#EEF4FE] text-[#308BF9]",
+  revoked: "bg-[#FCEAEB] text-[#B5363A]",
+  rejected: "bg-[#FFF4E0] text-[#A66B00]",
+  "accepted (email)": "bg-[#E5F6EE] text-[#1F7A4A]",
+  "accepted (phone)": "bg-[#E5F6EE] text-[#1F7A4A]",
+};
+
+function isInvitationExpired(invitation) {
+  if (String(invitation?.status || "").toLowerCase() === "expired") return true;
+  if (!invitation?.expires_at) return false;
+  const expiresAt = new Date(String(invitation.expires_at).replace(" ", "T"));
+  if (Number.isNaN(expiresAt.getTime())) return false;
+  return expiresAt.getTime() < Date.now();
+}
 
 const formatOverrideMonthly = (overrideMonthly) => {
   if (overrideMonthly === null || overrideMonthly === undefined) return "-";
@@ -144,7 +203,7 @@ function InviteForm({ onInvitationSent }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
-          <label className={labelClassName}>First name</label>
+          <label className={labelClassName}>First name <span className="text-red-500">*</span></label>
           <input
             className={inputClassName}
             value={firstName}
@@ -155,7 +214,7 @@ function InviteForm({ onInvitationSent }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className={labelClassName}>Last name</label>
+          <label className={labelClassName}>Last name <span className="text-red-500">*</span></label>
           <input
             className={inputClassName}
             value={lastName}
@@ -166,7 +225,7 @@ function InviteForm({ onInvitationSent }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className={labelClassName}>Email</label>
+          <label className={labelClassName}>Email <span className="text-red-500">*</span></label>
           <input
             className={inputClassName}
             value={emailAddress}
@@ -178,7 +237,7 @@ function InviteForm({ onInvitationSent }) {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className={labelClassName}>Phone</label>
+          <label className={labelClassName}>Phone <span className="text-red-500">*</span></label>
           <input
             className={inputClassName}
             value={phoneNumber}
@@ -207,7 +266,7 @@ function InviteForm({ onInvitationSent }) {
   );
 }
 
-function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
+function ExistingTrainerAdminsTable({ existingTrainerAdmins, onSelectTrainerAdmin }) {
   if (existingTrainerAdmins.length === 0) {
     return (
       <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
@@ -227,9 +286,6 @@ function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
               Trainers
             </th>
             <th className="py-2.5 px-4 font-semibold text-right">Clients</th>
-            <th className="py-2.5 px-4 font-semibold text-right">
-              Override / mo
-            </th>
             <th className="py-2.5 px-4 font-semibold">Status</th>
           </tr>
         </thead>
@@ -244,14 +300,13 @@ function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
                 className="border-t border-[#F5F7FA] hover:bg-[#F5F7FA]"
               >
                 <td className="py-2.5 px-4">
-                  <Link
-                    href={`/super-admin/trainer-admins/${
-                      trainerAdmin.role_id || trainerAdmin.user_id
-                    }`}
-                    className="text-[#308BF9] font-semibold hover:underline"
+                  <button
+                    type="button"
+                    onClick={() => onSelectTrainerAdmin(trainerAdmin)}
+                    className="text-[#308BF9] font-semibold hover:underline cursor-pointer text-left"
                   >
                     {trainerAdmin.name || "-"}
-                  </Link>
+                  </button>
 
                   <div className="text-[#A1A1A1] text-[11px]">
                     {trainerAdmin.email || "-"}
@@ -268,10 +323,6 @@ function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
 
                 <td className="py-2.5 px-4 text-right text-[#252525]">
                   {trainerAdmin.clients_count ?? 0}
-                </td>
-
-                <td className="py-2.5 px-4 text-right text-[#252525] font-semibold">
-                  {formatOverrideMonthly(trainerAdmin.override_monthly)}
                 </td>
 
                 <td className="py-2.5 px-4">
@@ -294,7 +345,70 @@ function ExistingTrainerAdminsTable({ existingTrainerAdmins }) {
   );
 }
 
-function PendingAdminInvitationsTable({ pendingAdminInvitations }) {
+function PendingAdminInvitationsTable({ pendingAdminInvitations, onResend, onRevoke, auditLogs }) {
+  console.log("pendingAdminInvitations336:-", pendingAdminInvitations);
+  const [actionInProgress, setActionInProgress] = useState({});
+  const [expandedRows, setExpandedRows] = useState({});
+  const [revokeModalInvitation, setRevokeModalInvitation] = useState(null);
+  const [revokeReason, setRevokeReason] = useState("");
+  const [isSubmittingRevokeReason, setIsSubmittingRevokeReason] = useState(false);
+
+  const toggleRow = (id) => {
+    setExpandedRows((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleResend = async (invitation) => {
+    const key = `resend-${invitation.invitation_id}`;
+    setActionInProgress((prev) => ({ ...prev, [key]: true }));
+    try {
+      await onResend(invitation);
+    } finally {
+      setActionInProgress((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleRevoke = async (invitation) => {
+    if (isInvitationExpired(invitation)) {
+      const key = `revoke-${invitation.invitation_id}`;
+      setActionInProgress((prev) => ({ ...prev, [key]: true }));
+      try {
+        await onRevoke(invitation, "");
+      } finally {
+        setActionInProgress((prev) => ({ ...prev, [key]: false }));
+      }
+      return;
+    }
+
+    setRevokeReason("");
+    setRevokeModalInvitation(invitation);
+  };
+
+  const closeRevokeModal = () => {
+    if (isSubmittingRevokeReason) return;
+    setRevokeModalInvitation(null);
+    setRevokeReason("");
+  };
+
+  const submitRevokeReason = async () => {
+    const trimmedReason = revokeReason.trim();
+    if (trimmedReason.length === 0) {
+      return toast.error("Please provide a reason for revoking.");
+    }
+
+    const invitation = revokeModalInvitation;
+    const key = `revoke-${invitation.invitation_id}`;
+    setIsSubmittingRevokeReason(true);
+    setActionInProgress((prev) => ({ ...prev, [key]: true }));
+    try {
+      await onRevoke(invitation, trimmedReason);
+      setRevokeModalInvitation(null);
+      setRevokeReason("");
+    } finally {
+      setIsSubmittingRevokeReason(false);
+      setActionInProgress((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
   if (pendingAdminInvitations.length === 0) {
     return (
       <div className="rounded-[10px] border border-dashed border-[#E1E6ED] p-6 text-[#A1A1A1] text-[12px] text-center">
@@ -304,6 +418,7 @@ function PendingAdminInvitationsTable({ pendingAdminInvitations }) {
   }
 
   return (
+    <>
     <div className="overflow-x-auto rounded-[10px] border border-[#E1E6ED]">
       <table className="w-full text-[12px]">
         <thead>
@@ -314,45 +429,161 @@ function PendingAdminInvitationsTable({ pendingAdminInvitations }) {
             <th className="py-2.5 px-4 font-semibold">Partner code</th>
             <th className="py-2.5 px-4 font-semibold">Status</th>
             <th className="py-2.5 px-4 font-semibold">Expires</th>
+            <th className="py-2.5 px-4 font-semibold">Actions</th>
           </tr>
         </thead>
 
         <tbody>
-          {pendingAdminInvitations.map((pendingInvitation) => (
-            <tr
-              key={pendingInvitation.invitation_id}
-              className="border-t border-[#F5F7FA]"
-            >
-              <td className="py-2.5 px-4 text-[#252525] font-semibold">
-                {pendingInvitation.name || "-"}
-              </td>
+          {pendingAdminInvitations.map((pendingInvitation) => {
+            const invId = pendingInvitation.invitation_id;
+            const resendKey = `resend-${invId}`;
+            const revokeKey = `revoke-${invId}`;
+            const isExpanded = expandedRows[invId];
+            const logs = auditLogs[invId] || [];
 
-              <td className="py-2.5 px-4 text-[#535359]">
-                {pendingInvitation.email || "-"}
-              </td>
+            return (
+              <Fragment key={invId}>
+                <tr className="border-t border-[#F5F7FA]">
+                  <td className="py-2.5 px-4">
+                    <button
+                      type="button"
+                      onClick={() => toggleRow(invId)}
+                      className="flex items-center gap-1.5 text-[#252525] font-semibold hover:text-[#308BF9] cursor-pointer text-left"
+                    >
+                      <span className={`text-[10px] transition-transform ${isExpanded ? "rotate-90" : ""}`}>&#9654;</span>
+                      {pendingInvitation.name || "-"}
+                      {logs.length > 0 && (
+                        <span className="text-[10px] text-[#A1A1A1] font-normal">({logs.length})</span>
+                      )}
+                    </button>
+                  </td>
 
-              <td className="py-2.5 px-4 text-[#535359]">
-                {pendingInvitation.phone_no || "-"}
-              </td>
+                  <td className="py-2.5 px-4 text-[#535359]">
+                    {pendingInvitation.email || "-"}
+                  </td>
 
-              <td className="py-2.5 px-4 text-[#535359] font-mono">
-                {pendingInvitation.partner_code || "-"}
-              </td>
+                  <td className="py-2.5 px-4 text-[#535359]">
+                    {pendingInvitation.phone_no || "-"}
+                  </td>
 
-              <td className="py-2.5 px-4">
-                <span className="inline-flex rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5">
-                  {pendingInvitation.status || "pending"}
-                </span>
-              </td>
+                  <td className="py-2.5 px-4 text-[#535359] font-mono">
+                    {pendingInvitation.partner_code || "-"}
+                  </td>
 
-              <td className="py-2.5 px-4 text-[#A1A1A1]">
-                {formatDateTime(pendingInvitation.expires_at)}
-              </td>
-            </tr>
-          ))}
+                  <td className="py-2.5 px-4">
+                    <span className="inline-flex rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5">
+                      {pendingInvitation.status || "pending"}
+                    </span>
+                  </td>
+
+                  <td className="py-2.5 px-4 text-[#A1A1A1]">
+                    {formatDateTime(pendingInvitation.expires_at)}
+                  </td>
+
+                  <td className="py-2.5 px-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleResend(pendingInvitation)}
+                        disabled={actionInProgress[resendKey]}
+                        className="rounded-full bg-[#EEF4FE] text-[#308BF9] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#d9e8fd] disabled:opacity-60 cursor-pointer"
+                      >
+                        {actionInProgress[resendKey] ? "Sending..." : "Resend"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRevoke(pendingInvitation)}
+                        disabled={actionInProgress[revokeKey]}
+                        className="rounded-full bg-[#FCEAEB] text-[#B5363A] text-[11px] font-semibold px-2.5 py-0.5 hover:bg-[#f8d4d5] disabled:opacity-60 cursor-pointer"
+                      >
+                        {actionInProgress[revokeKey] ? "Revoking..." : "Revoke"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+
+                {isExpanded && (
+                  <tr className="bg-[#FAFBFC]">
+                    <td colSpan={7} className="px-4 py-3">
+                      <div className="ml-4 border-l-2 border-[#E1E6ED] pl-4">
+                        <p className="text-[11px] font-semibold text-[#535359] mb-2">Audit log</p>
+                        {logs.length === 0 ? (
+                          <p className="text-[11px] text-[#A1A1A1]">No activity recorded yet.</p>
+                        ) : (
+                          <div className="flex flex-col gap-1.5">
+                            {logs.map((log, idx) => (
+                              <div key={idx} className="flex items-center gap-2 text-[11px]">
+                                <span className={`inline-flex rounded-full font-semibold px-2 py-0.5 ${AUDIT_ACTION_STYLES[log.action] || "bg-[#F5F7FA] text-[#535359]"}`}>
+                                  {log.action}
+                                </span>
+                                <span className="text-[#535359]">by <span className="font-semibold">{log.actor}</span></span>
+                                {log.detail && <span className="text-[#535359] italic">{log.detail}</span>}
+                                <span className="text-[#A1A1A1]">{formatAuditDate(log.timestamp)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
+
+    {revokeModalInvitation && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+        onClick={closeRevokeModal}
+      >
+        <div
+          className="w-full max-w-[420px] rounded-[12px] bg-white p-5 shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-[#252525] text-[15px] font-bold">
+            Revoke invite
+          </h3>
+          <p className="text-[#535359] text-[12px] mt-1">
+            Tell {revokeModalInvitation.name || revokeModalInvitation.email || "this user"} why their invite is being revoked.
+          </p>
+
+          <label className="block mt-4 text-[#535359] text-[12px] font-semibold">
+            Reason <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={revokeReason}
+            onChange={(e) => setRevokeReason(e.target.value)}
+            placeholder="e.g. Wrong email"
+            rows={3}
+            disabled={isSubmittingRevokeReason}
+            className="mt-1 w-full rounded-[10px] border border-[#E1E6ED] bg-white px-3 py-2.5 text-[13px] text-[#252525] focus:outline-none focus:border-[#308BF9] resize-none"
+          />
+
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={closeRevokeModal}
+              disabled={isSubmittingRevokeReason}
+              className="rounded-[10px] bg-[#F5F7FA] text-[#535359] text-[12px] font-semibold px-4 py-2 disabled:opacity-60 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submitRevokeReason}
+              disabled={isSubmittingRevokeReason}
+              className="rounded-[10px] bg-[#B5363A] text-white text-[12px] font-semibold px-4 py-2 disabled:opacity-60 cursor-pointer"
+            >
+              {isSubmittingRevokeReason ? "Revoking..." : "Submit"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -366,9 +597,23 @@ export default function TrainerAdminsPage() {
     total_clients: 0,
   });
 
+  const [auditLogs, setAuditLogs] = useState({});
+
   const [isLoadingTrainerAdmins, setIsLoadingTrainerAdmins] = useState(true);
   const [trainerAdminsErrorMessage, setTrainerAdminsErrorMessage] =
     useState("");
+
+  const [selectedTrainerAdmin, setSelectedTrainerAdmin] = useState(null);
+
+  const addAuditEntry = (invitationId, action, detail = null) => {
+    setAuditLogs((prev) => ({
+      ...prev,
+      [invitationId]: [
+        ...(prev[invitationId] || []),
+        { action, actor: getActorEmail(), timestamp: new Date().toISOString(), detail },
+      ],
+    }));
+  };
 
   const loadTrainerAdmins = async () => {
     setIsLoadingTrainerAdmins(true);
@@ -377,7 +622,31 @@ export default function TrainerAdminsPage() {
     try {
       const trainerAdminsResponse = await fetchTrainerAdminListService();
 
-      setExistingTrainerAdmins(trainerAdminsResponse?.existing || []);
+      const existingFromApi = trainerAdminsResponse?.existing || [];
+
+      const currentUser = getCurrentUser();
+      if (currentUser?.role === "super_admin" && currentUser?.partner_code) {
+        const alreadyInList = existingFromApi.some(
+          (ta) => ta.user_id === currentUser.user_id || ta.partner_code === currentUser.partner_code
+        );
+        if (!alreadyInList) {
+          const taClientsCount = existingFromApi.reduce((sum, ta) => sum + (ta.clients_count ?? 0), 0);
+          const totalClients = trainerAdminsResponse?.totals?.total_clients ?? 0;
+
+          existingFromApi.unshift({
+            role_id: "sa-self",
+            user_id: currentUser.user_id,
+            name: `${currentUser.first_name} ${currentUser.last_name}`.trim() || "Super Admin",
+            email: currentUser.email || currentUser.user_id,
+            partner_code: currentUser.partner_code,
+            trainers_count: existingFromApi.length,
+            clients_count: Math.max(0, totalClients - taClientsCount),
+            status: "active",
+          });
+        }
+      }
+
+      setExistingTrainerAdmins(existingFromApi);
       setPendingAdminInvitations(
         trainerAdminsResponse?.pending_invites || []
       );
@@ -418,7 +687,58 @@ export default function TrainerAdminsPage() {
       ...currentTotals,
       pending_count: Number(currentTotals.pending_count || 0) + 1,
     }));
+
+    addAuditEntry(newAdminInvitation.invitation_id, "invited", `to ${newAdminInvitation.email}`);
   };
+
+  const handleResendInvite = async (invitation) => {
+    try {
+      await resendTrainerAdminInviteService({
+        invitationId: invitation.invitation_id,
+      });
+      addAuditEntry(invitation.invitation_id, "resent", `to ${invitation.email}`);
+      toast.success(`Invite resent to ${invitation.name || invitation.email}`);
+    } catch (error) {
+      toast.error(
+        error?.data?.message || error?.message || "Could not resend invite."
+      );
+    }
+  };
+
+  const handleRevokeInvite = async (invitation, reason = "") => {
+    try {
+      await revokeTrainerAdminInviteService({
+        invitationId: invitation.invitation_id,
+        reason,
+      });
+      addAuditEntry(
+        invitation.invitation_id,
+        "revoked",
+        reason ? `reason: ${reason}` : null
+      );
+      setPendingAdminInvitations((current) =>
+        current.filter((inv) => inv.invitation_id !== invitation.invitation_id)
+      );
+      setTrainerAdminTotals((currentTotals) => ({
+        ...currentTotals,
+        pending_count: Math.max(0, Number(currentTotals.pending_count || 0) - 1),
+      }));
+      toast.success(`Invite to ${invitation.name || invitation.email} revoked.`);
+    } catch (error) {
+      toast.error(
+        error?.data?.message || error?.message || "Could not revoke invite."
+      );
+    }
+  };
+
+  if (selectedTrainerAdmin) {
+    return (
+      <TrainersList
+        trainerAdmin={selectedTrainerAdmin}
+        onBack={() => setSelectedTrainerAdmin(null)}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -430,7 +750,7 @@ export default function TrainerAdminsPage() {
 
           <p className="text-[#535359] text-[13px] mt-1">
             Invite and manage Trainer Admins. They onboard their own trainers
-            and earn 20% override commission on their network.
+            and earn commission on their network.
           </p>
         </div>
 
@@ -502,6 +822,7 @@ export default function TrainerAdminsPage() {
         ) : (
           <ExistingTrainerAdminsTable
             existingTrainerAdmins={existingTrainerAdmins}
+            onSelectTrainerAdmin={setSelectedTrainerAdmin}
           />
         )}
       </div>
@@ -518,6 +839,9 @@ export default function TrainerAdminsPage() {
         ) : (
           <PendingAdminInvitationsTable
             pendingAdminInvitations={pendingAdminInvitations}
+            onResend={handleResendInvite}
+            onRevoke={handleRevokeInvite}
+            auditLogs={auditLogs}
           />
         )}
       </div>

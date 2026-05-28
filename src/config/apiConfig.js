@@ -17,6 +17,8 @@ export const API_ENDPOINTS = {
   CLIENT:{
     CLIENTTABLE:"/dietitian/api/web/get_clients_with_diet_plan.php",
      CLIENTS_DASHBOARD:"/dietitian/api/web/get-clients-data-total-missed-test.php",
+     CLIENTS_DASHBOARD_MASKED:"/dietitian/api/web/get-clients-data-total-missed-test-masked.php",
+     TRAINERADMINCLIENTSLISTDIR:"/dietitian/api/web/trainer-admin-clients-list-dir.php",
   },
   CALENDER:{
 CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
@@ -35,6 +37,7 @@ CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
     CLIENTPROFILEDATA:"/dietitian/api/web/get_client_data.php",
     CLIENTPROFILEDETAILS:"/dietitian/api/web/get-graph-all-seven-trends-graph.php",
     CLIENTINDIVIDUALPROFILE:"/dietitian/api/web/get-data-points-score-all-ranges-coach.php",
+    CLIENTINDIVIDUALPROFILEMASKING:"/dietitian/api/web/get-data-points-score-all-ranges-coach-masking.php",
     CLIENTPROFILEDATESLIST:"/dietitian/api/web/get-profile-details-dates-taken.php",
     CLIENTWEEKLYDATES:"/dietitian/api/web/get-weekly-tab-list.php",
     GETCLIENTPROFILEDETAILS:"/dietitian/api/web/get_client_profile_details.php"
@@ -69,7 +72,8 @@ CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
     GETMACROSUMMARY:"/dietitian/api/app/get_macro_summary_by_date.php"
   },
   HABITMONITORING:{
-    GETHABITSDATA:"/dietitian/api/web/habits-tracking-users-choice1.php"
+    GETHABITSDATA:"/dietitian/api/web/habits-tracking-users-choice1.php",
+    GETHABITDETAIL:"/dietitian/api/web/get-client-selected-habit-detail.php"
   },
   LEVELUPDATE:{
 LEVEL:"/dietitian/api/web/level-type-update-change.php"
@@ -79,11 +83,30 @@ TRAINER:{
 },
 ADMINPANEL:{
   INVITETRAINERADMIN:"/dietitian/api/web/super-admin-invite-admin.php",
-  TRAINERADMINLIST:"/dietitian/api/web/list-admin-trainer-users-jwt.php",
+  SUPERADMINOVERVIEW:"/dietitian/api/web/super-admin-overview.php",
+  TRAINERADMINLIST:"/dietitian/api/web/list-admin-trainer-users.php",
+  LISTALLTRAINERSFORSUPERADMIN:"/dietitian/api/web/list-all-trainers-for-super-admin.php",
+  TRAINERCLIENTSOVERVIEWFORSUPERADMIN:"/dietitian/api/web/trainer-clients-overview-for-super-admin.php",
+  REVOKETRAINERADMININVITE:"/dietitian/api/web/revoke-admin-invite.php",
+  RESENDUSERINVITE:"/dietitian/api/web/resend-user-invite.php",
+  REVOKEUSERINVITE:"/dietitian/api/web/revoke-user-invite.php",
 
-  INVITETRAINER:"/dietitian/api/web/send_trainer_client_invite.php",
-  TRAINERLISTINVITES:"/dietitian/api/web/list-trainer-client-invites.php"
+  INVITETRAINER:"/dietitian/api/web/admin-invite-trainer.php",
+  TRAINERLISTINVITES:"/dietitian/api/web/trainer-admin-overview.php",
+  REVOKETRAINERCLIENTINVITE:"/dietitian/api/web/revoke-trainer-client-invite.php",
+  TRAINERADMINTRAINERSUMMARY:"/dietitian/api/web/trainer-admin-trainers-summary.php",
+  SENDTRAINERCLIENTINVITE:"/dietitian/api/web/send_trainer_client_invite.php",
+  REFERRALCLIENTLIST:"/dietitian/api/web/referral-client-list.php",
+REVOKECLIENTSUBSCRIPTIONINVITE:"/dietitian/api/web/revoke-client-subscription-invite.php",
+RESENDCLIENTSUBSCRIPTIONINVITE:"/dietitian/api/web/resend-client-subscription-invite.php",
 
+
+  VALIDATEINVITETOKEN:"/dietitian/api/web/validate-invite-token.php",
+  ACCEPTINVITE:"/dietitian/api/web/accept-invite.php",
+  INVITEPREVIEW:"/dietitian/api/web/invite-preview.php",
+
+  // Internal Next.js API routes (relative — not prefixed with API_BASE_URL)
+  LISTUSERSINTERNAL:"/api/admin/list-users"
 }
   
   

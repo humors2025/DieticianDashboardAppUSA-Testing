@@ -14,6 +14,22 @@ import ApproveConfirmationPopup from "./pop-folder/approve-confirmation-popup";
 import { approveDietPlanService } from "../services/authService";
 import { cookieManager } from "../lib/cookies";
 
+function decodeJwt(token) {
+  try {
+    const payload = token.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
 const MEAL_TYPES = [
   { key: "breakfast", label: "Breakfast" },
   { key: "lunch", label: "Lunch" },
@@ -26,6 +42,13 @@ export default function DietPlanLargeSize() {
   const [showApprovePopup, setShowApprovePopup] = useState(false);
   const [isApproved, setIsApproved] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    const token = cookieManager.get("access_token");
+    const decoded = token ? decodeJwt(token) : null;
+    setIsSuperAdmin(decoded?.role === "super_admin");
+  }, []);
 
   const searchParams = useSearchParams();
   const profileId = searchParams.get("profile_id");
@@ -229,48 +252,50 @@ export default function DietPlanLargeSize() {
         )}
       </div>
 
-      <div className="flex gap-2.5 justify-end mt-2">
-        {!isApproved && (
-          <p className="py-[11px] text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
-            Auto-approved if not reviewed within 24 hours
-          </p>
-        )}
+      {!isSuperAdmin && (
+        <div className="flex gap-2.5 justify-end mt-2">
+          {!isApproved && (
+            <p className="py-[11px] text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
+              Auto-approved if not reviewed within 24 hours
+            </p>
+          )}
 
-        <div className="flex gap-2.5">
-          {/* Approve / Approved Button */}
-          <div
-            onClick={() => {
-              if (!isApproved && !isApproving) {
-                setShowApprovePopup(true);
-              }
-            }}
-            aria-disabled={isApproved || isApproving}
-            className={[
-              "flex items-center gap-[5px] justify-center px-[11px] py-1 rounded-[4px]",
-              isApproved || isApproving
-                ? "bg-[#E1E6ED] cursor-not-allowed"
-                : "bg-[#308BF9] cursor-pointer",
-            ].join(" ")}
-          >
-            <Image
-              src="/icons/hugeicons_tick-0236.svg"
-              alt="approve-icon"
-              width={20}
-              height={20}
-              className={isApproved ? "opacity-50 grayscale" : ""}
-            />
-
-            <span
+          <div className="flex gap-2.5">
+            {/* Approve / Approved Button */}
+            <div
+              onClick={() => {
+                if (!isApproved && !isApproving) {
+                  setShowApprovePopup(true);
+                }
+              }}
+              aria-disabled={isApproved || isApproving}
               className={[
-                "text-[12px] font-semibold leading-normal tracking-[-0.24px]",
-                isApproved ? "text-[#738298]" : "text-white",
+                "flex items-center gap-[5px] justify-center px-[11px] py-1 rounded-[4px]",
+                isApproved || isApproving
+                  ? "bg-[#E1E6ED] cursor-not-allowed"
+                  : "bg-[#308BF9] cursor-pointer",
               ].join(" ")}
             >
-              {isApproved ? "Approved" : "Approve"}
-            </span>
+              <Image
+                src="/icons/hugeicons_tick-0236.svg"
+                alt="approve-icon"
+                width={20}
+                height={20}
+                className={isApproved ? "opacity-50 grayscale" : ""}
+              />
+
+              <span
+                className={[
+                  "text-[12px] font-semibold leading-normal tracking-[-0.24px]",
+                  isApproved ? "text-[#738298]" : "text-white",
+                ].join(" ")}
+              >
+                {isApproved ? "Approved" : "Approve"}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {showApprovePopup && !isApproved && (
         <ApproveConfirmationPopup

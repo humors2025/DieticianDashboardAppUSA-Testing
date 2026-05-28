@@ -3,9 +3,9 @@ import { fetchClientIndividualProfile } from "../services/authService";
 
 export const getClientIndividualProfile = createAsyncThunk(
   "clientIndividualProfile/getClientIndividualProfile",
-  async ({ profileId, date, dietitianId }, { rejectWithValue }) => {
+  async ({ profileId, date, dietitianId, masking = false }, { rejectWithValue }) => {
     try {
-      const response = await fetchClientIndividualProfile(profileId, date, dietitianId);
+      const response = await fetchClientIndividualProfile(profileId, date, dietitianId, { masking });
       return response;
     } catch (error) {
       return rejectWithValue(

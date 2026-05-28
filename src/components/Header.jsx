@@ -213,6 +213,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { ArrowLeftRight } from "lucide-react";
 import { cookieManager } from "../lib/cookies";
 import { toast } from "sonner";
 import NotificationModal from "./modal/notification-modal";
@@ -238,6 +239,25 @@ const MonoIcon = ({ src, size = 20, color = "#A1A1A1", alt = "" }) => (
   />
 );
 
+function decodeAccessTokenRole() {
+  try {
+    const token = cookieManager.get("access_token");
+    if (!token || typeof token !== "string") return null;
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join("")
+    );
+    return JSON.parse(jsonPayload)?.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -254,15 +274,20 @@ const hideHeaderPaths = [
   const [active, setActive] = useState(pathname);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
     setActive(pathname);
   }, [pathname]);
 
+  useEffect(() => {
+    setUserRole(decodeAccessTokenRole());
+  }, []);
+
   const menu = [
-    { name: "Dashboard", icon: "/icons/hugeicons_home-05.svg", path: "/trainer/dashboard" },
-    { name: "Earnings", icon: "/icons/hugeicons_award-01.svg", path: "/trainer/earnings" },
-    { name: "Settings", icon: "/icons/hugeicons_settings-03.svg", path: "/trainer/settings" },
+    // { name: "Dashboard", icon: "/icons/hugeicons_home-05.svg", path: "/trainer/dashboard" },
+    // { name: "Earnings", icon: "/icons/hugeicons_award-01.svg", path: "/trainer/earnings" },
+    // { name: "Settings", icon: "/icons/hugeicons_settings-03.svg", path: "/trainer/settings" },
   ];
 
   const handleLogout = () => {
@@ -287,13 +312,23 @@ const hideHeaderPaths = [
     toast.info("Coming Soon");
   };
 
+  const handleSwitchClick = () => {
+    if (userRole === "admin") {
+      router.push("/trainer-admin/trainers");
+    } else if (userRole === "super_admin") {
+      router.push("/super-admin/overview");
+    }
+  };
+
+  const showSwitchButton = userRole === "admin" || userRole === "super_admin";
+
 
 
   return (
     <>
       <div className="flex justify-between bg-[#F5F7FA] p-4">
       <div className="flex">
-  <Link href="/trainer/dashboard">
+  <Link href={userRole === "super_admin" ? "/super-admin/overview" : "/trainer/dashboard"}>
     <div className="flex flex-col items-center">
       <img src="/icons/logorespyr.png" alt="logo" width={50} height={50} />
       {/* <p className="text-[#252525] text-[12px] font-normal">Beta 1.0</p> */}
@@ -322,6 +357,19 @@ const hideHeaderPaths = [
               </Link>
             );
           })}
+
+          {showSwitchButton && (
+            <button
+              type="button"
+              onClick={handleSwitchClick}
+              className="flex items-center gap-1.5 cursor-pointer rounded-[15px] px-[20px] py-[15px] bg-white"
+            >
+              <ArrowLeftRight size={18} color="#308BF9" /> 
+              <span className="font-semibold text-[12px]" style={{ color: "#308BF9" }}>
+                Admin Panel
+              </span>
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-5">

@@ -4,7 +4,9 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cookieManager } from "@/lib/cookies";
+import { ROLES } from "@/lib/user";
 import { toast } from "sonner";
+import RoleSwitcher, { isSwitchedView } from "@/components/RoleSwitcher";
 
 const MonoIcon = ({ src, size = 20, color = "#A1A1A1", alt = "" }) => (
   <span
@@ -31,7 +33,7 @@ const MENU = [
   { name: "Overview",       icon: "/icons/hugeicons_home-05.svg",         path: "/super-admin/overview" },
   { name: "Trainer Admins", icon: "/icons/hugeicons_user-group.png",      path: "/super-admin/trainer-admins" },
   { name: "Trainers",       icon: "/icons/hugeicons_award-01.svg",        path: "/super-admin/trainers" },
-  { name: "Clients",        icon: "/icons/hugeicons_user.svg",            path: "/super-admin/clients" },
+  { name: "Client Directory", icon: "/icons/hugeicons_user.svg",          path: "/super-admin/client-directory" },
   { name: "Payouts",        icon: "/icons/hugeicons_file-export.svg",     path: "/super-admin/payouts" },
   { name: "Audit log",      icon: "/icons/hugeicons_note-01.svg",         path: "/super-admin/audit-logs" },
   { name: "Settings",       icon: "/icons/hugeicons_settings-03.svg",     path: "/super-admin/settings" },
@@ -75,28 +77,31 @@ export default function SuperAdminHeader() {
         </span>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto">
-        {MENU.map((m) => {
-          const isActive =
-            pathname === m.path ||
-            pathname?.startsWith(m.path + "/") ||
-            active === m.path;
-          const color = isActive ? "#308BF9" : "#A1A1A1";
+      <div className="flex gap-2 items-center">
+        <div className="flex gap-2 overflow-x-auto items-center">
+          {MENU.map((m) => {
+            const isActive =
+              pathname === m.path ||
+              pathname?.startsWith(m.path + "/") ||
+              active === m.path;
+            const color = isActive ? "#308BF9" : "#A1A1A1";
 
-          return (
-            <Link href={m.path} key={m.name}>
-              <button
-                className="flex items-center gap-1.5 cursor-pointer rounded-[15px] px-[16px] py-[12px] bg-white whitespace-nowrap"
-                onClick={() => setActive(m.path)}
-              >
-                <MonoIcon src={m.icon} color={color} alt={m.name} />
-                <span className="font-semibold text-[12px]" style={{ color }}>
-                  {m.name}
-                </span>
-              </button>
-            </Link>
-          );
-        })}
+            return (
+              <Link href={m.path} key={m.name}>
+                <button
+                  className="flex items-center gap-1.5 cursor-pointer rounded-[15px] px-[16px] py-[12px] bg-white whitespace-nowrap"
+                  onClick={() => setActive(m.path)}
+                >
+                  <MonoIcon src={m.icon} color={color} alt={m.name} />
+                  <span className="font-semibold text-[12px]" style={{ color }}>
+                    {m.name}
+                  </span>
+                </button>
+              </Link>
+            );
+          })}
+        </div>
+        <RoleSwitcher currentRole={ROLES.SUPER_ADMIN} />
       </div>
 
       <div className="flex items-center gap-3">

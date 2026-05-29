@@ -284,8 +284,13 @@ const hideHeaderPaths = [
     setUserRole(decodeAccessTokenRole());
   }, []);
 
+  const hideTrainerMenu =
+    userRole === "super_admin" &&
+    pathname?.startsWith("/superadmin-trainer/clients-profile");
+
   const menu =
-    userRole === "trainer"
+    !hideTrainerMenu &&
+    (userRole === "trainer" || userRole === "super_admin" || userRole === "admin")
       ? [
           { name: "Dashboard", icon: "/icons/hugeicons_home-05.svg", path: "/trainer/dashboard" },
           { name: "Earnings", icon: "/icons/hugeicons_award-01.svg", path: "/trainer/earnings" },

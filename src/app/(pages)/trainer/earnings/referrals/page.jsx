@@ -41,38 +41,38 @@ const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const isValidMobile = (m) => /^\+?[0-9\s\-()]{7,}$/.test(m);
 
 const PLANS = [
-  {
-    id: "free_trial",
-    apiValue: "free_trial",
-    label: "Free Trial",
-    price: "$0",
-    badge: "Free",
-    badgeColor: "bg-[#E5F6EE] text-[#1F7A4A]",
-  },
-  {
-    id: "monthly",
-    apiValue: "monthly",
-    label: "Monthly Plan",
-    price: "$50",
-    badge: "$50/mo",
-    badgeColor: "bg-[#EEF4FE] text-[#308BF9]",
-  },
-  {
-    id: "lease_quarterly",
-    apiValue: "lease_quarterly",
-    label: "Lease (Quarterly)",
-    price: "$150",
-    badge: "$150",
-    badgeColor: "bg-[#FFF4E0] text-[#A66B00]",
-  },
-  {
-    id: "yearly",
-    apiValue: "yearly",
-    label: "Yearly Plan",
-    price: "$300",
-    badge: "$300/yr",
-    badgeColor: "bg-[#F3EEFE] text-[#6B45BC]",
-  },
+  // {
+  //   id: "free_trial",
+  //   apiValue: "free_trial",
+  //   label: "Free Trial",
+  //   price: "$0",
+  //   badge: "Free",
+  //   badgeColor: "bg-[#E5F6EE] text-[#1F7A4A]",
+  // },
+  // {
+  //   id: "monthly",
+  //   apiValue: "monthly",
+  //   label: "Monthly Plan",
+  //   price: "$50",
+  //   badge: "$50/mo",
+  //   badgeColor: "bg-[#EEF4FE] text-[#308BF9]",
+  // },
+  // {
+  //   id: "lease_quarterly",
+  //   apiValue: "lease_quarterly",
+  //   label: "Lease (Quarterly)",
+  //   price: "$150",
+  //   badge: "$150",
+  //   badgeColor: "bg-[#FFF4E0] text-[#A66B00]",
+  // },
+  // {
+  //   id: "yearly",
+  //   apiValue: "yearly",
+  //   label: "Yearly Plan",
+  //   price: "$300",
+  //   badge: "$300/yr",
+  //   badgeColor: "bg-[#F3EEFE] text-[#6B45BC]",
+  // },
 ];
 
 // Revoke Confirmation Modal
@@ -173,33 +173,36 @@ function PartnerCodeCard({ code, name }) {
   };
 
   return (
-    <div className="bg-[#F5F7FA] rounded-[10px] p-5 flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <span className="text-[#A1A1A1] text-[11px] uppercase tracking-wide font-semibold">
-          Your partner code
-        </span>
-        <span className="text-[#535359] text-[12px]">
-          {name ? `${name} · ` : ""}Share this code so clients can attribute
-          their subscription to you.
-        </span>
-      </div>
+    // <div className="bg-[#F5F7FA] rounded-[10px] p-5 flex flex-col gap-3">
+    //   <div className="flex flex-col gap-1">
+    //     <span className="text-[#A1A1A1] text-[11px] uppercase tracking-wide font-semibold">
+    //       Your partner code
+    //     </span>
+    //     <span className="text-[#535359] text-[12px]">
+    //       {name ? `${name} · ` : ""}Share this code so clients can attribute
+    //       their subscription to you.
+    //     </span>
+    //   </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="bg-white rounded-[10px] px-4 py-3 border border-[#E1E6ED]">
-          <span className="text-[#252525] text-[20px] font-bold tracking-wide">
-            {code || "\u2014"}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={onCopy}
-          disabled={!code}
-          className="rounded-[10px] bg-[#308BF9] text-white text-[12px] font-semibold px-4 py-3 disabled:opacity-50 cursor-pointer"
-        >
-          {copied ? "Copied" : "Copy code"}
-        </button>
-      </div>
-    </div>
+    //   <div className="flex flex-wrap items-center gap-3">
+    //     <div className="bg-white rounded-[10px] px-4 py-3 border border-[#E1E6ED]">
+    //       <span className="text-[#252525] text-[20px] font-bold tracking-wide">
+    //         {code || "\u2014"}
+    //       </span>
+    //     </div>
+    //     <button
+    //       type="button"
+    //       onClick={onCopy}
+    //       disabled={!code}
+    //       className="rounded-[10px] bg-[#308BF9] text-white text-[12px] font-semibold px-4 py-3 disabled:opacity-50 cursor-pointer"
+    //     >
+    //       {copied ? "Copied" : "Copy code"}
+    //     </button>
+    //   </div>
+    // </div>
+    <>
+    
+    </>
   );
 }
 
@@ -246,7 +249,7 @@ function InviteForm({ partnerCode, onInviteSent }) {
     setSubmitting(true);
 
     try {
-      await sendTrainerClientInviteService({
+      const res = await sendTrainerClientInviteService({
         trainerId: trainerId,
         clientName: name.trim(),
         clientMobile: mobile.trim(),
@@ -254,8 +257,8 @@ function InviteForm({ partnerCode, onInviteSent }) {
         planCode: selectedPlan,
       });
 
-      const planObj = PLANS.find((p) => p.id === selectedPlan);
-      toast.success(`Invite sent to ${name.trim()} — ${planObj?.label}`);
+      const clientEmail = res?.data?.client_email || email.trim();
+      toast.success(`Invite sent to ${name.trim()} — ${clientEmail}`);
       reset();
       onInviteSent();
     } catch (err) {
@@ -319,7 +322,7 @@ function InviteForm({ partnerCode, onInviteSent }) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className={labelClass}>Select plan <span className="text-red-500">*</span></label>
+        {/* <label className={labelClass}>Free Trial <span className="text-red-500">*</span></label> */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {PLANS.map((plan) => (
             <button
@@ -489,7 +492,9 @@ function PendingInvites({
               <tr className="bg-[#F5F7FA] text-[#535359] text-left">
                 <th className="py-2.5 px-4 font-semibold">Name</th>
                 <th className="py-2.5 px-4 font-semibold">Mobile</th>
-                <th className="py-2.5 px-4 font-semibold">Email</th>
+                <th className="py-2.5 px-4 font-semibold">Invite Email</th>
+                <th className="py-2.5 px-4 font-semibold">Accepted Email</th>
+                <th className="py-2.5 px-4 font-semibold">Referral Code</th>
                 <th className="py-2.5 px-4 font-semibold">Plan</th>
                 <th className="py-2.5 px-4 font-semibold">Status</th>
                 <th className="py-2.5 px-4 font-semibold">Sent</th>
@@ -507,6 +512,12 @@ function PendingInvites({
                     <td className="py-2.5 px-4 text-[#252525] font-semibold">{inv.name}</td>
                     <td className="py-2.5 px-4 text-[#535359]">{inv.phone || "NA"}</td>
                     <td className="py-2.5 px-4 text-[#535359]">{inv.email}</td>
+                    <td className="py-2.5 px-4 text-[#535359]">
+                      {inv.accepted_email || inv.accepted_by_email || "-"}
+                    </td>
+                    <td className="py-2.5 px-4 text-[#535359]">
+                      {inv.referral_code || inv.code || inv.invite_code || "Yet to be done"}
+                    </td>
                     <td className="py-2.5 px-4">
                       {planObj ? (
                         <span className={`inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 ${planObj.badgeColor}`}>
@@ -716,7 +727,7 @@ export default function ReferralsPage() {
       <div>
         <h2 className="text-[#252525] text-[16px] font-bold">Referrals</h2>
         <p className="text-[#535359] text-[13px] mt-1">
-          Share your partner code, send invites, and track which clients have
+          Send invites, and track which clients have
           been invited. Select a plan and the client receives a code for that plan.
         </p>
       </div>

@@ -33,6 +33,7 @@ const MENU = [
   { name: "Overview",       icon: "/icons/hugeicons_home-05.svg",         path: "/super-admin/overview" },
   { name: "Trainer Admins", icon: "/icons/hugeicons_user-group.png",      path: "/super-admin/trainer-admins" },
   { name: "Trainers",       icon: "/icons/hugeicons_award-01.svg",        path: "/super-admin/trainers" },
+  { name: "Invites Trainers",        icon: "/icons/hugeicons_award-01.svg",        path: "/trainer-admin/invites" },
   { name: "Client Directory", icon: "/icons/hugeicons_user.svg",          path: "/super-admin/client-directory" },
   { name: "Payouts",        icon: "/icons/hugeicons_file-export.svg",     path: "/super-admin/payouts" },
   { name: "Audit log",      icon: "/icons/hugeicons_note-01.svg",         path: "/super-admin/audit-logs" },

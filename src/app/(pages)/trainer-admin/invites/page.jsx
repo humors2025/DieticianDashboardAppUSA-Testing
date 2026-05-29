@@ -5,10 +5,14 @@ import { toast } from "sonner";
 import Cookies from "js-cookie";
 import {
   inviteTrainerClientService,
+  superAdminInviteTrainerService,
   // fetchTrainerClientInvitesService,
   fetchTrainerAdminTrainerSummaryService,
+  fetchSuperAdminTrainerSummaryService,
   resendUserInviteService,
+  superAdminResendTrainerInviteService,
   revokeTrainerClientInviteService,
+  superAdminRevokeTrainerInviteService,
 } from "@/services/authService";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +58,13 @@ function getActorUserIdFromCookie() {
 function splitClientName(name = "") {
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
   return { first_name: parts[0] ?? "", last_name: parts.slice(1).join(" ") };
+}
+
+// Merge two normalized lists, de-duping by id. Used when appending paginated
+// pages so "Load more" doesn't double-add rows.
+function mergeById(prev, next) {
+  const seen = new Set(prev.map((item) => item.id));
+  return [...prev, ...next.filter((item) => !seen.has(item.id))];
 }
 
 function normalizeInvite(invite = {}) {
@@ -160,7 +171,16 @@ function InviteForm({ onSent }) {
 
     setSubmitting(true);
     try {
-      const res = await inviteTrainerClientService({
+      // Super admins invite trainers through their own endpoint
+      // (super-admin-invite-trainer.php); trainer admins use the trainer-admin
+      // endpoint. Both take the same payload, so we just swap the service.
+      const role = String(getLoggedInUserFromCookie()?.role || "").toLowerCase();
+      const invite =
+        role === "super_admin"
+          ? superAdminInviteTrainerService
+          : inviteTrainerClientService;
+
+      const res = await invite({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
@@ -502,6 +522,12 @@ export default function TrainerAdminInvitesPage() {
   const [loadingInvites, setLoadingInvites] = useState(false);
   const [inviteListError, setInviteListError] = useState("");
 
+  // Pagination: the summary endpoint returns one `page` (limit 10) across all
+  // four lists, with a per-list `*_has_more` flag. We append further pages.
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState({ accepted: false, pending: false, expired: false, revoked: false });
+  const [loadingMore, setLoadingMore] = useState(false);
+
   const addAuditEntry = (inviteId, action, detail = null) => {
     const actor = user?.email || user?.user_id || "Unknown";
     setAuditLogs((prev) => ({
@@ -510,12 +536,29 @@ export default function TrainerAdminInvitesPage() {
     }));
   };
 
-  const loadInvites = useCallback(async (page = 1) => {
-    setLoadingInvites(true);
+  const loadInvites = useCallback(async (page = 1, { append = false } = {}) => {
+    if (append) setLoadingMore(true);
+    else setLoadingInvites(true);
     setInviteListError("");
   
     try {
-      const res = await fetchTrainerAdminTrainerSummaryService(page);
+      // Super admins read their trainer summary from the super-admin endpoint;
+      // trainer admins use the trainer-admin endpoint. Both return the same shape.
+      const role = String(getLoggedInUserFromCookie()?.role || "").toLowerCase();
+      const fetchSummary =
+        role === "super_admin"
+          ? fetchSuperAdminTrainerSummaryService
+          : fetchTrainerAdminTrainerSummaryService;
+
+      const res = await fetchSummary(page);
+
+      setPage(page);
+      setHasMore({
+        accepted: !!res?.pagination?.accepted_has_more,
+        pending: !!res?.pagination?.pending_has_more,
+        expired: !!res?.pagination?.expired_has_more,
+        revoked: !!res?.pagination?.revoked_has_more,
+      });
   
       const acceptedTrainerList = Array.isArray(res?.accepted_trainers)
         ? res.accepted_trainers
@@ -533,13 +576,20 @@ export default function TrainerAdminInvitesPage() {
         ? res.revoked_invites
         : [];
   
-      setAcceptedClients(acceptedTrainerList.map(normalizeInvite));
+      const mapped = {
+        accepted: acceptedTrainerList.map(normalizeInvite),
+        pending: pendingInviteList.map(normalizeInvite),
+        expired: expiredInviteList.map(normalizeInvite),
+        revoked: revokedInviteList.map(normalizeInvite),
+      };
+
+      setAcceptedClients((prev) => (append ? mergeById(prev, mapped.accepted) : mapped.accepted));
   
-      setPendingInvites(pendingInviteList.map(normalizeInvite));
+      setPendingInvites((prev) => (append ? mergeById(prev, mapped.pending) : mapped.pending));
   
-      setExpiredInvites(expiredInviteList.map(normalizeInvite));
+      setExpiredInvites((prev) => (append ? mergeById(prev, mapped.expired) : mapped.expired));
   
-      setRevokedInvites(revokedInviteList.map(normalizeInvite));
+      setRevokedInvites((prev) => (append ? mergeById(prev, mapped.revoked) : mapped.revoked));
   
       if (res?.summary) {
         setTotals({
@@ -559,6 +609,7 @@ export default function TrainerAdminInvitesPage() {
       toast.error(message);
     } finally {
       setLoadingInvites(false);
+      setLoadingMore(false);
     }
   }, []);
 
@@ -582,9 +633,17 @@ export default function TrainerAdminInvitesPage() {
 
   const handleResendInvite = async (inv) => {
     try {
-      await resendUserInviteService({ inviteId: inv.id });
+      // Super admins resend through their own endpoint
+      // (super-admin-resend-trainers.php); trainer admins use the shared one.
+      const role = String(getLoggedInUserFromCookie()?.role || "").toLowerCase();
+      const resend =
+        role === "super_admin"
+          ? superAdminResendTrainerInviteService
+          : resendUserInviteService;
+
+      await resend({ inviteId: inv.id });
       addAuditEntry(inv.id, "resent", `to ${inv.email}`);
-      toast.success(`Invite resent to ${inv.first_name} ${inv.last_name}`);
+      toast.success(`Invite resent to ${inv.name || inv.email}`);
       await loadInvites();
     } catch (error) {
       toast.error(error?.data?.message || error?.message || "Could not resend invite.");
@@ -593,10 +652,18 @@ export default function TrainerAdminInvitesPage() {
 
   const handleRevokeInvite = async (inv, reason = "") => {
     try {
-      await revokeTrainerClientInviteService({ inviteId: inv.id, reason });
+      // Super admins revoke through their own endpoint
+      // (super-admin-revoke-trainers.php); trainer admins use the shared one.
+      const role = String(getLoggedInUserFromCookie()?.role || "").toLowerCase();
+      const revoke =
+        role === "super_admin"
+          ? superAdminRevokeTrainerInviteService
+          : revokeTrainerClientInviteService;
+
+      await revoke({ inviteId: inv.id, reason });
       addAuditEntry(inv.id, "revoked", reason ? `reason: ${reason}` : null);
       setPendingInvites((prev) => prev.filter((item) => item.id !== inv.id));
-      toast.success(`Invite to ${inv.first_name} ${inv.last_name} revoked.`);
+      toast.success(`Invite to ${inv.name || inv.email} revoked.`);
     } catch (error) {
       toast.error(error?.message || "Could not revoke invite.");
     }
@@ -606,7 +673,7 @@ export default function TrainerAdminInvitesPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
-          Invites Trainer & Referrals
+          Invites Trainer
         </h1>
         <p className="text-[#535359] text-[13px] mt-1">
           Send client invites and track their status.
@@ -667,6 +734,20 @@ export default function TrainerAdminInvitesPage() {
             Revoked invites <span className="ml-2 text-[#A1A1A1] text-[12px] font-normal">({revokedInvites.length})</span>
           </h3>
           <PendingInvitesTable invites={revokedInvites} onResend={handleResendInvite} onRevoke={handleRevokeInvite} auditLogs={auditLogs} />
+        </div>
+      )}
+
+      {/* Load more — fetches the next page and appends to every list */}
+      {(hasMore.accepted || hasMore.pending || hasMore.expired || hasMore.revoked) && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => loadInvites(page + 1, { append: true })}
+            disabled={loadingMore}
+            className="rounded-[10px] bg-[#EEF4FE] text-[#308BF9] text-[13px] font-semibold px-5 py-2.5 disabled:opacity-60 hover:bg-[#d9e8fd] transition-colors cursor-pointer"
+          >
+            {loadingMore ? "Loading…" : "Load more"}
+          </button>
         </div>
       )}
     </div>

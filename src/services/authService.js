@@ -983,6 +983,37 @@ export const inviteTrainerClientService = async ({
 };
 
 
+// Super admin invites a trainer directly (super-admin-invite-trainer.php).
+// Same payload shape as the trainer-admin invite; actor_user_id is taken from
+// the super admin's access token (user_id).
+export const superAdminInviteTrainerService = async ({
+  firstName,
+  lastName,
+  email,
+  phone,
+}) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.SUPERADMININVITETRAINER, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      first_name: firstName,
+      last_name: lastName,
+      email: email,
+      phone: phone,
+    }),
+  });
+};
+
+
 export const resendTrainerAdminInviteService = async ({ invitationId }) => {
   const actorUserId = getActorUserIdFromAccessToken();
 
@@ -1010,6 +1041,28 @@ export const resendUserInviteService = async ({ inviteId }) => {
   }
 
   return apiFetcher(API_ENDPOINTS.ADMINPANEL.RESENDUSERINVITE, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      invite_id: inviteId,
+    }),
+  });
+};
+
+// Super admin resends a trainer invite (super-admin-resend-trainers.php).
+// Same payload as the trainer-admin resend; actor_user_id comes from the
+// super admin's access token (user_id).
+export const superAdminResendTrainerInviteService = async ({ inviteId }) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.SUPERADMINRESENDTRAINER, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -1078,6 +1131,29 @@ export const revokeTrainerClientInviteService = async ({ inviteId, reason }) => 
   });
 };
 
+// Super admin revokes a trainer invite (super-admin-revoke-trainers.php).
+// Same payload as the trainer-admin revoke; actor_user_id comes from the
+// super admin's access token (user_id).
+export const superAdminRevokeTrainerInviteService = async ({ inviteId, reason }) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.SUPERADMINREVOKETRAINER, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      invite_id: inviteId,
+      reason: reason ?? "",
+    }),
+  });
+};
+
 export const validateInviteTokenService = async (token) => {
   return apiFetcher(`${API_ENDPOINTS.ADMINPANEL.VALIDATEINVITETOKEN}?token=${encodeURIComponent(token)}`, {
     method: "GET",
@@ -1132,6 +1208,29 @@ export const fetchTrainerAdminTrainerSummaryService = async (page = 1) => {
   }
 
   return apiFetcher(API_ENDPOINTS.ADMINPANEL.TRAINERADMINTRAINERSUMMARY, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      page: page,
+    }),
+  });
+};
+
+
+// Super admin's trainer summary (super-admin-trainers-summary.php). Same
+// request/response shape as the trainer-admin summary; actor_user_id comes
+// from the super admin's access token (user_id).
+export const fetchSuperAdminTrainerSummaryService = async (page = 1) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.SUPERADMINTRAINERSUMMARY, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

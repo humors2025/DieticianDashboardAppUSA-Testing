@@ -64,7 +64,15 @@ export function middleware(request) {
     if (pathname.startsWith('/superadmin-trainer') && role !== 'super_admin') {
       return NextResponse.redirect(new URL(homeForRole(role), request.url));
     }
-    if (pathname.startsWith('/trainer-admin') && role !== 'trainer_admin') {
+    // /trainer-admin/invites is also open to super_admin (and the `admin`
+    // alias) — being a super admin / admin you can invite trainers too.
+    // Every other /trainer-admin/* route stays trainer_admin-only.
+    if (pathname.startsWith('/trainer-admin/invites')) {
+      const inviteRoles = ['trainer_admin', 'admin', 'super_admin'];
+      if (!inviteRoles.includes(role)) {
+        return NextResponse.redirect(new URL(homeForRole(role), request.url));
+      }
+    } else if (pathname.startsWith('/trainer-admin') && role !== 'trainer_admin') {
       return NextResponse.redirect(new URL(homeForRole(role), request.url));
     }
     // /trainer/ (with trailing slash) so we don't accidentally match /trainer-admin.

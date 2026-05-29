@@ -284,11 +284,14 @@ const hideHeaderPaths = [
     setUserRole(decodeAccessTokenRole());
   }, []);
 
-  const menu = [
-    // { name: "Dashboard", icon: "/icons/hugeicons_home-05.svg", path: "/trainer/dashboard" },
-    // { name: "Earnings", icon: "/icons/hugeicons_award-01.svg", path: "/trainer/earnings" },
-    // { name: "Settings", icon: "/icons/hugeicons_settings-03.svg", path: "/trainer/settings" },
-  ];
+  const menu =
+    userRole === "trainer"
+      ? [
+          { name: "Dashboard", icon: "/icons/hugeicons_home-05.svg", path: "/trainer/dashboard" },
+          { name: "Earnings", icon: "/icons/hugeicons_award-01.svg", path: "/trainer/earnings" },
+          { name: "Settings", icon: "/icons/hugeicons_settings-03.svg", path: "/trainer/settings" },
+        ]
+      : [];
 
   const handleLogout = () => {
     try {

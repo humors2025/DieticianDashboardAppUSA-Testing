@@ -431,8 +431,16 @@ export const updateDietPlanJsonService = async (login_id, profile_id, diet_plan_
       login_id: login_id,
       profile_id: profile_id,
       diet_plan_id: diet_plan_id,
-      diet_json: JSON.stringify(diet_json), 
+      diet_json: JSON.stringify(diet_json),
     }),
+  });
+};
+
+export const updateDietPlanFoodService = async (payload) => {
+  return apiFetcher(API_ENDPOINTS.PLAN.UPDATEDIETFOOD, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
 };
 

@@ -31,7 +31,8 @@ CALENDERTABLE:"/dietitian/api/web/get_calander_fill_data.php"
     PLANSUMMARYFORM:"/dietitian/api/web/insert_diet_plan_strategy.php",
     DIETPLAN:"/dietitian/api/web/update_diet_plan_json.php",
     DIETPLANJSON:"/dietitian/api/web/fetch_diet_json.php",
-    DELETEDIETPLAN:"/dietitian/api/web/delete_diet_plan.php"
+    DELETEDIETPLAN:"/dietitian/api/web/delete_diet_plan.php",
+    UPDATEDIETFOOD:"/dietitian/api/web/trainer-update-weekly-food-json.php"
   },
   CLIENTPROFILE:{
     CLIENTPROFILEDATA:"/dietitian/api/web/get_client_data.php",

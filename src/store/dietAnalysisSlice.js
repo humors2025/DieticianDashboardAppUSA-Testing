@@ -39,6 +39,43 @@ const dietAnalysisSlice = createSlice({
       state.loading = false;
       state.error = null;
     },
+    setWeeklyJsonData(state, action) {
+      if (!state.data?.data?.food_json) return;
+      state.data.data.food_json.weekly_json_data = {
+        ...(state.data.data.food_json.weekly_json_data || {}),
+        ...action.payload,
+      };
+    },
+    updateEditedDays(state, action) {
+      if (!state.data?.data?.food_json) return;
+      const days = action.payload;
+      state.data.data.food_json.days = days;
+      const totals = { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 };
+      let nDays = 0;
+      for (const day of days || []) {
+        nDays += 1;
+        for (const slot of ["breakfast", "lunch", "snacks", "dinner"]) {
+          const foods = day?.[slot]?.foods || [];
+          for (const f of foods) {
+            totals.calories += Number(f.calories || 0);
+            totals.protein_g += Number(f.protein_g || 0);
+            totals.carbs_g += Number(f.carbs_g || 0);
+            totals.fat_g += Number(f.fat_g || 0);
+            totals.fiber_g += Number(f.fiber_g || 0);
+          }
+        }
+      }
+      if (nDays > 0) {
+        state.data.data.food_json.weekly_json_data = {
+          ...(state.data.data.food_json.weekly_json_data || {}),
+          calories: parseFloat((totals.calories / nDays).toFixed(2)),
+          protein_g: parseFloat((totals.protein_g / nDays).toFixed(2)),
+          carbs_g: parseFloat((totals.carbs_g / nDays).toFixed(2)),
+          fat_g: parseFloat((totals.fat_g / nDays).toFixed(2)),
+          fiber_g: parseFloat((totals.fiber_g / nDays).toFixed(2)),
+        };
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -58,7 +95,7 @@ const dietAnalysisSlice = createSlice({
   },
 });
 
-export const { clearDietAnalysis } = dietAnalysisSlice.actions;
+export const { clearDietAnalysis, updateEditedDays, setWeeklyJsonData } = dietAnalysisSlice.actions;
 
 export const selectDietAnalysisData = (state) => state.dietAnalysis.data;
 export const selectDietAnalysisLoading = (state) => state.dietAnalysis.loading;

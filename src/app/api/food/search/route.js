@@ -1,9 +1,29 @@
 import { NextResponse } from "next/server";
 
-const FLASK_BASE = process.env.NEXT_PUBLIC_FLASK_API_URL || "http://localhost:5000";
+const FOODS_API_BASE = process.env.RESPYR_FOODS_API_BASE || "https://respyr.in/foods-plan-api";
 const USDA_API_KEY = process.env.USDA_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+// Adapt respyr.in food_search shape → what the UI expects (flat macros)
+function adaptRespyrResult(item) {
+  const m = item.base_macros || {};
+  return {
+    food_name: item.food_name,
+    calories: m.calories || 0,
+    protein_g: m.protein_g || 0,
+    carbs_g: m.carbs_g || 0,
+    fat_g: m.fat_g || 0,
+    fiber_g: m.fiber_g || 0,
+    portion_with_metric: item.base_label || item.default_portion_label || "1 serving",
+    unit_grams: item.unit_grams || 100,
+    portion: item.base_portion || 1,
+    base_portion: item.base_portion || 1,
+    category: "Meals",
+    macro_source: "respyr",
+    match_score: item.match_score,
+  };
+}
 
 const NUTRIENT_MAP = {
   "Energy": "calories",
@@ -185,18 +205,20 @@ export async function GET(request) {
   const limit = parseInt(searchParams.get("limit") || "8", 10);
   const diet_type = searchParams.get("diet_type") || "";
 
-  // Step 1: Try Flask food pool (local DB)
+  // Step 1: Try Chandan's curated food pool at respyr.in
   try {
-    const url = `${FLASK_BASE}/food_search?q=${encodeURIComponent(q)}&limit=${limit}&diet_type=${encodeURIComponent(diet_type)}`;
+    const params = new URLSearchParams({ q, limit: String(limit) });
+    if (diet_type) params.set("diet_type", diet_type);
+    const url = `${FOODS_API_BASE}/food_search?${params.toString()}`;
     const res = await fetch(url, { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
-      if (data.results && data.results.length > 0) {
-        return NextResponse.json(data);
+      if (Array.isArray(data.results) && data.results.length > 0) {
+        return NextResponse.json({ results: data.results.map(adaptRespyrResult) });
       }
     }
   } catch {
-    // Flask not available
+    // respyr API not reachable — fall through
   }
 
   // Step 2: Try USDA FoodData Central API

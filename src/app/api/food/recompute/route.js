@@ -1,15 +1,21 @@
 import { NextResponse } from "next/server";
 
-const FLASK_BASE = process.env.NEXT_PUBLIC_FLASK_API_URL || "http://localhost:5000";
+const FOODS_API_BASE = process.env.RESPYR_FOODS_API_BASE || "https://respyr.in/foods-plan-api";
 
+// Thin proxy to respyr.in /food_macros so the server-side canonical
+// label + scaled macros can be retrieved on demand.
+// Accepts: { food_name, portion } -> GET food_macros?name=...&portion=...
 export async function POST(request) {
   try {
     const body = await request.json();
-    const res = await fetch(`${FLASK_BASE}/api/recompute_food`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const name = body.food_name || body.name;
+    const portion = Number(body.portion ?? 1);
+    if (!name) {
+      return NextResponse.json({ error: "food_name is required" }, { status: 400 });
+    }
+
+    const params = new URLSearchParams({ name, portion: String(portion) });
+    const res = await fetch(`${FOODS_API_BASE}/food_macros?${params.toString()}`, { cache: "no-store" });
 
     if (!res.ok) {
       const text = await res.text();

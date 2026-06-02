@@ -1,9 +1,63 @@
 import { NextResponse } from "next/server";
 
-const FLASK_BASE = process.env.NEXT_PUBLIC_FLASK_API_URL || "http://localhost:5000";
+const FOODS_API_BASE = process.env.RESPYR_FOODS_API_BASE || "https://respyr.in/foods-plan-api";
 const USDA_API_KEY = process.env.USDA_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+async function lookupViaRespyr(foodName, portion = 1) {
+  const params = new URLSearchParams({ name: foodName, portion: String(portion) });
+  const res = await fetch(`${FOODS_API_BASE}/food_macros?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("respyr lookup unavailable");
+  const data = await res.json();
+  if (data.error || !data.food_name) throw new Error(data.error || "no match");
+  return {
+    food_name: data.food_name,
+    calories: data.calories || 0,
+    protein_g: data.protein_g || 0,
+    carbs_g: data.carbs_g || 0,
+    fat_g: data.fat_g || 0,
+    fiber_g: data.fiber_g || 0,
+    portion_with_metric: data.portion_with_metric || `${portion} serving`,
+    unit_grams: data.unit_grams || 100,
+    portion: data.portion || portion,
+    base_portion: data.base_portion || 1,
+    category: "Meals",
+    macro_source: "respyr",
+  };
+}
+
+// Chandan's full USDA→OpenAI lookup with validation + persistence to the
+// shared food pool. New foods discovered here show up in future searches.
+async function lookupViaRespyrPipeline(foodName, opts = {}) {
+  const res = await fetch(`${FOODS_API_BASE}/api/lookup_food`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      food_name: foodName,
+      country: opts.country || "usa",
+      cuisine: opts.cuisine,
+      diet_type: opts.diet_type,
+    }),
+  });
+  if (!res.ok) throw new Error(`respyr lookup_food ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return {
+    food_name: data.food_name || foodName,
+    calories: data.calories || 0,
+    protein_g: data.protein_g || 0,
+    carbs_g: data.carbs_g || 0,
+    fat_g: data.fat_g || 0,
+    fiber_g: data.fiber_g || 0,
+    portion_with_metric: data.base_label || `${data.base_portion || 1} serving (${Math.round(data.base_grams || data.unit_grams || 100)}g)`,
+    unit_grams: data.unit_grams || data.base_grams || 100,
+    portion: data.base_portion || 1,
+    base_portion: data.base_portion || 1,
+    category: data.category || "Meals",
+    macro_source: data.macro_source || "respyr_pipeline",
+  };
+}
 
 const NUTRIENT_MAP = {
   "Energy": "calories",
@@ -126,16 +180,6 @@ async function lookupViaUSDA(foodName) {
   };
 }
 
-async function lookupViaFlask(body) {
-  const res = await fetch(`${FLASK_BASE}/api/lookup_food`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error("Flask unavailable");
-  return res.json();
-}
-
 async function lookupViaOpenAI(foodName, country = "usa") {
   const prompt = `You are a nutrition database. Given a food item, return its nutritional information for a standard single serving.
 
@@ -196,15 +240,28 @@ export async function POST(request) {
       return NextResponse.json({ error: "food_name is required" }, { status: 400 });
     }
 
-    // Step 1: Try Flask (local food DB)
+    // Step 1: fuzzy match against respyr.in's curated pool
     try {
-      const flaskResult = await lookupViaFlask(body);
-      if (!flaskResult.error) return NextResponse.json(flaskResult);
+      const respyrResult = await lookupViaRespyr(foodName.trim(), body.portion || 1);
+      return NextResponse.json(respyrResult);
     } catch {
-      // Flask not available
+      // not in pool — fall through
     }
 
-    // Step 2: Try USDA FoodData Central API
+    // Step 2: respyr's USDA→OpenAI pipeline with validation + pool-persist.
+    // Foods accepted here show up in future searches automatically.
+    try {
+      const respyrPipelineResult = await lookupViaRespyrPipeline(foodName.trim(), {
+        country: body.country || "usa",
+        cuisine: body.cuisine,
+        diet_type: body.diet_type,
+      });
+      return NextResponse.json(respyrPipelineResult);
+    } catch {
+      // respyr pipeline unreachable — fall through to local fallbacks
+    }
+
+    // Step 3 (offline fallback): direct USDA call
     try {
       const usdaResult = await lookupViaUSDA(foodName.trim());
       return NextResponse.json(usdaResult);
@@ -212,7 +269,7 @@ export async function POST(request) {
       // USDA failed or no results
     }
 
-    // Step 3: Fall back to OpenAI
+    // Step 4 (offline fallback): direct OpenAI
     const result = await lookupViaOpenAI(foodName.trim(), body.country || "usa");
     return NextResponse.json(result);
   } catch (err) {

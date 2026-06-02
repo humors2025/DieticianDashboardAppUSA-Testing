@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
-const FLASK_BASE = process.env.NEXT_PUBLIC_FLASK_API_URL || "http://localhost:5000";
+// Preference learning logger — Chandan's hosted Flask app from Ankur's zip.
+// Falls back to a local JSONL file if the hosted endpoint is unreachable
+// (offline dev, network blips, etc.).
+const LOG_PLAN_EDIT_URL = process.env.LOG_PLAN_EDIT_URL || "https://respyr.in/foods-plan-api/log_plan_edit";
 const MEAL_SLOTS = ["breakfast", "lunch", "snacks", "dinner"];
 
 function foodKey(food) {
@@ -124,17 +127,20 @@ function computePlanDiff(recDays, finDays) {
   };
 }
 
-async function tryFlaskLog(body) {
+async function tryRemoteLog(body) {
   try {
-    const res = await fetch(`${FLASK_BASE}/log_plan_edit`, {
+    const res = await fetch(LOG_PLAN_EDIT_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(2000),
+      signal: AbortSignal.timeout(3000),
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.ok || data?.status === "success" || data?.event_id || data?.event) return data;
+    }
   } catch {
-    // Flask unavailable — fall through to local storage
+    // remote unreachable — fall through to local storage
   }
   return null;
 }
@@ -174,7 +180,7 @@ export async function POST(request) {
       final,
     };
 
-    const flaskResult = await tryFlaskLog({
+    const remoteResult = await tryRemoteLog({
       user_id: event.user_id,
       recommended,
       final,
@@ -182,16 +188,17 @@ export async function POST(request) {
       meta: event.meta,
     });
 
-    const localFile = flaskResult ? null : persistLocally(event);
+    const localFile = remoteResult ? null : persistLocally(event);
+    const remoteStoredAt = remoteResult?.event?.stored_at || remoteResult?.stored_at || null;
 
     return NextResponse.json({
-      event_id: event.event_id,
+      event_id: remoteResult?.event?.event_id || event.event_id,
       user_id: event.user_id,
       ts_utc: event.ts_utc,
       source: event.source,
       diff_summary: diff.summary,
-      stored_via: flaskResult ? "flask" : localFile ? "local" : "none",
-      stored_at: flaskResult?.stored_at || localFile || null,
+      stored_via: remoteResult ? "remote" : localFile ? "local" : "none",
+      stored_at: remoteStoredAt || localFile || null,
     });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });

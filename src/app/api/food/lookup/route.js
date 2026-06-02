@@ -27,6 +27,38 @@ async function lookupViaRespyr(foodName, portion = 1) {
   };
 }
 
+// Chandan's full USDA→OpenAI lookup with validation + persistence to the
+// shared food pool. New foods discovered here show up in future searches.
+async function lookupViaRespyrPipeline(foodName, opts = {}) {
+  const res = await fetch(`${FOODS_API_BASE}/api/lookup_food`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      food_name: foodName,
+      country: opts.country || "usa",
+      cuisine: opts.cuisine,
+      diet_type: opts.diet_type,
+    }),
+  });
+  if (!res.ok) throw new Error(`respyr lookup_food ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return {
+    food_name: data.food_name || foodName,
+    calories: data.calories || 0,
+    protein_g: data.protein_g || 0,
+    carbs_g: data.carbs_g || 0,
+    fat_g: data.fat_g || 0,
+    fiber_g: data.fiber_g || 0,
+    portion_with_metric: data.base_label || `${data.base_portion || 1} serving (${Math.round(data.base_grams || data.unit_grams || 100)}g)`,
+    unit_grams: data.unit_grams || data.base_grams || 100,
+    portion: data.base_portion || 1,
+    base_portion: data.base_portion || 1,
+    category: data.category || "Meals",
+    macro_source: data.macro_source || "respyr_pipeline",
+  };
+}
+
 const NUTRIENT_MAP = {
   "Energy": "calories",
   "Protein": "protein_g",
@@ -208,15 +240,28 @@ export async function POST(request) {
       return NextResponse.json({ error: "food_name is required" }, { status: 400 });
     }
 
-    // Step 1: Try Chandan's curated food pool at respyr.in
+    // Step 1: fuzzy match against respyr.in's curated pool
     try {
       const respyrResult = await lookupViaRespyr(foodName.trim(), body.portion || 1);
       return NextResponse.json(respyrResult);
     } catch {
-      // not in respyr pool — fall through
+      // not in pool — fall through
     }
 
-    // Step 2: Try USDA FoodData Central API
+    // Step 2: respyr's USDA→OpenAI pipeline with validation + pool-persist.
+    // Foods accepted here show up in future searches automatically.
+    try {
+      const respyrPipelineResult = await lookupViaRespyrPipeline(foodName.trim(), {
+        country: body.country || "usa",
+        cuisine: body.cuisine,
+        diet_type: body.diet_type,
+      });
+      return NextResponse.json(respyrPipelineResult);
+    } catch {
+      // respyr pipeline unreachable — fall through to local fallbacks
+    }
+
+    // Step 3 (offline fallback): direct USDA call
     try {
       const usdaResult = await lookupViaUSDA(foodName.trim());
       return NextResponse.json(usdaResult);
@@ -224,7 +269,7 @@ export async function POST(request) {
       // USDA failed or no results
     }
 
-    // Step 3: Fall back to OpenAI
+    // Step 4 (offline fallback): direct OpenAI
     const result = await lookupViaOpenAI(foodName.trim(), body.country || "usa");
     return NextResponse.json(result);
   } catch (err) {

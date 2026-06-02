@@ -117,9 +117,9 @@ export default function FoodSearchModal({ mealSlot, onAdd, onClose }) {
     }
   };
 
-  const handleManualSubmit = () => {
+  const handleManualSubmit = async () => {
     if (!manualFood.food_name.trim()) return;
-    onAdd({
+    const local = {
       food_name: manualFood.food_name.trim(),
       calories: parseFloat(manualFood.calories) || 0,
       protein_g: parseFloat(manualFood.protein_g) || 0,
@@ -131,7 +131,22 @@ export default function FoodSearchModal({ mealSlot, onAdd, onClose }) {
       base_portion: 1,
       category: "Meals",
       macro_source: "manual",
-    });
+    };
+    try {
+      const res = await fetch("/api/food/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(local),
+      });
+      const persisted = await res.json();
+      if (res.ok && !persisted.error) {
+        onAdd(persisted);
+        return;
+      }
+    } catch {
+      // server unreachable — fall through to local-only add
+    }
+    onAdd(local);
   };
 
   return (

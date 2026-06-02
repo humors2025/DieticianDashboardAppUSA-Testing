@@ -1,9 +1,31 @@
 import { NextResponse } from "next/server";
 
-const FLASK_BASE = process.env.NEXT_PUBLIC_FLASK_API_URL || "http://localhost:5000";
+const FOODS_API_BASE = process.env.RESPYR_FOODS_API_BASE || "https://respyr.in/foods-plan-api";
 const USDA_API_KEY = process.env.USDA_API_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+async function lookupViaRespyr(foodName, portion = 1) {
+  const params = new URLSearchParams({ name: foodName, portion: String(portion) });
+  const res = await fetch(`${FOODS_API_BASE}/food_macros?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("respyr lookup unavailable");
+  const data = await res.json();
+  if (data.error || !data.food_name) throw new Error(data.error || "no match");
+  return {
+    food_name: data.food_name,
+    calories: data.calories || 0,
+    protein_g: data.protein_g || 0,
+    carbs_g: data.carbs_g || 0,
+    fat_g: data.fat_g || 0,
+    fiber_g: data.fiber_g || 0,
+    portion_with_metric: data.portion_with_metric || `${portion} serving`,
+    unit_grams: data.unit_grams || 100,
+    portion: data.portion || portion,
+    base_portion: data.base_portion || 1,
+    category: "Meals",
+    macro_source: "respyr",
+  };
+}
 
 const NUTRIENT_MAP = {
   "Energy": "calories",
@@ -126,16 +148,6 @@ async function lookupViaUSDA(foodName) {
   };
 }
 
-async function lookupViaFlask(body) {
-  const res = await fetch(`${FLASK_BASE}/api/lookup_food`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error("Flask unavailable");
-  return res.json();
-}
-
 async function lookupViaOpenAI(foodName, country = "usa") {
   const prompt = `You are a nutrition database. Given a food item, return its nutritional information for a standard single serving.
 
@@ -196,12 +208,12 @@ export async function POST(request) {
       return NextResponse.json({ error: "food_name is required" }, { status: 400 });
     }
 
-    // Step 1: Try Flask (local food DB)
+    // Step 1: Try Chandan's curated food pool at respyr.in
     try {
-      const flaskResult = await lookupViaFlask(body);
-      if (!flaskResult.error) return NextResponse.json(flaskResult);
+      const respyrResult = await lookupViaRespyr(foodName.trim(), body.portion || 1);
+      return NextResponse.json(respyrResult);
     } catch {
-      // Flask not available
+      // not in respyr pool — fall through
     }
 
     // Step 2: Try USDA FoodData Central API

@@ -431,8 +431,16 @@ export const updateDietPlanJsonService = async (login_id, profile_id, diet_plan_
       login_id: login_id,
       profile_id: profile_id,
       diet_plan_id: diet_plan_id,
-      diet_json: JSON.stringify(diet_json), 
+      diet_json: JSON.stringify(diet_json),
     }),
+  });
+};
+
+export const updateDietPlanFoodService = async (payload) => {
+  return apiFetcher(API_ENDPOINTS.PLAN.UPDATEDIETFOOD, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
 };
 
@@ -852,6 +860,54 @@ export const fetchAllTrainersForSuperAdminService = async ({
       search,
       trainer_admin_user_id: trainerAdminUserId,
       status,
+    }),
+  });
+};
+
+
+// Super admin: all clients across the entire network
+// (super-admin-all-clients-overview.php).
+// actor_user_id  -> user_id decoded from the access token
+// dietitian_id   -> partner_code decoded from the access token (used as a
+//                   filter; pass a specific code to scope to one dietitian,
+//                   or "" to list every client in the network)
+export const fetchSuperAdminAllClientsOverviewService = async ({
+  page = 1,
+  limit = 10,
+  search = "",
+  date = "",
+  type = "all",
+  dietitianId = "",
+} = {}) => {
+  const accessToken = Cookies.get("access_token");
+
+  if (!accessToken) {
+    throw new Error("Access token missing. Please login again.");
+  }
+
+  const decoded = decodeAccessTokenFromCookie();
+  const actorUserId = decoded?.user_id ?? decoded?.email ?? getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.SUPERADMINALLCLIENTSOVERVIEW, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      page,
+      limit,
+      search,
+      date,
+      type,
+      // Empty string lists every client in the network; pass a specific
+      // partner_code (dietitian_id) to scope the result to one dietitian.
+      dietitian_id: dietitianId || "",
     }),
   });
 };

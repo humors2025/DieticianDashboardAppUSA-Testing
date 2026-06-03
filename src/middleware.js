@@ -76,8 +76,13 @@ export function middleware(request) {
       return NextResponse.redirect(new URL(homeForRole(role), request.url));
     }
     // /trainer/ (with trailing slash) so we don't accidentally match /trainer-admin.
-    if (pathname.startsWith('/trainer/') && role !== 'trainer') {
-      return NextResponse.redirect(new URL(homeForRole(role), request.url));
+    // trainer_admin (and super_admin) can also view the trainer pages — their
+    // header links point here ("View my clients", "Client Directory").
+    if (pathname.startsWith('/trainer/')) {
+      const trainerRoles = ['trainer', 'trainer_admin', 'super_admin'];
+      if (!trainerRoles.includes(role)) {
+        return NextResponse.redirect(new URL(homeForRole(role), request.url));
+      }
     }
   }
 

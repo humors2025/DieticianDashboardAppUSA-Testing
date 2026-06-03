@@ -44,3 +44,7 @@ Desktop/New-recall/
 # database dumps (contain PHI — schema.sql is safe to commit)
 database/latest_database.sql
 database/*.dump.sql
+
+# local preference-learning log fallback (written by /api/diet-plan/log-edit
+# when Flask is unreachable — runtime data, not source)
+/preference_data/

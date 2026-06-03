@@ -183,6 +183,12 @@ const formatLastLoggedDate = (dateString) => {
       // Last test
       last_logged: formatLastLoggedDate(client.last_logged_date),
 
+      // Level type
+      level_type: client.level_type ?? "N/A",
+
+      // Diet plan generated
+      diet_plan_generated_date: client.diet_plan_generated_date || null,
+
       image: client.p_image && client.p_image !== "NA"
         ? client.p_image
         : "/icons/hugeicons_user-circle-02.svg",
@@ -321,6 +327,18 @@ const formatLastLoggedDate = (dateString) => {
                       Metabolism Score
                     </p>
                   </th>
+                  <th className="px-[15px] py-5 text-center">
+                    <p className="text-[#535359] font-normal text-xs leading-[1.1] tracking-[-0.24px] font-['Poppins']">
+                      Level
+                    </p>
+                  </th>
+
+                  <th className="px-[15px] py-5 text-center">
+                    <p className="text-[#535359] font-normal text-xs leading-[1.1] tracking-[-0.24px] font-['Poppins']">
+                      Diet Plan
+                    </p>
+                  </th>
+
                   <th className="px-[15px] py-5 text-center rounded-tr-[15px]">
                     <p className="text-[#535359] font-normal text-xs leading-[1.1] tracking-[-0.24px] font-['Poppins']">
                       Last Tested
@@ -354,7 +372,7 @@ const formatLastLoggedDate = (dateString) => {
               <tbody>
                 {filteredClients.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-[15px] py-8 text-center">
+                    <td colSpan={10} className="px-[15px] py-8 text-center">
                       <p className="text-[#A1A1A1] text-[18px]">
                         No clients found.
                       </p>
@@ -412,6 +430,30 @@ const formatLastLoggedDate = (dateString) => {
                         </span>
                       </td>
 
+                      {/* Level */}
+                      <td className="px-[15px] py-5 text-center">
+                        <span className="text-[#A1A1A1] text-[12px] font-normal leading-[126%] tracking-[-0.24px]">
+                          {client.level_type}
+                        </span>
+                      </td>
+
+                      {/* Diet Plan */}
+                      <td className="px-[15px] py-5 text-center">
+                        {client.diet_plan_generated_date ? (
+                          <span className="text-[#252525] text-[12px] font-normal leading-[126%] tracking-[-0.24px]">
+                            Yes,{" "}
+                            <span className="text-[#A1A1A1]">
+                              {client.diet_plan_generated_date}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-[#A1A1A1] text-[12px] font-normal leading-[126%] tracking-[-0.24px]">
+                            No
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Last Tested */}
                       <td className="px-[15px] py-5 text-center">
                         <span className="text-[#A1A1A1] text-[12px] font-normal leading-[126%] tracking-[-0.24px]">
                           {client.last_logged}

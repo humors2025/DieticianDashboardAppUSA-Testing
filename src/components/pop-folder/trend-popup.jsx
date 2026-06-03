@@ -906,19 +906,29 @@ export default function TrendPopUp({ closePopup, profileId: profileIdProp }) {
 
   const trendBreakdown = clientIndividualProfile?.data?.trend_breakdown || {};
 
+  // Titles to hide from the trend breakdown popup
+  const HIDDEN_TITLES = [
+    "Nutrient Utilization Trend",
+    "Energy Source Trend",
+    "Recovery Activity Trend",
+  ];
+  const visibleItems = (section) =>
+    (section?.items || []).filter(
+      (item) => !HIDDEN_TITLES.includes(item?.title)
+    );
+
+  const digestiveItems = visibleItems(trendBreakdown?.digestive_balance_trend);
+  const fuelItems = visibleItems(trendBreakdown?.fuel_and_energy_trend);
+  const metabolicItems = visibleItems(trendBreakdown?.metabolic_recovery_trend);
+
   const tabs = [
     {
       id: "digestive_balance_trend",
-      title:
-        trendBreakdown?.digestive_balance_trend?.tab_title ||
-        "Digestive Balance Trend",
-      status:
-        trendBreakdown?.digestive_balance_trend?.items?.[0]?.zone || "Optimal",
-      statusColor: getZoneColor(
-        trendBreakdown?.digestive_balance_trend?.items?.[0]?.zone || "Optimal"
-      ),
+      title: "Digestive Activity Trend",
+      status: digestiveItems?.[0]?.zone || "Optimal",
+      statusColor: getZoneColor(digestiveItems?.[0]?.zone || "Optimal"),
       cards:
-        trendBreakdown?.digestive_balance_trend?.items?.map((item, index) => ({
+        digestiveItems?.map((item, index) => ({
           id: `digestive_balance_trend-${index}`,
           title: item?.title || "NA",
           status: item?.zone || "NA",
@@ -933,16 +943,11 @@ export default function TrendPopUp({ closePopup, profileId: profileIdProp }) {
     },
     {
       id: "fuel_and_energy_trend",
-      title:
-        trendBreakdown?.fuel_and_energy_trend?.tab_title ||
-        "Fuel & Energy Trend",
-      status:
-        trendBreakdown?.fuel_and_energy_trend?.items?.[0]?.zone || "Focus",
-      statusColor: getZoneColor(
-        trendBreakdown?.fuel_and_energy_trend?.items?.[0]?.zone || "Focus"
-      ),
+      title: "Fuel Utilization Trend",
+      status: fuelItems?.[0]?.zone || "Focus",
+      statusColor: getZoneColor(fuelItems?.[0]?.zone || "Focus"),
       cards:
-        trendBreakdown?.fuel_and_energy_trend?.items?.map((item, index) => ({
+        fuelItems?.map((item, index) => ({
           id: `fuel_and_energy_trend-${index}`,
           title: item?.title || "NA",
           status: item?.zone || "NA",
@@ -957,18 +962,11 @@ export default function TrendPopUp({ closePopup, profileId: profileIdProp }) {
     },
     {
       id: "metabolic_recovery_trend",
-      title:
-        trendBreakdown?.metabolic_recovery_trend?.tab_title ||
-        "Metabolic Recovery Trend",
-      status:
-        trendBreakdown?.metabolic_recovery_trend?.items?.[0]?.zone ||
-        "Moderate",
-      statusColor: getZoneColor(
-        trendBreakdown?.metabolic_recovery_trend?.items?.[0]?.zone ||
-          "Moderate"
-      ),
+      title: "Metabolic Load Trend",
+      status: metabolicItems?.[0]?.zone || "Moderate",
+      statusColor: getZoneColor(metabolicItems?.[0]?.zone || "Moderate"),
       cards:
-        trendBreakdown?.metabolic_recovery_trend?.items?.map((item, index) => ({
+        metabolicItems?.map((item, index) => ({
           id: `metabolic_recovery_trend-${index}`,
           title: item?.title || "NA",
           status: item?.zone || "NA",

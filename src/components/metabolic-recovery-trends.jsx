@@ -240,6 +240,7 @@ export default function MetabolicRecoveryTrends({ data }) {
                     </div>
                 </div>
 
+                {recoveryActivity && (
                 <div className="flex flex-col gap-[25px] w-full">
                     <div className="flex flex-col gap-2.5">
                         <div className="flex gap-[5px] items-center">
@@ -327,6 +328,7 @@ export default function MetabolicRecoveryTrends({ data }) {
             </div>
                     </div>
                 </div>
+                )}
             </div>
 
 

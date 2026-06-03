@@ -15,7 +15,31 @@ export default function TrendBreakdown() {
     const [activeTab, setActiveTab] = useState("digestive");
     const [showPopup, setShowPopup] = useState(false);
 
-    const trendBreakdownData = clientIndividualProfile?.data?.trend_breakdown || {};
+    const rawTrendBreakdownData = clientIndividualProfile?.data?.trend_breakdown || {};
+
+    // Titles to hide from the trend breakdown
+    const hiddenTitles = [
+        "Nutrient Utilization Trend",
+        "Energy Source Trend",
+        "Recovery Activity Trend",
+    ];
+
+    const filterItems = (section) => {
+        if (!section) return section;
+        return {
+            ...section,
+            items: (section.items || []).filter(
+                (item) => !hiddenTitles.includes(item?.title)
+            ),
+        };
+    };
+
+    const trendBreakdownData = {
+        ...rawTrendBreakdownData,
+        digestive_balance_trend: filterItems(rawTrendBreakdownData.digestive_balance_trend),
+        fuel_and_energy_trend: filterItems(rawTrendBreakdownData.fuel_and_energy_trend),
+        metabolic_recovery_trend: filterItems(rawTrendBreakdownData.metabolic_recovery_trend),
+    };
 
 
     const getZoneColor = (zone) => {
@@ -94,7 +118,7 @@ export default function TrendBreakdown() {
                             className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] whitespace-nowrap
                             ${activeTab === "digestive" ? "text-[#308BF9]" : "text-[#A1A1A1]"}`}
                         >
-                            Digestive Balance Trend
+                            Digestive Activity Trend
                         </span>
                         <div
                             className="w-[6px] h-[6px] rounded-full"
@@ -113,7 +137,7 @@ export default function TrendBreakdown() {
                             className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px]  whitespace-nowrap
                             ${activeTab === "fuel" ? "text-[#308BF9]" : "text-[#A1A1A1]"}`}
                         >
-                            Fuel & Energy Trend
+                            Fuel Utilization Trend
                         </span>
                         <div
                             className="w-[6px] h-[6px] rounded-full"
@@ -132,7 +156,7 @@ export default function TrendBreakdown() {
                             className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px]  whitespace-nowrap
                             ${activeTab === "metabolic" ? "text-[#308BF9]" : "text-[#A1A1A1]"}`}
                         >
-                            Metabolic Recovery Trend
+                            Metabolic Load Trend
                         </span>
                         <div
                             className="w-[6px] h-[6px] rounded-full"

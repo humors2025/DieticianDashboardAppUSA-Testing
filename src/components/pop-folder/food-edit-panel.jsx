@@ -48,7 +48,7 @@ function formatPortion(baseLabel, unitGrams, portion) {
   return label;
 }
 
-export default function FoodEditPanel({ food, onSave, onRemove, onCancel }) {
+export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCancel }) {
   const initialQty = parseFloat(food.portion) || parseFloat(food.base_portion) || 1;
   const initialUnitGrams = food.unit_grams || parseGramsFromLabel(food.portion_with_metric) || 100;
 
@@ -85,6 +85,41 @@ export default function FoodEditPanel({ food, onSave, onRemove, onCancel }) {
   const debounceRef = useRef(null);
   const nameInputRef = useRef(null);
   const dropdownRef = useRef(null);
+
+  // Keep the latest props in refs so the live-update effect can read them
+  // without re-firing when the parent re-renders us with a new `food` object.
+  const foodRef = useRef(food);
+  foodRef.current = food;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  // Build the food payload from current local state. Shared by live updates
+  // (onChange) and the final save (onSave) so they never drift apart.
+  const buildUpdatedFood = useCallback(() => ({
+    ...foodRef.current,
+    food_name: selectedFood,
+    calories: macros.calories,
+    protein_g: macros.protein_g,
+    carbs_g: macros.carbs_g,
+    fat_g: macros.fat_g,
+    fiber_g: macros.fiber_g,
+    portion: portionQty,
+    base_portion: baseMacrosRef.current.base_portion,
+    unit_grams: baseMacrosRef.current.unit_grams,
+    portion_with_metric: macros.portion_with_metric,
+  }), [selectedFood, macros, portionQty]);
+
+  // Push edits to the parent in real time so meal/day macro totals update
+  // as the trainer changes calories, portion or any macro — without waiting
+  // for "Done". Skip the initial mount so we don't fire a no-op update.
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    onChangeRef.current?.(buildUpdatedFood());
+  }, [buildUpdatedFood]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -215,19 +250,7 @@ export default function FoodEditPanel({ food, onSave, onRemove, onCancel }) {
   };
 
   const handleSave = () => {
-    onSave({
-      ...food,
-      food_name: selectedFood,
-      calories: macros.calories,
-      protein_g: macros.protein_g,
-      carbs_g: macros.carbs_g,
-      fat_g: macros.fat_g,
-      fiber_g: macros.fiber_g,
-      portion: portionQty,
-      base_portion: baseMacrosRef.current.base_portion,
-      unit_grams: baseMacrosRef.current.unit_grams,
-      portion_with_metric: macros.portion_with_metric,
-    });
+    onSave(buildUpdatedFood());
   };
 
   const macroFields = [

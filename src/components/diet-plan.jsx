@@ -51,6 +51,9 @@ export default function DietPlan() {
   // Edit state — no toggle needed, edit controls are always visible on unapproved plans
   const [editedPlan, setEditedPlan] = useState(null);
   const [editingFoodIndex, setEditingFoodIndex] = useState(null);
+  // Snapshot of the food being edited, taken when the panel opens, so live
+  // edits can be reverted if the trainer hits "Cancel".
+  const editSnapshotRef = useRef(null);
   const [showAddFoodModal, setShowAddFoodModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingOps, setPendingOps] = useState([]);
@@ -225,10 +228,53 @@ export default function DietPlan() {
         ...ops,
         { action: "update", dayCode, mealType: mealKey, foodIndex, food: updatedFood },
       ]);
+      editSnapshotRef.current = null;
       setEditingFoodIndex(null);
     },
     [planDays]
   );
+
+  // Live preview: reflect in-progress edits in the working plan so meal/day
+  // macro totals update in real time. Does NOT record a pending op or close
+  // the panel — those happen only on "Done" (updateFoodInPlan).
+  const updateFoodLive = useCallback(
+    (dayIndex, mealKey, foodIndex, updatedFood) => {
+      setEditedPlan((prev) => {
+        const base = prev || { days: JSON.parse(JSON.stringify(planDays)) };
+        const newDays = JSON.parse(JSON.stringify(base.days));
+        if (newDays[dayIndex]?.[mealKey]?.foods?.[foodIndex]) {
+          newDays[dayIndex][mealKey].foods[foodIndex] = updatedFood;
+        }
+        return { ...base, days: newDays };
+      });
+    },
+    [planDays]
+  );
+
+  // Open the editor for a food, snapshotting it first so Cancel can revert
+  // any live edits.
+  const startEditFood = useCallback((index, food) => {
+    editSnapshotRef.current = JSON.parse(JSON.stringify(food));
+    setEditingFoodIndex(index);
+  }, []);
+
+  // Cancel editing: restore the pre-edit snapshot into the working plan, then
+  // close the panel.
+  const cancelEditFood = useCallback((dayIndex, mealKey, foodIndex) => {
+    const snapshot = editSnapshotRef.current;
+    if (snapshot) {
+      setEditedPlan((prev) => {
+        if (!prev) return prev;
+        const newDays = JSON.parse(JSON.stringify(prev.days));
+        if (newDays[dayIndex]?.[mealKey]?.foods?.[foodIndex]) {
+          newDays[dayIndex][mealKey].foods[foodIndex] = snapshot;
+        }
+        return { ...prev, days: newDays };
+      });
+    }
+    editSnapshotRef.current = null;
+    setEditingFoodIndex(null);
+  }, []);
 
   const removeFoodFromPlan = useCallback(
     (dayIndex, mealKey, foodIndex) => {
@@ -552,7 +598,7 @@ export default function DietPlan() {
                             <div
                               className={`flex flex-col gap-1 flex-1 ${canEdit && editingFoodIndex !== index ? "cursor-pointer rounded-[6px] px-1.5 py-1 -mx-1.5 -my-1 hover:bg-[#F5F7FA] transition-colors" : ""}`}
                               onClick={() => {
-                                if (canEdit && editingFoodIndex !== index) setEditingFoodIndex(index);
+                                if (canEdit && editingFoodIndex !== index) startEditFood(index, food);
                               }}
                             >
                               <p className="text-[#252525] text-[12px] xl:text-[14px] 2xl:text-[15px] font-semibold leading-[126%] tracking-[-0.24px]">
@@ -590,7 +636,7 @@ export default function DietPlan() {
                             {canEdit && editingFoodIndex !== index && (
                               <div className="flex items-center gap-1 shrink-0 mt-0.5">
                                 <button
-                                  onClick={() => setEditingFoodIndex(index)}
+                                  onClick={() => startEditFood(index, food)}
                                   className="p-1.5 rounded-[6px] hover:bg-[#EEF4FE] cursor-pointer transition-colors"
                                   title="Edit food"
                                 >
@@ -617,13 +663,18 @@ export default function DietPlan() {
                           {canEdit && editingFoodIndex === index ? (
                             <FoodEditPanel
                               food={food}
+                              onChange={(updatedFood) =>
+                                updateFoodLive(activeDay - 1, currentMealKey, index, updatedFood)
+                              }
                               onSave={(updatedFood) =>
                                 updateFoodInPlan(activeDay - 1, currentMealKey, index, updatedFood)
                               }
                               onRemove={() =>
                                 removeFoodFromPlan(activeDay - 1, currentMealKey, index)
                               }
-                              onCancel={() => setEditingFoodIndex(null)}
+                              onCancel={() =>
+                                cancelEditFood(activeDay - 1, currentMealKey, index)
+                              }
                             />
                           ) : (
                             <div className="flex flex-wrap gap-1">

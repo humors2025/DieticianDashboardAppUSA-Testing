@@ -148,6 +148,7 @@ export default function DigestiveBalanceTrends({ data }) {
   return (
     <>
       <div className="flex gap-[97px] ">
+        {nutrientUtilization && (
         <div className="flex flex-col gap-[25px] w-full">
           <div className="flex flex-col gap-2.5">
             <div className="flex gap-[5px] items-center">
@@ -234,6 +235,7 @@ export default function DigestiveBalanceTrends({ data }) {
 </div>
           </div>
         </div>
+        )}
 
         <div className="flex flex-col gap-[25px] w-full">
           <div className="flex flex-col gap-2.5">

@@ -236,6 +236,7 @@ export default function FuelEnergyTrends({ data }) {
                     </div>
                 </div>
 
+                {energySource && (
                 <div className="flex flex-col gap-[25px] w-full">
                     <div className="flex flex-col gap-2.5">
                         <div className="flex gap-[5px] items-center">
@@ -324,6 +325,7 @@ export default function FuelEnergyTrends({ data }) {
 
                     </div>
                 </div>
+                )}
             </div>
 
 

@@ -288,19 +288,27 @@ function SignupForm() {
 
       {/* Step progress */}
       <div className="flex items-center px-7 py-[14px] pb-4 bg-[#f5f7fa] border-b border-[#e1e6ed]">
-        {["Invitation", "Set Password"].map((label, i) => (
-          <div key={label} className="flex items-center flex-shrink-0 gap-[7px]">
-            {i === 1 && (
-              <div className="flex-1 w-16 h-[2px] bg-[#e1e6ed] rounded-full mx-2.5 overflow-hidden">
-                <div className="h-full w-full bg-[#3faf58] rounded-full" />
-              </div>
-            )}
-            <div className="w-[22px] h-[22px] rounded-full bg-[#3faf58] flex items-center justify-center">
-              <CheckIcon size={9} />
-            </div>
-            <span className="text-[11px] font-medium text-[#252525] tracking-[-0.02em] whitespace-nowrap">{label}</span>
+        <div className="flex items-center gap-[7px] flex-shrink-0">
+          <div className="w-[22px] h-[22px] rounded-full bg-[#3faf58] flex items-center justify-center">
+            <CheckIcon size={9} />
           </div>
-        ))}
+          <span className="text-[11px] font-medium text-[#252525] tracking-[-0.02em] whitespace-nowrap">
+            Agreement
+          </span>
+        </div>
+
+        <div className="flex-1 h-[2px] bg-[#e1e6ed] rounded-full mx-2.5 overflow-hidden">
+          <div className="h-full w-full bg-[#3faf58] rounded-full" />
+        </div>
+
+        <div className="flex items-center gap-[7px] flex-shrink-0">
+          <div className="w-[22px] h-[22px] rounded-full bg-[#3faf58] flex items-center justify-center">
+            <CheckIcon size={9} />
+          </div>
+          <span className="text-[11px] font-medium text-[#252525] tracking-[-0.02em] whitespace-nowrap">
+            Set Password
+          </span>
+        </div>
       </div>
 
       {/* Body */}

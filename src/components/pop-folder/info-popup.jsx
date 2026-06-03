@@ -33,6 +33,13 @@ const LIMITER_BADGE_SIGNALS = new Set([
   "Digestive Activity",
 ]);
 
+// Only these signals should be rendered in the popup.
+const VISIBLE_SIGNALS = new Set([
+  "Digestive Activity",
+  "Fuel Utilization",
+  "Metabolic Load",
+]);
+
 // Resolve a marker-grouped view of the signals from the response.
 // Prefers the engine's pre-grouped object; falls back to filtering the flat
 // list. Always returns { acetone: [], ethanol: [], hydrogen: [] }.
@@ -42,11 +49,10 @@ function resolveSignalsByMarker(metabolismSignals, signalsByMarker) {
 
   return MARKERS.reduce((acc, { key }) => {
     const grouped = Array.isArray(fromGrouped[key]) ? fromGrouped[key] : [];
-    if (grouped.length > 0) {
-      acc[key] = grouped;
-    } else {
-      acc[key] = fromFlat.filter((s) => s?.marker_source === key);
-    }
+    const source = grouped.length > 0
+      ? grouped
+      : fromFlat.filter((s) => s?.marker_source === key);
+    acc[key] = source.filter((s) => VISIBLE_SIGNALS.has(s?.signal));
     return acc;
   }, {});
 }

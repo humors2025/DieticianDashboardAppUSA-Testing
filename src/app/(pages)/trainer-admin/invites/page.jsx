@@ -326,7 +326,7 @@ function InviteForm({ onSent }) {
   const [submitting, setSubmitting] = useState(false);
 
   const dialCode = countryCode.split("-")[1] || "+1";
-  const fullPhone = `${dialCode} ${phone.trim()}`.trim();
+  const fullPhone = `${dialCode}${phone.replace(/\D/g, "")}`.trim();
 
   const reset = () => { setFirstName(""); setLastName(""); setEmail(""); setCountryCode("US-+1"); setPhone(""); setSelectedPlan("free_trial"); };
 

@@ -278,8 +278,8 @@ function InviteForm({ onInvitationSent }) {
     const trimmedFirstName = firstName.trim();
     const trimmedLastName = lastName.trim();
     const normalizedEmailAddress = emailAddress.trim().toLowerCase();
-    const localPhoneNumber = phoneNumber.trim();
-    const trimmedPhoneNumber = `${dialCode} ${localPhoneNumber}`.trim();
+    const localPhoneNumber = phoneNumber.replace(/\D/g, "");
+    const trimmedPhoneNumber = `${dialCode}${localPhoneNumber}`.trim();
 
     if (trimmedFirstName.length < 2) {
       return toast.error("First name required.");

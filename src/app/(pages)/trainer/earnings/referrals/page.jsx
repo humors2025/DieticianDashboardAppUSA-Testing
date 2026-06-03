@@ -379,7 +379,7 @@ function InviteForm({ partnerCode, onInviteSent }) {
   const [submitting, setSubmitting] = useState(false);
 
   const dialCode = countryCode.split("-")[1] || "+1";
-  const fullMobile = `${dialCode} ${mobile.trim()}`.trim();
+  const fullMobile = `${dialCode}${mobile.replace(/\D/g, "")}`.trim();
 
   const reset = () => {
     setName("");

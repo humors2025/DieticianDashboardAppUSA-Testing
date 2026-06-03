@@ -865,6 +865,54 @@ export const fetchAllTrainersForSuperAdminService = async ({
 };
 
 
+// Super admin: all clients across the entire network
+// (super-admin-all-clients-overview.php).
+// actor_user_id  -> user_id decoded from the access token
+// dietitian_id   -> partner_code decoded from the access token (used as a
+//                   filter; pass a specific code to scope to one dietitian,
+//                   or "" to list every client in the network)
+export const fetchSuperAdminAllClientsOverviewService = async ({
+  page = 1,
+  limit = 10,
+  search = "",
+  date = "",
+  type = "all",
+  dietitianId = "",
+} = {}) => {
+  const accessToken = Cookies.get("access_token");
+
+  if (!accessToken) {
+    throw new Error("Access token missing. Please login again.");
+  }
+
+  const decoded = decodeAccessTokenFromCookie();
+  const actorUserId = decoded?.user_id ?? decoded?.email ?? getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.SUPERADMINALLCLIENTSOVERVIEW, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      page,
+      limit,
+      search,
+      date,
+      type,
+      // Empty string lists every client in the network; pass a specific
+      // partner_code (dietitian_id) to scope the result to one dietitian.
+      dietitian_id: dietitianId || "",
+    }),
+  });
+};
+
+
 export const fetchTrainerClientsOverviewForSuperAdminService = async ({
   trainerId,
   page = 1,

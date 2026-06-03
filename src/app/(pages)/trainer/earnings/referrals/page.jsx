@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { cookieManager } from "@/lib/cookies";
 import {
@@ -12,6 +12,7 @@ import {
   resendClientSubscriptionInviteService,
 } from "@/services/authService";
 import Cookies from "js-cookie";
+import * as CountryFlags from "country-flag-icons/react/3x2";
 
 function decodeJwt(token) {
   try {
@@ -39,6 +40,168 @@ function resolvePartnerCode(dietician) {
 
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const isValidMobile = (m) => /^\+?[0-9\s\-()]{7,}$/.test(m);
+
+// Country dial codes for the mobile input
+const COUNTRIES = [
+  { code: "AF", name: "Afghanistan", dial: "+93" },
+  { code: "AL", name: "Albania", dial: "+355" },
+  { code: "DZ", name: "Algeria", dial: "+213" },
+  { code: "AR", name: "Argentina", dial: "+54" },
+  { code: "AU", name: "Australia", dial: "+61" },
+  { code: "AT", name: "Austria", dial: "+43" },
+  { code: "BH", name: "Bahrain", dial: "+973" },
+  { code: "BD", name: "Bangladesh", dial: "+880" },
+  { code: "BE", name: "Belgium", dial: "+32" },
+  { code: "BR", name: "Brazil", dial: "+55" },
+  { code: "BG", name: "Bulgaria", dial: "+359" },
+  { code: "CA", name: "Canada", dial: "+1" },
+  { code: "CL", name: "Chile", dial: "+56" },
+  { code: "CN", name: "China", dial: "+86" },
+  { code: "CO", name: "Colombia", dial: "+57" },
+  { code: "HR", name: "Croatia", dial: "+385" },
+  { code: "CZ", name: "Czechia", dial: "+420" },
+  { code: "DK", name: "Denmark", dial: "+45" },
+  { code: "EG", name: "Egypt", dial: "+20" },
+  { code: "FI", name: "Finland", dial: "+358" },
+  { code: "FR", name: "France", dial: "+33" },
+  { code: "DE", name: "Germany", dial: "+49" },
+  { code: "GR", name: "Greece", dial: "+30" },
+  { code: "HK", name: "Hong Kong", dial: "+852" },
+  { code: "HU", name: "Hungary", dial: "+36" },
+  { code: "IN", name: "India", dial: "+91" },
+  { code: "ID", name: "Indonesia", dial: "+62" },
+  { code: "IE", name: "Ireland", dial: "+353" },
+  { code: "IL", name: "Israel", dial: "+972" },
+  { code: "IT", name: "Italy", dial: "+39" },
+  { code: "JP", name: "Japan", dial: "+81" },
+  { code: "JO", name: "Jordan", dial: "+962" },
+  { code: "KE", name: "Kenya", dial: "+254" },
+  { code: "KW", name: "Kuwait", dial: "+965" },
+  { code: "MY", name: "Malaysia", dial: "+60" },
+  { code: "MX", name: "Mexico", dial: "+52" },
+  { code: "MA", name: "Morocco", dial: "+212" },
+  { code: "NL", name: "Netherlands", dial: "+31" },
+  { code: "NZ", name: "New Zealand", dial: "+64" },
+  { code: "NG", name: "Nigeria", dial: "+234" },
+  { code: "NO", name: "Norway", dial: "+47" },
+  { code: "OM", name: "Oman", dial: "+968" },
+  { code: "PK", name: "Pakistan", dial: "+92" },
+  { code: "PH", name: "Philippines", dial: "+63" },
+  { code: "PL", name: "Poland", dial: "+48" },
+  { code: "PT", name: "Portugal", dial: "+351" },
+  { code: "QA", name: "Qatar", dial: "+974" },
+  { code: "RO", name: "Romania", dial: "+40" },
+  { code: "RU", name: "Russia", dial: "+7" },
+  { code: "SA", name: "Saudi Arabia", dial: "+966" },
+  { code: "SG", name: "Singapore", dial: "+65" },
+  { code: "ZA", name: "South Africa", dial: "+27" },
+  { code: "KR", name: "South Korea", dial: "+82" },
+  { code: "ES", name: "Spain", dial: "+34" },
+  { code: "LK", name: "Sri Lanka", dial: "+94" },
+  { code: "SE", name: "Sweden", dial: "+46" },
+  { code: "CH", name: "Switzerland", dial: "+41" },
+  { code: "TW", name: "Taiwan", dial: "+886" },
+  { code: "TH", name: "Thailand", dial: "+66" },
+  { code: "TR", name: "Turkey", dial: "+90" },
+  { code: "UA", name: "Ukraine", dial: "+380" },
+  { code: "AE", name: "United Arab Emirates", dial: "+971" },
+  { code: "GB", name: "United Kingdom", dial: "+44" },
+  { code: "US", name: "United States", dial: "+1" },
+  { code: "VN", name: "Vietnam", dial: "+84" },
+]
+  .filter((c) => CountryFlags[c.code])
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+// Renders the SVG flag for a given ISO country code
+function CountryFlag({ code, className }) {
+  const Flag = CountryFlags[code];
+  if (!Flag) return null;
+  return <Flag title={code} className={className} />;
+}
+
+function CountryCodeSelect({ value, onChange, buttonClass }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  const selected =
+    COUNTRIES.find((c) => `${c.code}-${c.dial}` === value) || COUNTRIES[0];
+
+  const filtered = COUNTRIES.filter((c) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      c.name.toLowerCase().includes(q) ||
+      c.dial.includes(q) ||
+      c.code.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`${buttonClass} flex items-center gap-1.5 whitespace-nowrap cursor-pointer`}
+      >
+        <CountryFlag code={selected.code} className="w-5 h-auto rounded-[2px]" />
+        <span className="text-[#252525]">{selected.dial}</span>
+        <svg width="12" height="12" viewBox="0 0 20 20" fill="none" className="text-[#A1A1A1]">
+          <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1 w-64 rounded-[10px] border border-[#E1E6ED] bg-white shadow-lg">
+          <div className="p-2 border-b border-[#F5F7FA]">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search country or code"
+              className="w-full rounded-[8px] border border-[#E1E6ED] bg-white px-2.5 py-1.5 text-[12px] text-[#252525] focus:outline-none focus:border-[#308BF9]"
+            />
+          </div>
+          <ul className="max-h-56 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-[12px] text-[#A1A1A1]">No matches</li>
+            ) : (
+              filtered.map((c) => (
+                <li key={`${c.code}-${c.dial}`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(`${c.code}-${c.dial}`);
+                      setOpen(false);
+                      setQuery("");
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-[#F5F7FA] cursor-pointer"
+                  >
+                    <CountryFlag code={c.code} className="w-5 h-auto rounded-[2px] shrink-0" />
+                    <span className="flex-1 text-[#252525]">{c.name}</span>
+                    <span className="text-[#A1A1A1]">{c.dial}</span>
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const PLANS = [
   // {
@@ -173,34 +336,35 @@ function PartnerCodeCard({ code, name }) {
   };
 
   return (
-    // <div className="bg-[#F5F7FA] rounded-[10px] p-5 flex flex-col gap-3">
-    //   <div className="flex flex-col gap-1">
-    //     <span className="text-[#A1A1A1] text-[11px] uppercase tracking-wide font-semibold">
-    //       Your partner code
-    //     </span>
-    //     <span className="text-[#535359] text-[12px]">
-    //       {name ? `${name} · ` : ""}Share this code so clients can attribute
-    //       their subscription to you.
-    //     </span>
-    //   </div>
-
-    //   <div className="flex flex-wrap items-center gap-3">
-    //     <div className="bg-white rounded-[10px] px-4 py-3 border border-[#E1E6ED]">
-    //       <span className="text-[#252525] text-[20px] font-bold tracking-wide">
-    //         {code || "\u2014"}
-    //       </span>
-    //     </div>
-    //     <button
-    //       type="button"
-    //       onClick={onCopy}
-    //       disabled={!code}
-    //       className="rounded-[10px] bg-[#308BF9] text-white text-[12px] font-semibold px-4 py-3 disabled:opacity-50 cursor-pointer"
-    //     >
-    //       {copied ? "Copied" : "Copy code"}
-    //     </button>
-    //   </div>
-    // </div>
     <>
+    {/* <div className="bg-[#F5F7FA] rounded-[10px] p-5 flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <span className="text-[#A1A1A1] text-[11px] uppercase tracking-wide font-semibold">
+          Your partner code
+        </span>
+        <span className="text-[#535359] text-[12px]">
+          {name ? `${name} · ` : ""}Share this code so clients can attribute
+          their subscription to you.
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="bg-white rounded-[10px] px-4 py-3 border border-[#E1E6ED]">
+          <span className="text-[#252525] text-[20px] font-bold tracking-wide">
+            {code || "\u2014"}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onCopy}
+          disabled={!code}
+          className="rounded-[10px] bg-[#308BF9] text-white text-[12px] font-semibold px-4 py-3 disabled:opacity-50 cursor-pointer"
+        >
+          {copied ? "Copied" : "Copy code"}
+        </button>
+      </div>
+    </div> */}
+  
     
     </>
   );
@@ -208,13 +372,18 @@ function PartnerCodeCard({ code, name }) {
 
 function InviteForm({ partnerCode, onInviteSent }) {
   const [name, setName] = useState("");
+  const [countryCode, setCountryCode] = useState("US-+1");
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
   const [selectedPlan, setSelectedPlan] = useState("free_trial");
   const [submitting, setSubmitting] = useState(false);
 
+  const dialCode = countryCode.split("-")[1] || "+1";
+  const fullMobile = `${dialCode} ${mobile.trim()}`.trim();
+
   const reset = () => {
     setName("");
+    setCountryCode("US-+1");
     setMobile("");
     setEmail("");
     setSelectedPlan("free_trial");
@@ -231,7 +400,7 @@ function InviteForm({ partnerCode, onInviteSent }) {
       toast.error("Please enter the client's name.");
       return;
     }
-    if (!isValidMobile(mobile)) {
+    if (!mobile.trim() || !isValidMobile(fullMobile)) {
       toast.error("Please enter a valid mobile number.");
       return;
     }
@@ -252,7 +421,7 @@ function InviteForm({ partnerCode, onInviteSent }) {
       const res = await sendTrainerClientInviteService({
         trainerId: trainerId,
         clientName: name.trim(),
-        clientMobile: mobile.trim(),
+        clientMobile: fullMobile,
         clientEmail: email.trim(),
         planCode: selectedPlan,
       });
@@ -301,13 +470,20 @@ function InviteForm({ partnerCode, onInviteSent }) {
         </div>
         <div className="flex flex-col gap-1">
           <label className={labelClass}>Mobile <span className="text-red-500">*</span></label>
-          <input
-            className={fieldClass}
-            value={mobile}
-            onChange={(e) => setMobile(e.target.value)}
-            placeholder="+1 555 123 4567"
-            inputMode="tel"
-          />
+          <div className="flex items-stretch rounded-[10px] border border-[#E1E6ED] bg-white transition-colors focus-within:border-[#308BF9]">
+            <CountryCodeSelect
+              value={countryCode}
+              onChange={setCountryCode}
+              buttonClass="px-2.5 py-2.5 text-[13px] border-r border-[#E1E6ED] rounded-l-[10px] hover:bg-[#F5F7FA] focus:outline-none transition-colors"
+            />
+            <input
+              className="flex-1 min-w-0 bg-transparent px-3 py-2.5 text-[13px] text-[#252525] rounded-r-[10px] focus:outline-none"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value.replace(/[^\d\s\-()]/g, ""))}
+              placeholder="555 123 4567"
+              inputMode="tel"
+            />
+          </div>
         </div>
         <div className="flex flex-col gap-1">
           <label className={labelClass}>Email <span className="text-red-500">*</span></label>
@@ -516,7 +692,7 @@ function PendingInvites({
                       {inv.accepted_email || inv.accepted_by_email || "-"}
                     </td>
                     <td className="py-2.5 px-4 text-[#535359]">
-                      {inv.referral_code || inv.code || inv.invite_code || "Yet to be done"}
+                      {inv.redeem_code || "-"}
                     </td>
                     <td className="py-2.5 px-4">
                       {planObj ? (

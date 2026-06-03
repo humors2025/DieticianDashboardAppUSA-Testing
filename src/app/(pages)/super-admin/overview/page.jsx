@@ -137,6 +137,7 @@ export default function SuperAdminOverview() {
           value={String(ownClients)}
           hint="Directly onboarded by you"
           pending={loading && !overview}
+            href="/trainer/dashboard"
         />
 
         <KpiCard
@@ -144,7 +145,7 @@ export default function SuperAdminOverview() {
           value={String(totalClients)}
           hint="Total in network"
           pending={loading && !overview}
-          // href="/super-admin/clients"
+          href="/super-admin/all-clients"
         />
        
       </div>

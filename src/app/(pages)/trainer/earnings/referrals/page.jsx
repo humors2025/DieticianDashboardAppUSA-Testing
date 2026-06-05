@@ -41,6 +41,27 @@ function resolvePartnerCode(dietician) {
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 const isValidMobile = (m) => /^\+?[0-9\s\-()]{7,}$/.test(m);
 
+// Trial window length (days) for an accepted referral client.
+const TRIAL_DAYS = 7;
+
+// Computes the remaining days in the 7-day trial window starting from sent_on_date.
+// Returns null when there's no usable date, otherwise { days, expired }.
+function getTrialCountdown(sentOnDate) {
+  if (!sentOnDate) return null;
+  // "2026-06-03 23:53:13" -> parse reliably across browsers
+  const sent = new Date(String(sentOnDate).replace(" ", "T"));
+  if (Number.isNaN(sent.getTime())) return null;
+
+  const expiry = new Date(sent.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+  const msLeft = expiry.getTime() - Date.now();
+
+  if (msLeft <= 0) return { days: 0, expired: true };
+
+  // Round up so a partial day still counts as a remaining day; cap at the trial length.
+  const days = Math.min(Math.ceil(msLeft / (24 * 60 * 60 * 1000)), TRIAL_DAYS);
+  return { days, expired: false };
+}
+
 // Country dial codes for the mobile input
 const COUNTRIES = [
   { code: "AF", name: "Afghanistan", dial: "+93" },
@@ -540,12 +561,13 @@ function PendingInvites({
   invites, 
   onResend, 
   onRevoke, 
-  isLoading, 
-  onPageChange, 
-  pagination, 
+  isLoading,
+  onPageChange,
+  pagination,
   summary,
   onSubscriptionRevoke,
-  onSubscriptionResend 
+  onSubscriptionResend,
+  onExtend
 }) {
   const [actionInProgress, setActionInProgress] = useState({});
   const [revokeModal, setRevokeModal] = useState({ isOpen: false, client: null });
@@ -607,6 +629,16 @@ function PendingInvites({
       await onRevoke(inv); 
     } finally {
       setActionInProgress((prev) => ({ ...prev, [`revoke-${uniqueKey}`]: false }));
+    }
+  };
+
+  const handleExtendClick = async (inv, index) => {
+    const uniqueKey = getUniqueKey(inv, index);
+    setActionInProgress((prev) => ({ ...prev, [`extend-${uniqueKey}`]: true }));
+    try {
+      await onExtend(inv);
+    } finally {
+      setActionInProgress((prev) => ({ ...prev, [`extend-${uniqueKey}`]: false }));
     }
   };
 
@@ -706,7 +738,40 @@ function PendingInvites({
                       )}
                     </td>
                     <td className="py-2.5 px-4">
-                      {getStatusBadge(inv.status)}
+                      {(() => {
+                        const countdown =
+                          inv.status === "accepted"
+                            ? getTrialCountdown(inv.sent_on_date)
+                            : null;
+
+                        // For accepted clients, show the trial countdown instead of the badge.
+                        if (countdown) {
+                          if (countdown.expired) {
+                            return (
+                              <div className="flex items-center gap-3">
+                                <span className="inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 bg-[#FCEAEB] text-[#B5363A] whitespace-nowrap">
+                                  Expired
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleExtendClick(inv, index)}
+                                  disabled={actionInProgress[`extend-${uniqueKey}`]}
+ className="rounded-[8px] border border-[#E1E6ED] px-3 py-1.5 text-[12px] font-semibold text-[#535359] disabled:opacity-40 hover:bg-[#F5F7FA] transition-colors cursor-pointer whitespace-nowrap"
+                                >
+                                  {actionInProgress[`extend-${uniqueKey}`] ? "Extending..." : "+7 days"}
+                                </button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <span className="inline-flex rounded-full text-[11px] font-semibold px-2.5 py-0.5 bg-[#E5F6EE] text-[#1F7A4A] whitespace-nowrap">
+                              {countdown.days} {countdown.days === 1 ? "day" : "days"} remaining
+                            </span>
+                          );
+                        }
+
+                        return getStatusBadge(inv.status);
+                      })()}
                     </td>
                     <td className="py-2.5 px-4 text-[#A1A1A1]">
                       {inv.sent_on_date ? new Date(inv.sent_on_date).toLocaleString("en-US", {
@@ -884,6 +949,12 @@ export default function ReferralsPage() {
     }
   };
 
+  const handleExtendTrial = async (inv) => {
+    // TODO: wire to the extend-trial API once the backend endpoint is ready.
+    // Expected: POST { actor_user_id, subscription_id } -> adds 7 days to the trial window.
+    toast.success(`Trial for ${inv.name} will be extended by 7 days (pending backend).`);
+  };
+
   const handleSubscriptionRevoke = async (inv, reason) => {
     try {
       await revokeClientSubscriptionInviteService({
@@ -926,6 +997,7 @@ export default function ReferralsPage() {
           summary={summary}
           onSubscriptionRevoke={handleSubscriptionRevoke}
           onSubscriptionResend={handleSubscriptionResend}
+          onExtend={handleExtendTrial}
         />
       </div>
     </div>

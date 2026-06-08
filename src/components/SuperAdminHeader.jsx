@@ -73,7 +73,7 @@ export default function SuperAdminHeader() {
             <img src="/icons/logorespyr.png" alt="logo" width={50} height={50} />
           </div>
         </Link>
-        <span className="rounded-full bg-[#252525] text-white text-[10px] font-semibold px-2.5 py-1 uppercase tracking-wide">
+        <span className="rounded-full bg-[#252525] text-white text-[10px] font-semibold px-2.5 py-1 uppercase tracking-wide whitespace-nowrap">
           Super Admin
         </span>
       </div>

@@ -1,9 +1,9 @@
-import Header from "@/components/Header";
+import TrainerHeaderSwitch from "@/components/TrainerHeaderSwitch";
 
 export default function TrainerLayout({ children }) {
   return (
     <>
-      <Header />
+      <TrainerHeaderSwitch />
       {children}
     </>
   );

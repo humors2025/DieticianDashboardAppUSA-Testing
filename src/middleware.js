@@ -77,7 +77,7 @@ function readRole(request) {
 function homeForRole(role) {
   switch (role) {
     case 'super_admin':   return '/super-admin/overview';
-    case 'trainer_admin': return '/trainer-admin/overview';
+    case 'trainer_admin': return '/trainer-admin/trainers';
     case 'trainer':       return '/trainer/dashboard';
     default:              return '/trainer/dashboard';
   }

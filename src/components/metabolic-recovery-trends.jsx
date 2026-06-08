@@ -3,11 +3,12 @@
 import Image from "next/image";
 import { useState } from "react";
 import SomeInfoPopup from "./pop-folder/some-info-popup";
+import ExpandableText from "./ExpandableText";
 
 function SegmentedProgressBar({
     value = 85,
     totalSegments = 55,
-    labels = [0, 60, 80, 100],
+    labels = [0, 50, 70, 100],
 
     // ✅ treat as weights (ratio only), NOT px width
     segmentWeights = [80, 82, 172],
@@ -45,11 +46,11 @@ function SegmentedProgressBar({
         return base; // [zone0, zone1, zone2]
     })();
 
-    // ranges matching labels [0,60,80,100]
+    // ranges matching labels [0,50,70,100]
     const ranges = [
-        { from: 0, to: 60, weight: segmentWeights[0], segs: zoneSegments[0] },
-        { from: 60, to: 80, weight: segmentWeights[1], segs: zoneSegments[1] },
-        { from: 80, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
+        { from: 0, to: 50, weight: segmentWeights[0], segs: zoneSegments[0] },
+        { from: 50, to: 70, weight: segmentWeights[1], segs: zoneSegments[1] },
+        { from: 70, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
     ];
 
     // filled segments per zone
@@ -182,7 +183,7 @@ export default function MetabolicRecoveryTrends({ data }) {
                     <SegmentedProgressBar
                         value={metabolicScore}
                         totalSegments={55}
-                        labels={[0, 60, 80, 100]}
+                        labels={[0, 50, 70, 100]}
                         segmentWeights={[80, 82, 172]}
                         filledColor={metabolicZoneConfig.color}
                     />
@@ -202,40 +203,9 @@ export default function MetabolicRecoveryTrends({ data }) {
 
 
 
-                        <div className="flex flex-col gap-2.5 items-start">
-
-
-
-<p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-  <b className="font-semibold">
-  intervention:{" "}
-    
-  </b>
-  {(metabolicLoad?.intervention || "").split(":")[0]}
-
-  {" "}
-  {(metabolicLoad?.intervention || "")
-    .split(":")
-    .slice(1)
-    .join(":")
-    .trim()}
-</p>
-
-
-<p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-  <b className="font-semibold">
-  interpretation:{" "}
-    
-  </b>
-  {(recoveryActivity?.interpretation || "").split(":")[0]}
-  {" "}
-  {(recoveryActivity?.interpretation || "")
-    .split(":")
-    .slice(1)
-    .join(":")
-    .trim()}
-</p>
-
+                        <div className="flex flex-col gap-2.5 items-start w-full">
+  <ExpandableText label="intervention: " body={metabolicLoad?.intervention} />
+  <ExpandableText label="interpretation: " body={metabolicLoad?.interpretation} />
 </div>
                     </div>
                 </div>
@@ -272,7 +242,7 @@ export default function MetabolicRecoveryTrends({ data }) {
                     <SegmentedProgressBar
                         value={recoveryScore}
                         totalSegments={55}
-                        labels={[0, 60, 80, 100]}
+                        labels={[0, 50, 70, 100]}
                         segmentWeights={[80, 82, 172]}
                         filledColor={recoveryZoneConfig.color}
                     />
@@ -291,40 +261,9 @@ export default function MetabolicRecoveryTrends({ data }) {
                     
 
 
-                        <div className="flex flex-col gap-2.5 items-center">
-
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              intervention:{" "}
-                
-              </b>
-              {(recoveryActivity?.intervention || "").split(":")[0]}
-           
-              {" "}
-              {(recoveryActivity?.intervention || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              interpretation:{" "}
-                
-              </b>
-              {(recoveryActivity?.interpretation || "").split(":")[0]}
-              {" "}
-              {(recoveryActivity?.interpretation || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
+                        <div className="flex flex-col gap-2.5 items-start w-full">
+              <ExpandableText label="intervention: " body={recoveryActivity?.intervention} />
+              <ExpandableText label="interpretation: " body={recoveryActivity?.interpretation} />
             </div>
                     </div>
                 </div>

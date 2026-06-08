@@ -8,7 +8,7 @@ import InfoPopUp from "./pop-folder/info-popup";
 function SegmentedProgressBar({
   value = 85,
   totalSegments = 55,
-  labels = [0, 60, 80, 100],
+  labels = [0, 50, 70, 100],
   segmentWeights = [80, 82, 172],
   filledColor = "#3FAF58",
   emptyColor = "#E1E6ED",
@@ -41,9 +41,9 @@ function SegmentedProgressBar({
   })();
 
   const ranges = [
-    { from: 0, to: 60, weight: segmentWeights[0], segs: zoneSegments[0] },
-    { from: 60, to: 80, weight: segmentWeights[1], segs: zoneSegments[1] },
-    { from: 80, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
+    { from: 0, to: 50, weight: segmentWeights[0], segs: zoneSegments[0] },
+    { from: 50, to: 70, weight: segmentWeights[1], segs: zoneSegments[1] },
+    { from: 70, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
   ];
 
   const filledByRange = ranges.map((r) => {
@@ -98,6 +98,34 @@ function SegmentedProgressBar({
   );
 }
 
+// One paragraph with its own independent "View all / View less" toggle.
+function ExpandableText({ label, body }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!body) return null;
+
+  return (
+    <div className="flex flex-col gap-1 items-start w-full">
+      <p
+        className={`text-[#738298] text-[12px] font-normal leading-[130%] ${
+          expanded ? "" : "line-clamp-3"
+        }`}
+      >
+        <b className="font-semibold">{label}</b>
+        {body}
+      </p>
+
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        className="text-[#308BF9] text-[12px] font-semibold leading-normal tracking-[-0.24px] underline cursor-pointer"
+      >
+        {expanded ? "View less" : "View all"}
+      </button>
+    </div>
+  );
+}
+
 export default function FatUsePatternTrend() {
   const [showPopup, setShowPopup] = useState(false);
 
@@ -113,18 +141,40 @@ export default function FatUsePatternTrend() {
     {};
 
 
-  const value = trendData?.score ?? "NA";
+  const value = trendData?.value ?? trendData?.score ?? "NA";
   const status =
     trendData?.zone && trendData?.zone !== ""
       ? trendData.zone
       : "NA";
 
 
+  // Scientific block — old API: scientific_interpretation, new API: trainer_*
   const scientificTitle =
-    trendData?.scientific_interpretation?.title || "NA";
+    trendData?.scientific_interpretation?.title ||
+    trendData?.trainer_state ||
+    "NA";
 
   const scientificText =
-    trendData?.scientific_interpretation?.text || "NA";
+    trendData?.scientific_interpretation?.text ||
+    trendData?.trainer_score_meaning ||
+    "NA";
+
+  // Client block — old API: client_interpretation, new API: client_*
+  const clientTitle =
+    trendData?.client_interpretation?.title ||
+    trendData?.client_state ||
+    "";
+
+  const clientText =
+    trendData?.client_interpretation?.text ||
+    trendData?.client_score_meaning ||
+    "";
+
+  // Intervention / deep science — new API only (empty in old API)
+  const interventionText =
+    trendData?.intervention ||
+    trendData?.trainer_score_deep_science ||
+    "";
 
   const title = rawJson?.Muscle_Gain_Trend
     ? "Muscle Gain Trend"
@@ -173,7 +223,7 @@ export default function FatUsePatternTrend() {
         <SegmentedProgressBar
           value={value}
           totalSegments={55}
-          labels={[0, 60, 80, 100]}
+          labels={[0, 50, 70, 100]}
           segmentWeights={[80, 82, 172]}
           filledColor={statusColor}
         />
@@ -193,21 +243,21 @@ export default function FatUsePatternTrend() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2.5 items-start"> 
-        <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
-          <b className="font-semibold">{scientificTitle}. </b>
-          {scientificText}
-        </p>
+      <div className="flex flex-col gap-2.5 items-start">
+        <ExpandableText
+          label={`${scientificTitle}. `}
+          body={scientificText}
+        />
 
-        <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
-          <b className="font-semibold">intervention: </b>
-          {trendData?.intervention}
-        </p>
+        <ExpandableText
+          label="interpretation: "
+          body={`${clientTitle ? `${clientTitle}. ` : ""}${clientText}`}
+        />
 
-        <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
-          <b className="font-semibold">interpretation: </b>
-          {trendData?.scientific_interpretation?.title} {trendData?.scientific_interpretation?.text}
-        </p>
+        <ExpandableText
+          label="intervention: "
+          body={interventionText}
+        />
       </div>
     </div>
 

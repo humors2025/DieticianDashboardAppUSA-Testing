@@ -69,7 +69,7 @@ export default function TrainerAdminHeader() {
             <img src="/icons/logorespyr.png" alt="logo" width={50} height={50} />
           </div>
         </Link>
-        <span className="rounded-full bg-[#308BF9] text-white text-[10px] font-semibold px-2.5 py-1 uppercase tracking-wide">
+        <span className="rounded-full bg-[#308BF9] text-white text-[10px] font-semibold px-2.5 py-1 uppercase tracking-wide whitespace-nowrap">
           Trainer Admin
         </span>
       </div>

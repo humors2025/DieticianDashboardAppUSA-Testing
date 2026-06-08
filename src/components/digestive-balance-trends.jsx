@@ -3,11 +3,12 @@
 import Image from "next/image";
 import { useState } from "react";
 import SomeInfoPopup from "./pop-folder/some-info-popup";
+import ExpandableText from "./ExpandableText";
 
 function SegmentedProgressBar({
   value = 85,
   totalSegments = 55,
-  labels = [0, 60, 80, 100],
+  labels = [0, 50, 70, 100],
   segmentWeights = [80, 82, 172],
   filledColor = "#FFBF2D",
   emptyColor = "#E1E6ED",
@@ -40,9 +41,9 @@ function SegmentedProgressBar({
   })();
 
   const ranges = [
-    { from: 0, to: 60, weight: segmentWeights[0], segs: zoneSegments[0] },
-    { from: 60, to: 80, weight: segmentWeights[1], segs: zoneSegments[1] },
-    { from: 80, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
+    { from: 0, to: 50, weight: segmentWeights[0], segs: zoneSegments[0] },
+    { from: 50, to: 70, weight: segmentWeights[1], segs: zoneSegments[1] },
+    { from: 70, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
   ];
 
   const filledByRange = ranges.map((r) => {
@@ -181,7 +182,7 @@ export default function DigestiveBalanceTrends({ data }) {
           <SegmentedProgressBar
             value={nutrientScore}
             totalSegments={55}
-            labels={[0, 60, 80, 100]}
+            labels={[0, 50, 70, 100]}
             segmentWeights={[80, 82, 172]}
             filledColor={getZoneColor(nutrientZone)}
           />
@@ -199,39 +200,9 @@ export default function DigestiveBalanceTrends({ data }) {
 
         
 
-<div className="flex flex-col gap-2.5 items-start">
-
-
-
-<p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-  <b className="font-semibold">
-  intervention:{" "}
-    
-  </b>
-  {(digestiveActivity?.intervention || "").split(":")[0]}
-  {" "}
-  {(digestiveActivity?.intervention || "")
-    .split(":")
-    .slice(1)
-    .join(":")
-    .trim()}
-</p>
-
-
-<p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-  <b className="font-semibold">
-  interpretation:{" "}
-    
-  </b>
-  {(digestiveActivity?.interpretation || "").split(":")[0]}
-  {" "}
-  {(digestiveActivity?.interpretation || "")
-    .split(":")
-    .slice(1)
-    .join(":")
-    .trim()}
-</p>
-
+<div className="flex flex-col gap-2.5 items-start w-full">
+  <ExpandableText label="intervention: " body={digestiveActivity?.intervention} />
+  <ExpandableText label="interpretation: " body={digestiveActivity?.interpretation} />
 </div>
           </div>
         </div>
@@ -269,7 +240,7 @@ export default function DigestiveBalanceTrends({ data }) {
           <SegmentedProgressBar
             value={digestiveScore}
             totalSegments={55}
-            labels={[0, 60, 80, 100]}
+            labels={[0, 50, 70, 100]}
             segmentWeights={[80, 82, 172]}
             filledColor={getZoneColor(digestiveZone)}
           />
@@ -285,39 +256,9 @@ export default function DigestiveBalanceTrends({ data }) {
               </p>
             </div>
 
-<div className="flex flex-col gap-2.5 items-center">
-
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              intervention:{" "}
-                
-              </b>
-              {(digestiveActivity?.intervention || "").split(":")[0]}
-              {" "}
-              {(digestiveActivity?.intervention || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              interpretation:{" "}
-                
-              </b>
-              {(digestiveActivity?.interpretation || "").split(":")[0]}
-              {" "}
-              {(digestiveActivity?.interpretation || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
+<div className="flex flex-col gap-2.5 items-start w-full">
+              <ExpandableText label="intervention: " body={digestiveActivity?.intervention} />
+              <ExpandableText label="interpretation: " body={digestiveActivity?.interpretation} />
             </div>
           </div>
         </div>

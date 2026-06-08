@@ -2,11 +2,12 @@
 import Image from "next/image";
 import { useState } from "react";
 import SomeInfoPopup from "./pop-folder/some-info-popup";
+import ExpandableText from "./ExpandableText";
 
 function SegmentedProgressBar({
     value = 85,
     totalSegments = 55, 
-    labels = [0, 60, 80, 100],
+    labels = [0, 50, 70, 100],
 
     // ✅ treat as weights (ratio only), NOT px width
     segmentWeights = [80, 82, 172],
@@ -44,11 +45,11 @@ function SegmentedProgressBar({
         return base; // [zone0, zone1, zone2]
     })();
 
-    // ranges matching labels [0,60,80,100]
+    // ranges matching labels [0,50,70,100]
     const ranges = [
-        { from: 0, to: 60, weight: segmentWeights[0], segs: zoneSegments[0] },
-        { from: 60, to: 80, weight: segmentWeights[1], segs: zoneSegments[1] },
-        { from: 80, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
+        { from: 0, to: 50, weight: segmentWeights[0], segs: zoneSegments[0] },
+        { from: 50, to: 70, weight: segmentWeights[1], segs: zoneSegments[1] },
+        { from: 70, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
     ];
 
     // filled segments per zone
@@ -181,7 +182,7 @@ export default function FuelEnergyTrends({ data }) {
                     <SegmentedProgressBar
                         value={fuelScore}
                         totalSegments={55}
-                        labels={[0, 60, 80, 100]}
+                        labels={[0, 50, 70, 100]}
                         segmentWeights={[80, 82, 172]}
                         filledColor={fuelZoneConfig.color}
                     />
@@ -198,40 +199,9 @@ export default function FuelEnergyTrends({ data }) {
                         </div>
 
 
-<div className="flex flex-col gap-2.5 items-start">
-
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              intervention:{" "}
-                
-              </b>
-              {(fuelUtilization?.intervention || "").split(":")[0]}
-           
-              {" "}
-              {(fuelUtilization?.intervention || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              interpretation:{" "}
-                
-              </b>
-              {(fuelUtilization?.interpretation || "").split(":")[0]}
-              {" "}
-              {(fuelUtilization?.interpretation || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
+<div className="flex flex-col gap-2.5 items-start w-full">
+              <ExpandableText label="intervention: " body={fuelUtilization?.intervention} />
+              <ExpandableText label="interpretation: " body={fuelUtilization?.interpretation} />
             </div>
                     </div>
                 </div>
@@ -268,7 +238,7 @@ export default function FuelEnergyTrends({ data }) {
                     <SegmentedProgressBar
                         value={energyScore}
                         totalSegments={55}
-                        labels={[0, 60, 80, 100]}
+                        labels={[0, 50, 70, 100]}
                         segmentWeights={[80, 82, 172]}
                         filledColor={energyZoneConfig.color}
                     />
@@ -287,40 +257,9 @@ export default function FuelEnergyTrends({ data }) {
                                             
 
 
-<div className="flex flex-col gap-2.5 items-center">
-
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              intervention:{" "}
-                
-              </b>
-              {(energySource?.intervention || "").split(":")[0]}
-           
-              {" "}
-              {(energySource?.intervention || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              interpretation:{" "}
-                
-              </b>
-              {(energySource?.interpretation || "").split(":")[0]}
-              {" "}
-              {(energySource?.interpretation || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
+<div className="flex flex-col gap-2.5 items-start w-full">
+              <ExpandableText label="intervention: " body={energySource?.intervention} />
+              <ExpandableText label="interpretation: " body={energySource?.interpretation} />
             </div>
 
                     </div>

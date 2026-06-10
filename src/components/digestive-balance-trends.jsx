@@ -201,8 +201,9 @@ export default function DigestiveBalanceTrends({ data }) {
         
 
 <div className="flex flex-col gap-2.5 items-start w-full">
-  <ExpandableText label="intervention: " body={digestiveActivity?.intervention} />
-  <ExpandableText label="interpretation: " body={digestiveActivity?.interpretation} />
+  <ExpandableText body={digestiveActivity?.trainer_state} />
+  <ExpandableText label="Meaning: " body={digestiveActivity?.trainer_score_meaning} />
+  <ExpandableText label="Deep Science: " body={digestiveActivity?.trainer_score_deep_science} />
 </div>
           </div>
         </div>
@@ -257,8 +258,9 @@ export default function DigestiveBalanceTrends({ data }) {
             </div>
 
 <div className="flex flex-col gap-2.5 items-start w-full">
-              <ExpandableText label="intervention: " body={digestiveActivity?.intervention} />
-              <ExpandableText label="interpretation: " body={digestiveActivity?.interpretation} />
+              <ExpandableText body={digestiveActivity?.trainer_state} />
+              <ExpandableText label="Meaning: " body={digestiveActivity?.trainer_score_meaning} />
+              <ExpandableText label="Deep Science: " body={digestiveActivity?.trainer_score_deep_science} />
             </div>
           </div>
         </div>

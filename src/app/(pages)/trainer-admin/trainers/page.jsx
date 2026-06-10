@@ -128,9 +128,9 @@ export default function TrainerAdminTrainersPage() {
         <div className="bg-[#308BF9] rounded-[10px] p-5 text-white flex flex-col gap-1">
           <div className="text-[12px] opacity-80">Trainers in network</div>
           <div className="text-[28px] font-bold">{totalTrainers}</div>
-          <div className="text-[11px] opacity-80">
+          {/* <div className="text-[11px] opacity-80">
             {actorInfo?.accepted_trainers_count || 0} accepted + you
-          </div>
+          </div> */}
         </div>
         <div className="bg-white rounded-[10px] p-5 border border-[#E1E6ED] flex flex-col gap-1">
           <div className="text-[#535359] text-[12px]">Total clients in Network</div>

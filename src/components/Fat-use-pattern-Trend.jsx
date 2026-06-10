@@ -148,33 +148,10 @@ export default function FatUsePatternTrend() {
       : "NA";
 
 
-  // Scientific block — old API: scientific_interpretation, new API: trainer_*
-  const scientificTitle =
-    trendData?.scientific_interpretation?.title ||
-    trendData?.trainer_state ||
-    "NA";
-
-  const scientificText =
-    trendData?.scientific_interpretation?.text ||
-    trendData?.trainer_score_meaning ||
-    "NA";
-
-  // Client block — old API: client_interpretation, new API: client_*
-  const clientTitle =
-    trendData?.client_interpretation?.title ||
-    trendData?.client_state ||
-    "";
-
-  const clientText =
-    trendData?.client_interpretation?.text ||
-    trendData?.client_score_meaning ||
-    "";
-
-  // Intervention / deep science — new API only (empty in old API)
-  const interventionText =
-    trendData?.intervention ||
-    trendData?.trainer_score_deep_science ||
-    "";
+  // Trainer blocks — bind straight from the trend data
+  const trainerState = trendData?.trainer_state || "";
+  const trainerMeaning = trendData?.trainer_score_meaning || "";
+  const trainerDeepScience = trendData?.trainer_score_deep_science || "";
 
   const title = rawJson?.Muscle_Gain_Trend
     ? "Muscle Gain Trend"
@@ -244,19 +221,16 @@ export default function FatUsePatternTrend() {
       </div>
 
       <div className="flex flex-col gap-2.5 items-start">
+        <ExpandableText body={trainerState} />
+
         <ExpandableText
-          label={`${scientificTitle}. `}
-          body={scientificText}
+          label="Meaning: "
+          body={trainerMeaning}
         />
 
         <ExpandableText
-          label="interpretation: "
-          body={`${clientTitle ? `${clientTitle}. ` : ""}${clientText}`}
-        />
-
-        <ExpandableText
-          label="intervention: "
-          body={interventionText}
+          label="Deep Science: "
+          body={trainerDeepScience}
         />
       </div>
     </div>

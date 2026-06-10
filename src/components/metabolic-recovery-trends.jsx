@@ -204,8 +204,9 @@ export default function MetabolicRecoveryTrends({ data }) {
 
 
                         <div className="flex flex-col gap-2.5 items-start w-full">
-  <ExpandableText label="intervention: " body={metabolicLoad?.intervention} />
-  <ExpandableText label="interpretation: " body={metabolicLoad?.interpretation} />
+  <ExpandableText body={metabolicLoad?.trainer_state} />
+  <ExpandableText label="Meaning: " body={metabolicLoad?.trainer_score_meaning} />
+  <ExpandableText label="Deep Science: " body={metabolicLoad?.trainer_score_deep_science} />
 </div>
                     </div>
                 </div>
@@ -262,8 +263,9 @@ export default function MetabolicRecoveryTrends({ data }) {
 
 
                         <div className="flex flex-col gap-2.5 items-start w-full">
-              <ExpandableText label="intervention: " body={recoveryActivity?.intervention} />
-              <ExpandableText label="interpretation: " body={recoveryActivity?.interpretation} />
+              <ExpandableText body={recoveryActivity?.trainer_state} />
+              <ExpandableText label="Meaning: " body={recoveryActivity?.trainer_score_meaning} />
+              <ExpandableText label="Deep Science: " body={recoveryActivity?.trainer_score_deep_science} />
             </div>
                     </div>
                 </div>

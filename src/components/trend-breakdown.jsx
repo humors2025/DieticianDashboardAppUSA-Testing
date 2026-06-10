@@ -42,8 +42,9 @@ export default function TrendBreakdown() {
                     score: raw.value ?? raw.score ?? item.score,
                     zone: raw.zone || item.zone,
                     short_text: raw.client_state || item.short_text,
-                    interpretation: raw.trainer_score_meaning || raw.interpretation || item.interpretation,
-                    intervention: raw.trainer_score_deep_science || raw.intervention || item.intervention,
+                    trainer_state: raw.trainer_state || item.trainer_state,
+                    trainer_score_meaning: raw.trainer_score_meaning || item.trainer_score_meaning,
+                    trainer_score_deep_science: raw.trainer_score_deep_science || item.trainer_score_deep_science,
                 };
             }),
         };

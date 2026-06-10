@@ -200,8 +200,9 @@ export default function FuelEnergyTrends({ data }) {
 
 
 <div className="flex flex-col gap-2.5 items-start w-full">
-              <ExpandableText label="intervention: " body={fuelUtilization?.intervention} />
-              <ExpandableText label="interpretation: " body={fuelUtilization?.interpretation} />
+              <ExpandableText body={fuelUtilization?.trainer_state} />
+              <ExpandableText label="Meaning: " body={fuelUtilization?.trainer_score_meaning} />
+              <ExpandableText label="Deep Science: " body={fuelUtilization?.trainer_score_deep_science} />
             </div>
                     </div>
                 </div>
@@ -258,8 +259,9 @@ export default function FuelEnergyTrends({ data }) {
 
 
 <div className="flex flex-col gap-2.5 items-start w-full">
-              <ExpandableText label="intervention: " body={energySource?.intervention} />
-              <ExpandableText label="interpretation: " body={energySource?.interpretation} />
+              <ExpandableText body={energySource?.trainer_state} />
+              <ExpandableText label="Meaning: " body={energySource?.trainer_score_meaning} />
+              <ExpandableText label="Deep Science: " body={energySource?.trainer_score_deep_science} />
             </div>
 
                     </div>

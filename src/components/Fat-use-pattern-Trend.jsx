@@ -8,7 +8,7 @@ import InfoPopUp from "./pop-folder/info-popup";
 function SegmentedProgressBar({
   value = 85,
   totalSegments = 55,
-  labels = [0, 60, 80, 100],
+  labels = [0, 50, 70, 100],
   segmentWeights = [80, 82, 172],
   filledColor = "#3FAF58",
   emptyColor = "#E1E6ED",
@@ -41,9 +41,9 @@ function SegmentedProgressBar({
   })();
 
   const ranges = [
-    { from: 0, to: 60, weight: segmentWeights[0], segs: zoneSegments[0] },
-    { from: 60, to: 80, weight: segmentWeights[1], segs: zoneSegments[1] },
-    { from: 80, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
+    { from: 0, to: 50, weight: segmentWeights[0], segs: zoneSegments[0] },
+    { from: 50, to: 70, weight: segmentWeights[1], segs: zoneSegments[1] },
+    { from: 70, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
   ];
 
   const filledByRange = ranges.map((r) => {
@@ -98,8 +98,23 @@ function SegmentedProgressBar({
   );
 }
 
+// One paragraph of trainer/insight text.
+function ExpandableText({ label, body }) {
+  if (!body) return null;
+
+  return (
+    <div className="flex flex-col gap-1 items-start w-full">
+      <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
+        <b className="font-semibold">{label}</b>
+        {body}
+      </p>
+    </div>
+  );
+}
+
 export default function FatUsePatternTrend() {
   const [showPopup, setShowPopup] = useState(false);
+  const [activeTab, setActiveTab] = useState("meaning");
 
   const clientIndividualProfile = useSelector(
     (state) => state.clientIndividualProfile.data
@@ -113,18 +128,17 @@ export default function FatUsePatternTrend() {
     {};
 
 
-  const value = trendData?.score ?? "NA";
+  const value = trendData?.value ?? trendData?.score ?? "NA";
   const status =
     trendData?.zone && trendData?.zone !== ""
       ? trendData.zone
       : "NA";
 
 
-  const scientificTitle =
-    trendData?.scientific_interpretation?.title || "NA";
-
-  const scientificText =
-    trendData?.scientific_interpretation?.text || "NA";
+  // Trainer blocks — bind straight from the trend data
+  const trainerState = trendData?.trainer_state || "";
+  const trainerMeaning = trendData?.trainer_score_meaning || "";
+  const trainerDeepScience = trendData?.trainer_score_deep_science || "";
 
   const title = rawJson?.Muscle_Gain_Trend
     ? "Muscle Gain Trend"
@@ -173,12 +187,12 @@ export default function FatUsePatternTrend() {
         <SegmentedProgressBar
           value={value}
           totalSegments={55}
-          labels={[0, 60, 80, 100]}
+          labels={[0, 50, 70, 100]}
           segmentWeights={[80, 82, 172]}
           filledColor={statusColor}
         />
 
-        <div className="flex items-baseline">
+        <div className="flex items-center">
           <div className="flex items-baseline gap-[4px]">
             <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
               {value !== "NA" && !isNaN(Number(value))
@@ -190,24 +204,43 @@ export default function FatUsePatternTrend() {
               %
             </p>
           </div>
+
+          <ExpandableText body={trainerState} />
         </div>
       </div>
 
-      <div className="flex flex-col gap-2.5 items-start"> 
-        <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
-          <b className="font-semibold">{scientificTitle}. </b>
-          {scientificText}
-        </p>
+      <div className="flex flex-col gap-2.5 items-start">
+        <div className="flex items-center gap-2 w-full">
+          <button
+            type="button"
+            onClick={() => setActiveTab("meaning")}
+            className={`text-[12px] font-semibold leading-normal tracking-[-0.24px] px-[18px] py-1.5 rounded-[24px] cursor-pointer transition-colors ${
+              activeTab === "meaning"
+                ? "bg-[#308BF9] text-white"
+                : "bg-[#F2F5F9] text-[#738298]"
+            }`}
+          >
+            Meaning
+          </button>
 
-        <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
-          <b className="font-semibold">intervention: </b>
-          {trendData?.intervention}
-        </p>
+          <button
+            type="button"
+            onClick={() => setActiveTab("deepScience")}
+            className={`text-[12px] font-semibold leading-normal tracking-[-0.24px] px-[18px] py-1.5 rounded-[24px] cursor-pointer transition-colors ${
+              activeTab === "deepScience"
+                ? "bg-[#308BF9] text-white"
+                : "bg-[#F2F5F9] text-[#738298]"
+            }`}
+          >
+            Deep Science
+          </button>
+        </div>
 
-        <p className="text-[#738298] text-[12px] font-normal leading-[130%]">
-          <b className="font-semibold">interpretation: </b>
-          {trendData?.scientific_interpretation?.title} {trendData?.scientific_interpretation?.text}
-        </p>
+        {activeTab === "meaning" ? (
+          <ExpandableText body={trainerMeaning} />
+        ) : (
+          <ExpandableText body={trainerDeepScience} />
+        )}
       </div>
     </div>
 

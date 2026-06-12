@@ -195,9 +195,10 @@ export default function ClientLists() {
   };
 
   const getZoneColor = (zone) => {
-    if (zone === "Optimal") return "#3FAF58";
-    if (zone === "Moderate") return "#FFBF2D";
-    if (zone === "Focus") return "#E48326";
+    // Optimal -> Strong, Moderate -> Steady, Focus -> Building
+    if (zone === "Optimal" || zone === "Strong") return "#3FAF58";
+    if (zone === "Moderate" || zone === "Steady") return "#FFBF2D";
+    if (zone === "Focus" || zone === "Building") return "#E48326";
     return "#535359";
   };
 

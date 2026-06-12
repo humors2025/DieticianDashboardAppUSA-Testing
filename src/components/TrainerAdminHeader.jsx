@@ -62,71 +62,76 @@ export default function TrainerAdminHeader() {
   };
 
   return (
-    <div className="flex justify-between bg-[#F5F7FA] p-4">
-      <div className="flex items-center gap-3">
-        <Link href="/trainer-admin/trainers">
-          <div className="flex flex-col items-center">
-            <img src="/icons/logorespyr.png" alt="logo" width={50} height={50} />
+    <>
+      <div className="flex justify-between bg-[#F5F7FA] p-4">
+        <div className="flex items-center gap-3">
+          <Link href="/trainer-admin/trainers">
+            <div className="flex flex-col items-center">
+              <img src="/icons/logorespyr.png" alt="logo" width={50} height={50} />
+            </div>
+          </Link>
+        </div>
+
+        <div className="flex gap-2 items-center">
+          {MENU.map((m) => {
+            const isActive =
+              pathname === m.path ||
+              pathname?.startsWith(m.path + "/") ||
+              active === m.path;
+            const color = isActive ? "#308BF9" : "#A1A1A1";
+
+            return (
+              <Link href={m.path} key={m.name}>
+                <button
+                  className="flex items-center gap-1.5 cursor-pointer rounded-[15px] px-[20px] py-[15px] bg-white"
+                  onClick={() => setActive(m.path)}
+                >
+                  <MonoIcon src={m.icon} color={color} alt={m.name} />
+                  <span className="font-semibold text-[12px]" style={{ color }}>
+                    {m.name}
+                  </span>
+                </button>
+              </Link>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center cursor-pointer rounded-[15px] p-[13px] bg-white"
+            onClick={handleNotificationClick}
+          >
+            <MonoIcon src="/icons/hugeicons_notification-01.svg" color="#A1A1A1" alt="notification" />
           </div>
-        </Link>
-        <span className="rounded-full bg-[#308BF9] text-white text-[10px] font-semibold px-2.5 py-1 uppercase tracking-wide">
+
+          <div
+            className="relative"
+            onMouseEnter={() => setIsDropdownOpen(true)}
+            onMouseLeave={() => setIsDropdownOpen(false)}
+          >
+            <div className="flex items-center cursor-pointer rounded-[15px] p-[13px] bg-white">
+              <MonoIcon src="/icons/hugeicons_user.svg" color="#A1A1A1" size={20} alt="user" />
+            </div>
+
+            {isDropdownOpen && (
+              <div className="absolute right-0 top-full w-48 bg-white rounded-[15px] shadow-lg p-1.5 z-50">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center cursor-pointer w-full px-4 py-3 text-sm text-[#A1A1A1] hover:bg-gray-100 transition-colors"
+                >
+                  <span className="ml-3 cursor-pointer">Logout</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-[#F5F7FA] pb-4">
+        <span className="inline-block rounded-full bg-[#308BF9] text-white text-[10px] font-semibold px-2.5 py-1 uppercase tracking-wide whitespace-nowrap">
           Trainer Admin
         </span>
       </div>
-
-      <div className="flex gap-2 items-center">
-        {MENU.map((m) => {
-          const isActive =
-            pathname === m.path ||
-            pathname?.startsWith(m.path + "/") ||
-            active === m.path;
-          const color = isActive ? "#308BF9" : "#A1A1A1";
-
-          return (
-            <Link href={m.path} key={m.name}>
-              <button
-                className="flex items-center gap-1.5 cursor-pointer rounded-[15px] px-[20px] py-[15px] bg-white"
-                onClick={() => setActive(m.path)}
-              >
-                <MonoIcon src={m.icon} color={color} alt={m.name} />
-                <span className="font-semibold text-[12px]" style={{ color }}>
-                  {m.name}
-                </span>
-              </button>
-            </Link>
-          );
-        })}
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div
-          className="flex items-center cursor-pointer rounded-[15px] p-[13px] bg-white"
-          onClick={handleNotificationClick}
-        >
-          <MonoIcon src="/icons/hugeicons_notification-01.svg" color="#A1A1A1" alt="notification" />
-        </div>
-
-        <div
-          className="relative"
-          onMouseEnter={() => setIsDropdownOpen(true)}
-          onMouseLeave={() => setIsDropdownOpen(false)}
-        >
-          <div className="flex items-center cursor-pointer rounded-[15px] p-[13px] bg-white">
-            <MonoIcon src="/icons/hugeicons_user.svg" color="#A1A1A1" size={20} alt="user" />
-          </div>
-
-          {isDropdownOpen && (
-            <div className="absolute right-0 top-full w-48 bg-white rounded-[15px] shadow-lg p-1.5 z-50">
-              <button
-                onClick={handleLogout}
-                className="flex items-center cursor-pointer w-full px-4 py-3 text-sm text-[#A1A1A1] hover:bg-gray-100 transition-colors"
-              >
-                <span className="ml-3 cursor-pointer">Logout</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    </>
   );
 }

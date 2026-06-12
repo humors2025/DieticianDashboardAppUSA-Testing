@@ -57,19 +57,90 @@ function resolveSignalsByMarker(metabolismSignals, signalsByMarker) {
   }, {});
 }
 
+// Fallback source: when trainer_direction_elite.why_todays_plan is "NA"/absent,
+// this endpoint still returns the sub-scores under raw_json.Metabolism_Score_Analysis.
+// Map each trend to its breath marker and reshape into signal cards.
+const TREND_TO_MARKER = {
+  Fuel_Utilization_Trend:     { marker: "acetone",  signal: "Fuel Utilization" },
+  Energy_Source_Trend:        { marker: "acetone",  signal: "Energy Source" },
+  Metabolic_Load_Trend:       { marker: "ethanol",  signal: "Metabolic Load" },
+  Recovery_Activity_Trend:    { marker: "ethanol",  signal: "Recovery Activity" },
+  Digestive_Activity_Trend:   { marker: "hydrogen", signal: "Digestive Activity" },
+  Nutrient_Utilization_Trend: { marker: "hydrogen", signal: "Nutrient Utilization" },
+};
+
+const ZONE_TO_TIER = {
+  optimal: "best",
+  strong: "best",
+  moderate: "mid",
+  steady: "mid",
+  focus: "limiter",
+  building: "limiter",
+  attention: "limiter",
+  weak: "limiter",
+};
+
+function buildSignalsByMarkerFromMetabolism(metabolismScores) {
+  const grouped = { acetone: [], ethanol: [], hydrogen: [] };
+  if (!metabolismScores || typeof metabolismScores !== "object") return grouped;
+
+  Object.entries(TREND_TO_MARKER).forEach(([key, { marker, signal }]) => {
+    const t = metabolismScores[key];
+    if (!t || typeof t !== "object") return;
+
+    const rawScore = t.score ?? t.value;
+    const zone = t.zone || "";
+
+    grouped[marker].push({
+      signal,
+      marker_source: marker,
+      zone_label: zone,
+      tier: ZONE_TO_TIER[String(zone).toLowerCase()] || "",
+      flag: "",
+      score: rawScore == null ? null : Math.round(Number(rawScore)),
+      threshold_rule: t.what_is_this_score || "",
+      trainer_interpretation:
+        t.interpretation || t.trainer_score_meaning || t.client_state || "",
+    });
+  });
+
+  return grouped;
+}
+
 export default function InfoPopUp({ onClose }) {
   const clientIndividualProfile = useSelector(
     (state) => state.clientIndividualProfile.data
   );
 
-  const why =
-    clientIndividualProfile?.data?.raw_json?.trainer_direction_elite
-      ?.why_todays_plan || {};
+  const rawJson = clientIndividualProfile?.data?.raw_json || {};
 
-  const byMarker = resolveSignalsByMarker(
+  // Title follows whichever composite trend the response carries.
+  const trendLabel = rawJson?.Muscle_Gain_Trend
+    ? "Muscle Gain Trend"
+    : "Fat-use Pattern Trend";
+
+  const why =
+    rawJson?.trainer_direction_elite?.why_todays_plan || {};
+
+  const fromWhy = resolveSignalsByMarker(
     why.metabolism_signals,
     why.metabolism_signals_by_marker
   );
+
+  // If the elite/why_todays_plan source has no signals, fall back to the
+  // Metabolism_Score_Analysis sub-scores this endpoint always returns.
+  const hasWhySignals = MARKERS.some(
+    ({ key }) => (fromWhy[key] || []).length > 0
+  );
+
+  const byMarker = hasWhySignals
+    ? fromWhy
+    : resolveSignalsByMarker(
+        null,
+        buildSignalsByMarkerFromMetabolism(
+          clientIndividualProfile?.data?.raw_json?.Metabolism_Score_Analysis
+        )
+      );
 
   const handleOverlayClick = (e) => {
     if (e.target === e.currentTarget) onClose();
@@ -87,7 +158,7 @@ export default function InfoPopUp({ onClose }) {
         <div className="sticky top-0 bg-white border-b border-[#E1E6ED] px-6 py-4 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-[#252525] text-[20px] font-bold leading-tight tracking-[-0.4px]">
-              Fat-use Pattern Trend — breakdown
+              {trendLabel} — breakdown
             </h2>
             <p className="text-[#535359] text-[12px] mt-1">
               All sub-scores across the three breath markers powering this trend.

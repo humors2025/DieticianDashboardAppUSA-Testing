@@ -7,6 +7,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { toast } from "sonner";
 import EditDietPopup from "./pop-folder/edit-diet-popup";
 import ApproveConfirmationPopup from "./pop-folder/approve-confirmation-popup";
+import DiscardConfirmationPopup from "./pop-folder/discard-confirmation-popup";
 import FoodEditPanel from "./pop-folder/food-edit-panel";
 import FoodSearchModal from "./pop-folder/food-search-modal";
 import {
@@ -57,6 +58,7 @@ export default function DietPlan() {
   const [showAddFoodModal, setShowAddFoodModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingOps, setPendingOps] = useState([]);
+  const [showDiscardPopup, setShowDiscardPopup] = useState(false);
 
   // status_value (approval) only controls mobile app visibility — trainer
   // dashboard editing must work for both status=0 (draft) and status=1 (approved).
@@ -119,6 +121,7 @@ export default function DietPlan() {
     setEditedPlan(null);
     setEditingFoodIndex(null);
     setPendingOps([]);
+    setShowDiscardPopup(false);
     if (dietAnalysisData?.data?.food_json?.days) {
       originalDaysRef.current = JSON.parse(JSON.stringify(dietAnalysisData.data.food_json.days));
     }
@@ -318,8 +321,17 @@ export default function DietPlan() {
     [activeDay, currentMealKey, planDays]
   );
 
+  // Discard button click — confirm via popup if there are edits, else clear immediately.
   const discardEdits = () => {
-    if (hasEdits && !window.confirm(`Discard ${pendingOps.length} change${pendingOps.length === 1 ? "" : "s"}?`)) return;
+    if (hasEdits) {
+      setShowDiscardPopup(true);
+      return;
+    }
+    performDiscard();
+  };
+
+  const performDiscard = () => {
+    setShowDiscardPopup(false);
     setEditedPlan(null);
     setPendingOps([]);
     setEditingFoodIndex(null);
@@ -575,7 +587,7 @@ export default function DietPlan() {
                   </div>
                   {currentMealFoods.map((food, index) => (
                     <div
-                      key={`${food.food_name}-${index}`}
+                      key={`${currentMealKey}-${index}`}
                       className="flex gap-[5px]"
                     >
                       <div className="flex my-[3px] items-start shrink-0">
@@ -708,6 +720,32 @@ export default function DietPlan() {
                     </div>
                   ))}
 
+
+                    {/* Save / Discard bar — always visible when there are pending edits */}
+                  {hasEdits && (
+                    <div className="flex items-center gap-2 mt-3 px-3 py-2.5 rounded-[10px] border border-[#308BF9] bg-[#EEF4FE]">
+                      <p className="text-[12px] xl:text-[13px] font-medium text-[#252525] flex-1">
+                        {pendingOps.length} unsaved change{pendingOps.length === 1 ? "" : "s"}
+                      </p>
+                      <button
+                        onClick={discardEdits}
+                        disabled={isSaving}
+                        className="px-4 py-2 rounded-[8px] border border-[#E1E6ED] bg-white text-[#535359] text-[12px] xl:text-[13px] font-semibold cursor-pointer hover:bg-[#F5F7FA] disabled:opacity-50"
+                      >
+                        Discard
+                      </button>
+                      <button
+                        onClick={saveAllChanges}
+                        disabled={isSaving}
+                        className="px-5 py-2 rounded-[8px] bg-[#308BF9] text-white text-[12px] xl:text-[13px] font-semibold cursor-pointer hover:bg-[#2678D9] disabled:opacity-50"
+                      >
+                        {isSaving ? "Saving..." : "Save Changes"}
+                      </button>
+                    </div>
+                  )}
+
+
+
                   {/* Add Food button — always visible when editable */}
                   {canEdit && (
                     <button
@@ -724,6 +762,7 @@ export default function DietPlan() {
                     </button>
                   )}
 
+                
                 </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center gap-3">
@@ -746,29 +785,6 @@ export default function DietPlan() {
               )}
             </div>
           </div>
-
-          {/* Save / Discard bar — always visible when there are pending edits */}
-          {hasEdits && (
-            <div className="flex items-center gap-2 mt-3 px-3 py-2.5 rounded-[10px] border border-[#308BF9] bg-[#EEF4FE]">
-              <p className="text-[12px] xl:text-[13px] font-medium text-[#252525] flex-1">
-                {pendingOps.length} unsaved change{pendingOps.length === 1 ? "" : "s"}
-              </p>
-              <button
-                onClick={discardEdits}
-                disabled={isSaving}
-                className="px-4 py-2 rounded-[8px] border border-[#E1E6ED] bg-white text-[#535359] text-[12px] xl:text-[13px] font-semibold cursor-pointer hover:bg-[#F5F7FA] disabled:opacity-50"
-              >
-                Discard
-              </button>
-              <button
-                onClick={saveAllChanges}
-                disabled={isSaving}
-                className="px-5 py-2 rounded-[8px] bg-[#308BF9] text-white text-[12px] xl:text-[13px] font-semibold cursor-pointer hover:bg-[#2678D9] disabled:opacity-50"
-              >
-                {isSaving ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          )}
 
           {!isSuperAdmin && (
             <div className="flex gap-2.5 justify-end mt-2">
@@ -837,6 +853,14 @@ export default function DietPlan() {
           mealSlot={activeMeal}
           onAdd={addFoodToPlan}
           onClose={() => setShowAddFoodModal(false)}
+        />
+      )}
+
+      {showDiscardPopup && (
+        <DiscardConfirmationPopup
+          count={pendingOps.length}
+          onClose={() => setShowDiscardPopup(false)}
+          onConfirm={performDiscard}
         />
       )}
     </>

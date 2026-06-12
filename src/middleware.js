@@ -18,11 +18,55 @@ function readJsonCookie(request, name) {
   }
 }
 
-// Resolve role from cookies. Prefers the new `user` cookie; falls back to the
-// legacy `dietician` cookie which has no role and defaults to 'trainer'.
+// Decode the role claim straight from the access_token JWT. This is the
+// authoritative source (same one the Header uses) and avoids drift between the
+// token and the `user`/`dietician` cookies. Edge-safe: no Node Buffer, returns
+// null on any failure so middleware never throws.
+function readRoleFromToken(request) {
+  const token = request.cookies.get('access_token')?.value;
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join('')
+    );
+    return JSON.parse(json)?.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Canonical role aliases. Mirrors ROLE_ALIASES in src/lib/user.js — the JWT and
+// some cookies use aliases like `admin`, but the guards below compare against the
+// canonical names, so every resolved role must be normalized first.
+const ROLE_ALIASES = {
+  admin: 'trainer_admin',
+  trainer_admin: 'trainer_admin',
+  super_admin: 'super_admin',
+  trainer: 'trainer',
+  dietician: 'trainer',
+  client: 'client',
+};
+
+function normalizeRole(role) {
+  if (!role) return null;
+  return ROLE_ALIASES[String(role).trim().toLowerCase()] ?? null;
+}
+
+// Resolve role. Prefers the JWT role claim; falls back to the new `user` cookie,
+// then the legacy `dietician` cookie which has no role and defaults to 'trainer'.
+// Always returns a canonical role name (or null).
 function readRole(request) {
+  const fromToken = normalizeRole(readRoleFromToken(request));
+  if (fromToken) return fromToken;
   const user = readJsonCookie(request, 'user');
-  if (user?.role) return user.role;
+  const fromUser = normalizeRole(user?.role);
+  if (fromUser) return fromUser;
   const legacy = readJsonCookie(request, 'dietician');
   if (legacy) return 'trainer';
   return null;
@@ -33,7 +77,7 @@ function readRole(request) {
 function homeForRole(role) {
   switch (role) {
     case 'super_admin':   return '/super-admin/overview';
-    case 'trainer_admin': return '/trainer-admin/overview';
+    case 'trainer_admin': return '/trainer-admin/trainers';
     case 'trainer':       return '/trainer/dashboard';
     default:              return '/trainer/dashboard';
   }

@@ -19,6 +19,27 @@ const TYPES = {
   digestive: { signalName: "Digestive Activity",   title: "Digestive Activity breakdown",  subtitle: "Hydrogen — digestive balance", limiterBadge: true  },
 };
 
+// Fallback source: map each signal name to its raw_json.Metabolism_Score_Analysis key.
+const SIGNAL_TO_TREND_KEY = {
+  "Fuel Utilization":     "Fuel_Utilization_Trend",
+  "Energy Source":        "Energy_Source_Trend",
+  "Metabolic Load":       "Metabolic_Load_Trend",
+  "Recovery Activity":    "Recovery_Activity_Trend",
+  "Nutrient Utilization": "Nutrient_Utilization_Trend",
+  "Digestive Activity":   "Digestive_Activity_Trend",
+};
+
+const ZONE_TO_TIER = {
+  optimal: "best",
+  strong: "best",
+  moderate: "mid",
+  steady: "mid",
+  focus: "limiter",
+  building: "limiter",
+  attention: "limiter",
+  weak: "limiter",
+};
+
 export default function SomeInfoPopup({ onClose, type }) {
   const clientIndividualProfile = useSelector(
     (state) => state.clientIndividualProfile.data
@@ -34,18 +55,39 @@ export default function SomeInfoPopup({ onClose, type }) {
     const why =
       clientIndividualProfile?.data?.raw_json?.trainer_direction_elite
         ?.why_todays_plan;
-    if (!why) return null;
 
-    const grouped = why.metabolism_signals_by_marker || {};
-    for (const marker of Object.keys(grouped)) {
-      const hit = grouped[marker]?.find((s) => s?.signal === signalName);
-      if (hit) return hit;
+    if (why) {
+      const grouped = why.metabolism_signals_by_marker || {};
+      for (const marker of Object.keys(grouped)) {
+        const hit = grouped[marker]?.find((s) => s?.signal === signalName);
+        if (hit) return hit;
+      }
+
+      const flat = why.metabolism_signals;
+      if (Array.isArray(flat)) {
+        const hit = flat.find((s) => s?.signal === signalName);
+        if (hit) return hit;
+      }
     }
 
-    const flat = why.metabolism_signals;
-    if (Array.isArray(flat)) {
-      const hit = flat.find((s) => s?.signal === signalName);
-      if (hit) return hit;
+    // Fallback: this endpoint returns the sub-scores under Metabolism_Score_Analysis.
+    const metab =
+      clientIndividualProfile?.data?.raw_json?.Metabolism_Score_Analysis || {};
+    const key = SIGNAL_TO_TREND_KEY[signalName];
+    const t = key ? metab[key] : null;
+    if (t) {
+      const rawScore = t.score ?? t.value;
+      const zone = t.zone || "";
+      return {
+        signal: signalName,
+        zone_label: zone,
+        tier: ZONE_TO_TIER[String(zone).toLowerCase()] || "",
+        flag: "",
+        score: rawScore == null ? null : Math.round(Number(rawScore)),
+        threshold_rule: t.what_is_this_score || "",
+        trainer_interpretation:
+          t.interpretation || t.trainer_score_meaning || t.client_state || "",
+      };
     }
 
     return null;

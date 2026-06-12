@@ -3,11 +3,75 @@
 import Image from "next/image";
 import { useState } from "react";
 import SomeInfoPopup from "./pop-folder/some-info-popup";
+import ExpandableText from "./ExpandableText";
+
+// Score value + trainer-state line, with Meaning / Deep Science tabs underneath.
+// Each instance owns its tab state, so the two cards switch independently.
+function TrendInsightTabs({
+  score,
+  trainerState,
+  trainerMeaning,
+  trainerDeepScience,
+}) {
+  const [activeTab, setActiveTab] = useState("meaning");
+
+  return (
+    <>
+      <div className="flex items-center gap-4">
+        <div className="flex items-baseline gap-[4px]">
+          <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
+            {score}
+          </p>
+
+          <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
+            %
+          </p>
+        </div>
+
+        <ExpandableText body={trainerState} />
+      </div>
+
+      <div className="flex flex-col gap-2.5 items-start">
+        <div className="flex items-center gap-2 w-full">
+          <button
+            type="button"
+            onClick={() => setActiveTab("meaning")}
+            className={`text-[12px] font-semibold leading-normal tracking-[-0.24px] px-[18px] py-1.5 rounded-[24px] cursor-pointer transition-colors ${
+              activeTab === "meaning"
+                ? "bg-[#308BF9] text-white"
+                : "bg-[#F2F5F9] text-[#738298]"
+            }`}
+          >
+            Meaning
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("deepScience")}
+            className={`text-[12px] font-semibold leading-normal tracking-[-0.24px] px-[18px] py-1.5 rounded-[24px] cursor-pointer transition-colors ${
+              activeTab === "deepScience"
+                ? "bg-[#308BF9] text-white"
+                : "bg-[#F2F5F9] text-[#738298]"
+            }`}
+          >
+            Deep Science
+          </button>
+        </div>
+
+        {activeTab === "meaning" ? (
+          <ExpandableText body={trainerMeaning} />
+        ) : (
+          <ExpandableText body={trainerDeepScience} />
+        )}
+      </div>
+    </>
+  );
+}
 
 function SegmentedProgressBar({
   value = 85,
   totalSegments = 55,
-  labels = [0, 60, 80, 100],
+  labels = [0, 50, 70, 100],
   segmentWeights = [80, 82, 172],
   filledColor = "#FFBF2D",
   emptyColor = "#E1E6ED",
@@ -40,9 +104,9 @@ function SegmentedProgressBar({
   })();
 
   const ranges = [
-    { from: 0, to: 60, weight: segmentWeights[0], segs: zoneSegments[0] },
-    { from: 60, to: 80, weight: segmentWeights[1], segs: zoneSegments[1] },
-    { from: 80, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
+    { from: 0, to: 50, weight: segmentWeights[0], segs: zoneSegments[0] },
+    { from: 50, to: 70, weight: segmentWeights[1], segs: zoneSegments[1] },
+    { from: 70, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
   ];
 
   const filledByRange = ranges.map((r) => {
@@ -181,59 +245,17 @@ export default function DigestiveBalanceTrends({ data }) {
           <SegmentedProgressBar
             value={nutrientScore}
             totalSegments={55}
-            labels={[0, 60, 80, 100]}
+            labels={[0, 50, 70, 100]}
             segmentWeights={[80, 82, 172]}
             filledColor={getZoneColor(nutrientZone)}
           />
 
-          <div className="flex flex-col gap-4 items-baseline">
-            <div className="flex items-baseline gap-[4px]">
-              <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
-                {nutrientScore}
-              </p>
-
-              <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
-                %
-              </p>
-            </div>
-
-        
-
-<div className="flex flex-col gap-2.5 items-start">
-
-
-
-<p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-  <b className="font-semibold">
-  intervention:{" "}
-    
-  </b>
-  {(digestiveActivity?.intervention || "").split(":")[0]}
-  {" "}
-  {(digestiveActivity?.intervention || "")
-    .split(":")
-    .slice(1)
-    .join(":")
-    .trim()}
-</p>
-
-
-<p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-  <b className="font-semibold">
-  interpretation:{" "}
-    
-  </b>
-  {(digestiveActivity?.interpretation || "").split(":")[0]}
-  {" "}
-  {(digestiveActivity?.interpretation || "")
-    .split(":")
-    .slice(1)
-    .join(":")
-    .trim()}
-</p>
-
-</div>
-          </div>
+          <TrendInsightTabs
+            score={nutrientScore}
+            trainerState={nutrientUtilization?.trainer_state}
+            trainerMeaning={nutrientUtilization?.trainer_score_meaning}
+            trainerDeepScience={nutrientUtilization?.trainer_score_deep_science}
+          />
         </div>
         )}
 
@@ -269,57 +291,17 @@ export default function DigestiveBalanceTrends({ data }) {
           <SegmentedProgressBar
             value={digestiveScore}
             totalSegments={55}
-            labels={[0, 60, 80, 100]}
+            labels={[0, 50, 70, 100]}
             segmentWeights={[80, 82, 172]}
             filledColor={getZoneColor(digestiveZone)}
           />
 
-          <div className="flex flex-col gap-4 items-baseline">
-            <div className="flex items-baseline gap-[4px]">
-              <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
-                {digestiveScore}
-              </p>
-
-              <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
-                %
-              </p>
-            </div>
-
-<div className="flex flex-col gap-2.5 items-center">
-
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              intervention:{" "}
-                
-              </b>
-              {(digestiveActivity?.intervention || "").split(":")[0]}
-              {" "}
-              {(digestiveActivity?.intervention || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              interpretation:{" "}
-                
-              </b>
-              {(digestiveActivity?.interpretation || "").split(":")[0]}
-              {" "}
-              {(digestiveActivity?.interpretation || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
-            </div>
-          </div>
+          <TrendInsightTabs
+            score={digestiveScore}
+            trainerState={digestiveActivity?.trainer_state}
+            trainerMeaning={digestiveActivity?.trainer_score_meaning}
+            trainerDeepScience={digestiveActivity?.trainer_score_deep_science}
+          />
         </div>
       </div>
 

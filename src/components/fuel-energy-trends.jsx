@@ -2,11 +2,75 @@
 import Image from "next/image";
 import { useState } from "react";
 import SomeInfoPopup from "./pop-folder/some-info-popup";
+import ExpandableText from "./ExpandableText";
+
+// Score value + trainer-state line, with Meaning / Deep Science tabs underneath.
+// Each instance owns its tab state, so the two cards switch independently.
+function TrendInsightTabs({
+  score,
+  trainerState,
+  trainerMeaning,
+  trainerDeepScience,
+}) {
+  const [activeTab, setActiveTab] = useState("meaning");
+
+  return (
+    <>
+      <div className="flex items-center gap-4">
+        <div className="flex items-baseline gap-[4px]">
+          <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
+            {score}
+          </p>
+
+          <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
+            %
+          </p>
+        </div>
+
+        <ExpandableText body={trainerState} />
+      </div>
+
+      <div className="flex flex-col gap-2.5 items-start">
+        <div className="flex items-center gap-2 w-full">
+          <button
+            type="button"
+            onClick={() => setActiveTab("meaning")}
+            className={`text-[12px] font-semibold leading-normal tracking-[-0.24px] px-[18px] py-1.5 rounded-[24px] cursor-pointer transition-colors ${
+              activeTab === "meaning"
+                ? "bg-[#308BF9] text-white"
+                : "bg-[#F2F5F9] text-[#738298]"
+            }`}
+          >
+            Meaning
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("deepScience")}
+            className={`text-[12px] font-semibold leading-normal tracking-[-0.24px] px-[18px] py-1.5 rounded-[24px] cursor-pointer transition-colors ${
+              activeTab === "deepScience"
+                ? "bg-[#308BF9] text-white"
+                : "bg-[#F2F5F9] text-[#738298]"
+            }`}
+          >
+            Deep Science
+          </button>
+        </div>
+
+        {activeTab === "meaning" ? (
+          <ExpandableText body={trainerMeaning} />
+        ) : (
+          <ExpandableText body={trainerDeepScience} />
+        )}
+      </div>
+    </>
+  );
+}
 
 function SegmentedProgressBar({
     value = 85,
     totalSegments = 55, 
-    labels = [0, 60, 80, 100],
+    labels = [0, 50, 70, 100],
 
     // ✅ treat as weights (ratio only), NOT px width
     segmentWeights = [80, 82, 172],
@@ -44,11 +108,11 @@ function SegmentedProgressBar({
         return base; // [zone0, zone1, zone2]
     })();
 
-    // ranges matching labels [0,60,80,100]
+    // ranges matching labels [0,50,70,100]
     const ranges = [
-        { from: 0, to: 60, weight: segmentWeights[0], segs: zoneSegments[0] },
-        { from: 60, to: 80, weight: segmentWeights[1], segs: zoneSegments[1] },
-        { from: 80, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
+        { from: 0, to: 50, weight: segmentWeights[0], segs: zoneSegments[0] },
+        { from: 50, to: 70, weight: segmentWeights[1], segs: zoneSegments[1] },
+        { from: 70, to: 100, weight: segmentWeights[2], segs: zoneSegments[2] },
     ];
 
     // filled segments per zone
@@ -181,59 +245,17 @@ export default function FuelEnergyTrends({ data }) {
                     <SegmentedProgressBar
                         value={fuelScore}
                         totalSegments={55}
-                        labels={[0, 60, 80, 100]}
+                        labels={[0, 50, 70, 100]}
                         segmentWeights={[80, 82, 172]}
                         filledColor={fuelZoneConfig.color}
                     />
 
-                    <div className="flex flex-col gap-4 items-baseline">
-                        <div className="flex items-baseline gap-[4px]">
-                            <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
-                                {fuelScore}
-                            </p>
-
-                            <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
-                                %
-                            </p>
-                        </div>
-
-
-<div className="flex flex-col gap-2.5 items-start">
-
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              intervention:{" "}
-                
-              </b>
-              {(fuelUtilization?.intervention || "").split(":")[0]}
-           
-              {" "}
-              {(fuelUtilization?.intervention || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              interpretation:{" "}
-                
-              </b>
-              {(fuelUtilization?.interpretation || "").split(":")[0]}
-              {" "}
-              {(fuelUtilization?.interpretation || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
-            </div>
-                    </div>
+                    <TrendInsightTabs
+                        score={fuelScore}
+                        trainerState={fuelUtilization?.trainer_state}
+                        trainerMeaning={fuelUtilization?.trainer_score_meaning}
+                        trainerDeepScience={fuelUtilization?.trainer_score_deep_science}
+                    />
                 </div>
 
                 {energySource && (
@@ -268,62 +290,17 @@ export default function FuelEnergyTrends({ data }) {
                     <SegmentedProgressBar
                         value={energyScore}
                         totalSegments={55}
-                        labels={[0, 60, 80, 100]}
+                        labels={[0, 50, 70, 100]}
                         segmentWeights={[80, 82, 172]}
                         filledColor={energyZoneConfig.color}
                     />
 
-                    <div className="flex flex-col gap-4 items-baseline">
-                        <div className="flex items-baseline gap-[4px]">
-                            <p className="text-[#252525] text-[72px] font-normal leading-none tracking-[-1.44px]">
-                                {energyScore}
-                            </p>
-
-                            <p className="text-[#252525] text-[20px] font-semibold leading-none tracking-[-0.4px] pr-[13px]">
-                                %
-                            </p>
-                        </div>
-
-                                            
-
-
-<div className="flex flex-col gap-2.5 items-center">
-
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              intervention:{" "}
-                
-              </b>
-              {(energySource?.intervention || "").split(":")[0]}
-           
-              {" "}
-              {(energySource?.intervention || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
-
-            <p className="text-[#738298] text-[12px] font-normal leading-[130%] tracking-[-0.24px]">
-              <b className="font-semibold">
-              interpretation:{" "}
-                
-              </b>
-              {(energySource?.interpretation || "").split(":")[0]}
-              {" "}
-              {(energySource?.interpretation || "")
-                .split(":")
-                .slice(1)
-                .join(":")
-                .trim()}
-            </p>
-
-            </div>
-
-                    </div>
+                    <TrendInsightTabs
+                        score={energyScore}
+                        trainerState={energySource?.trainer_state}
+                        trainerMeaning={energySource?.trainer_score_meaning}
+                        trainerDeepScience={energySource?.trainer_score_deep_science}
+                    />
                 </div>
                 )}
             </div>

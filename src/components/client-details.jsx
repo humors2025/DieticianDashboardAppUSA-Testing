@@ -145,7 +145,7 @@ const transformDatesToDisplay = () => {
 
   const handleExportPDF = async () => {
     if (activeTab !== "diet") {
-      toast.warning("PDF export is only available for Diet Analysis tab");
+      toast.warning("PDF export is only available for Weekly Diet Analysis tab");
       return;
     }
 

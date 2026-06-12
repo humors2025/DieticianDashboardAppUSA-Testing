@@ -21,7 +21,7 @@ const ROLE_COLORS = {
 
 const ROLE_HOME = {
   [ROLES.SUPER_ADMIN]: "/super-admin/overview",
-  [ROLES.TRAINER_ADMIN]: "/trainer-admin/overview",
+  [ROLES.TRAINER_ADMIN]: "/trainer-admin/trainers",
   [ROLES.TRAINER]: "/trainer/dashboard",
 };
 

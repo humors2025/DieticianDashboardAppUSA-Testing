@@ -17,6 +17,39 @@ export default function TrendBreakdown() {
 
     const rawTrendBreakdownData = clientIndividualProfile?.data?.trend_breakdown || {};
 
+    // Real score/zone/text values live in raw_json.Metabolism_Score_Analysis
+    const metabolismScores =
+        clientIndividualProfile?.data?.raw_json?.Metabolism_Score_Analysis || {};
+
+    // Map each visible trend title to its raw_json key
+    const rawJsonKeyByTitle = {
+        "Digestive Activity Trend": "Digestive_Activity_Trend",
+        "Fuel Utilization Trend": "Fuel_Utilization_Trend",
+        "Metabolic Load Trend": "Metabolic_Load_Trend",
+    };
+
+    // Overlay raw_json values onto the trend_breakdown items
+    const bindFromRawJson = (section) => {
+        if (!section) return section;
+        return {
+            ...section,
+            items: (section.items || []).map((item) => {
+                const rawKey = rawJsonKeyByTitle[item?.title];
+                const raw = rawKey ? metabolismScores[rawKey] : null;
+                if (!raw) return item;
+                return {
+                    ...item,
+                    score: raw.value ?? raw.score ?? item.score,
+                    zone: raw.zone || item.zone,
+                    short_text: raw.client_state || item.short_text,
+                    trainer_state: raw.trainer_state || item.trainer_state,
+                    trainer_score_meaning: raw.trainer_score_meaning || item.trainer_score_meaning,
+                    trainer_score_deep_science: raw.trainer_score_deep_science || item.trainer_score_deep_science,
+                };
+            }),
+        };
+    };
+
     // Titles to hide from the trend breakdown
     const hiddenTitles = [
         "Nutrient Utilization Trend",
@@ -36,28 +69,52 @@ export default function TrendBreakdown() {
 
     const trendBreakdownData = {
         ...rawTrendBreakdownData,
-        digestive_balance_trend: filterItems(rawTrendBreakdownData.digestive_balance_trend),
-        fuel_and_energy_trend: filterItems(rawTrendBreakdownData.fuel_and_energy_trend),
-        metabolic_recovery_trend: filterItems(rawTrendBreakdownData.metabolic_recovery_trend),
+        digestive_balance_trend: bindFromRawJson(filterItems(rawTrendBreakdownData.digestive_balance_trend)),
+        fuel_and_energy_trend: bindFromRawJson(filterItems(rawTrendBreakdownData.fuel_and_energy_trend)),
+        metabolic_recovery_trend: bindFromRawJson(filterItems(rawTrendBreakdownData.metabolic_recovery_trend)),
     };
 
 
     const getZoneColor = (zone) => {
-        if (zone === "Optimal") return "#3FAF58";
-        if (zone === "Moderate") return "#FFBF2D";
-        if (zone === "Focus") return "#E48326";
-        return "#A1A1A1";
+        switch (String(zone).toLowerCase()) {
+            case "optimal":
+            case "strong":
+                return "#3FAF58";
+            case "moderate":
+            case "steady":
+                return "#FFBF2D";
+            case "focus":
+            case "building":
+            case "attention":
+            case "weak":
+                return "#E48326";
+            default:
+                return "#A1A1A1";
+        }
     };
 
 
     const getTabZone = (items = []) => {
         if (!items.length) return "";
 
-        if (items.some((item) => item?.zone === "Focus")) return "Focus";
-        if (items.some((item) => item?.zone === "Moderate")) return "Moderate";
-        if (items.some((item) => item?.zone === "Optimal")) return "Optimal";
+        // Only consider real zones the API returned (ignore "NA"/empty)
+        const present = new Set(
+            items.map((item) => item?.zone).filter((zone) => zone && zone !== "NA")
+        );
 
-        return "";
+        // worst-first priority — the dot reflects the zone needing most attention
+        const priority = [
+            "Focus",
+            "Building",
+            "Attention",
+            "Weak",
+            "Moderate",
+            "Steady",
+            "Optimal",
+            "Strong",
+        ];
+
+        return priority.find((zone) => present.has(zone)) || "";
     };
 
     const digestiveZone = getTabZone(
@@ -174,7 +231,10 @@ export default function TrendBreakdown() {
 
             </div>
             {showPopup && (
-                <TrendPopUp closePopup={() => setShowPopup(false)} />
+                <TrendPopUp
+                    closePopup={() => setShowPopup(false)}
+                    profileId={clientIndividualProfile?.data?.profile_details?.profile_id}
+                />
             )}
         </>
     );

@@ -497,12 +497,12 @@ export const fetchClientsDashboard = async (
     date: date,
   };
 
-  if (masking) {
-    const decoded = decodeAccessTokenFromCookie();
-    const actorUserId = decoded?.user_id;
-    if (actorUserId) {
-      body.actor_user_id = actorUserId;
-    }
+  // actor_user_id is the user_id decoded from the access_token cookie.
+  // Required by the API on both the normal and masked routes.
+  const decoded = decodeAccessTokenFromCookie();
+  const actorUserId = decoded?.user_id;
+  if (actorUserId) {
+    body.actor_user_id = actorUserId;
   }
 
   return apiFetcher(endpoint, {

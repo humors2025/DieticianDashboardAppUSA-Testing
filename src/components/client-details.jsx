@@ -61,6 +61,7 @@ export default function ClientDetails() {
   const dietAnalysisData = useSelector(selectDietAnalysisData);
 
   const [profileDates, setProfileDates] = useState([]);
+  console.log("profileDates63:", profileDates);
   const [datesLoading, setDatesLoading] = useState(false);
   const [datesError, setDatesError] = useState(null);
 
@@ -131,6 +132,7 @@ const transformDatesToDisplay = () => {
   };
 
   const testDateData = transformDatesToDisplay();
+  console.log("testDateData134:", testDateData);
   const weekData = transformWeeklyDatesToDisplay();
 
   const getSelectedWeekInfo = () => {
@@ -180,7 +182,7 @@ const transformDatesToDisplay = () => {
 
       try {
         const response = await fetchClientProfileDatesList(profileId, dietitianId);
-
+console.log("fetchClientProfileDatesList response185:", response); 
         if (response.status && response.data) {
           const dates = response.data.dates || [];
           setProfileDates(dates);
@@ -407,7 +409,7 @@ const transformDatesToDisplay = () => {
   };
 
   const visibleItems = currentData.slice(startIndex, startIndex + ITEMS_TO_SHOW);
-
+console.log("visibleItems410:", visibleItems);
 
   if (isLoadingWeeklyData) {
     return (
@@ -592,7 +594,7 @@ const transformDatesToDisplay = () => {
               </div>
             </div>
 
-            {showWhenNotSuperAdmin && (
+            {/* {showWhenNotSuperAdmin && ( */}
               <div className="flex gap-[30px]">
                 <Image
                   src="/icons/hugeicons_file-export.svg"
@@ -612,7 +614,7 @@ const transformDatesToDisplay = () => {
                   onClick={() => setIsSidebarOpen(true)}
                 />
               </div>
-            )}
+            {/* )} */}
           </div>
 
           <div className="flex py-[11px] pl-[5px]">

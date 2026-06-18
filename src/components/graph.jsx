@@ -413,9 +413,9 @@ const normalizeZone = (z) => String(z || "").trim().toLowerCase();
 
 const zoneToColor = (zone, fallback = "#E48326") => {
   const z = normalizeZone(zone);
-  if (z === "optimal") return "#3FAF58";
-  if (z === "moderate") return "#FFBF2D";
-  if (z === "focus") return "#E48326";
+  if (z === "optimal" || z === "strong") return "#3FAF58";
+  if (z === "moderate" || z === "steady") return "#FFBF2D";
+  if (z === "focus" || z === "building") return "#E48326";
   return fallback;
 };
 
@@ -427,9 +427,9 @@ const getColorByScore = (type, value, fallback = "#E48326", zoneInfo) => {
   // If we have zone information from the API, use it directly
   if (zoneInfo && zoneInfo[type]) {
     const zone = zoneInfo[type].zone?.toLowerCase();
-    if (zone === "optimal") return "#3FAF58";
-    if (zone === "moderate") return "#FFBF2D";
-    if (zone === "focus") return "#E48326";
+    if (zone === "optimal" || zone === "strong") return "#3FAF58";
+    if (zone === "moderate" || zone === "steady") return "#FFBF2D";
+    if (zone === "focus" || zone === "building") return "#E48326";
   }
 
   // Fallback to numeric thresholds if no zone info available

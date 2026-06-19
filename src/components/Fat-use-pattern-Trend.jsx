@@ -159,10 +159,25 @@ export default function FatUsePatternTrend() {
   const statusColor = statusColorMap[status] || "#3FAF58";
 
   // Scroll the TestAnalysis panel down to the bottom row (Progress / Trainer Note).
+  // We scroll ONLY the inner scroll container (.scroll-target) instead of using
+  // scrollIntoView, which would also nudge outer/ancestor scroll positions and
+  // leave the panel unable to scroll all the way back to the top.
   const handleScrollToTrends = () => {
-    document
-      .getElementById("test-analysis-bottom-row")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const target = document.getElementById("test-analysis-bottom-row");
+    if (!target) return;
+
+    const container = target.closest(".scroll-target");
+    if (!container) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    const top =
+      container.scrollTop +
+      (target.getBoundingClientRect().top -
+        container.getBoundingClientRect().top);
+
+    container.scrollTo({ top, behavior: "smooth" });
   };
 
   return (

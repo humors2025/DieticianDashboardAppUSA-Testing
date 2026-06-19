@@ -1,6 +1,6 @@
 "use client";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { IoChevronBackOutline, IoChevronForwardOutline } from "react-icons/io5";
 import { useDispatch, useSelector } from "react-redux";
@@ -61,7 +61,6 @@ export default function ClientDetails() {
   const dietAnalysisData = useSelector(selectDietAnalysisData);
 
   const [profileDates, setProfileDates] = useState([]);
-  console.log("profileDates63:", profileDates);
   const [datesLoading, setDatesLoading] = useState(false);
   const [datesError, setDatesError] = useState(null);
 
@@ -78,6 +77,26 @@ export default function ClientDetails() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [roleChecked, setRoleChecked] = useState(false);
+
+  const cardRef = useRef(null);
+
+  // Forward wheel scrolling from the non-scrollable areas (header, tabs,
+  // date selector) down to whichever content panel is currently visible,
+  // so the user can scroll TestAnalysis (or any active tab) from anywhere
+  // on the card.
+  const handleCardWheel = (e) => {
+    const card = cardRef.current;
+    if (!card) return;
+
+    const scrollTarget = card.querySelector(".scroll-target:not(.hidden)");
+    if (!scrollTarget) return;
+
+    // If the cursor is already over the scrollable panel, let the browser
+    // scroll it natively to avoid double-scrolling.
+    if (scrollTarget.contains(e.target)) return;
+
+    scrollTarget.scrollTop += e.deltaY;
+  };
 
   useEffect(() => {
     const token = cookieManager.get("access_token");
@@ -132,7 +151,6 @@ const transformDatesToDisplay = () => {
   };
 
   const testDateData = transformDatesToDisplay();
-  console.log("testDateData134:", testDateData);
   const weekData = transformWeeklyDatesToDisplay();
 
   const getSelectedWeekInfo = () => {
@@ -182,7 +200,6 @@ const transformDatesToDisplay = () => {
 
       try {
         const response = await fetchClientProfileDatesList(profileId, dietitianId);
-console.log("fetchClientProfileDatesList response185:", response); 
         if (response.status && response.data) {
           const dates = response.data.dates || [];
           setProfileDates(dates);
@@ -498,6 +515,8 @@ console.log("visibleItems410:", visibleItems);
         )}
 
         <div
+          ref={cardRef}
+          onWheel={handleCardWheel}
           className={`w-full h-full bg-white px-[15px] pt-[23px] pb-5 rounded-[15px] flex flex-col overflow-hidden transition-all duration-300 relative ${isSidebarOpen ? "opacity-90" : "opacity-100"
             }`}
         >
@@ -879,28 +898,28 @@ console.log("visibleItems410:", visibleItems);
           )}
 
           <div
-            className={`${activeTab === "test" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+            className={`scroll-target ${activeTab === "test" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
               }`}
           >
             <TestAnalysis />
           </div>
 
           <div
-            className={`${activeTab === "macros" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+            className={`scroll-target ${activeTab === "macros" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
               }`}
           >
             <MacrosAnalysis activeTab={activeTab} />
           </div>
 
           <div
-            className={`${activeTab === "diet" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+            className={`scroll-target ${activeTab === "diet" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
               }`}
           >
             <DietAnalysis />
           </div>
 
           <div
-            className={`${activeTab === "habits" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
+            className={`scroll-target ${activeTab === "habits" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
               }`}
           >
 

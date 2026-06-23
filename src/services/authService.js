@@ -1323,23 +1323,33 @@ export const sendTrainerClientInviteService = async ({
 };
 
 
-export const fetchReferralClientListService = async (page = 1, limit = 10) => {
+export const fetchReferralClientListService = async (
+  page = 1,
+  limit = 10,
+  { partnerCode = "", search = "" } = {}
+) => {
   const actorUserId = getActorUserIdFromAccessToken();
 
   if (!actorUserId) {
     throw new Error("Session expired. Please login again.");
   }
 
+  const payload = {
+    actor_user_id: actorUserId,
+    page: page,
+    limit: limit,
+  };
+
+  // Only include optional filters when provided so the backend can apply its defaults.
+  if (partnerCode) payload.partner_code = partnerCode;
+  if (search) payload.search = search;
+
   return apiFetcher(API_ENDPOINTS.ADMINPANEL.REFERRALCLIENTLIST, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      actor_user_id: actorUserId,
-      page: page,
-      limit: limit,
-    }),
+    body: JSON.stringify(payload),
   });
 };
 
@@ -1380,6 +1390,27 @@ export const resendClientSubscriptionInviteService = async ({ subscriptionId }) 
     body: JSON.stringify({
       actor_user_id: actorUserId,
       subscription_id: subscriptionId,
+    }),
+  });
+};
+
+
+export const extendClientFreeTrialService = async ({ profileId, reason }) => {
+  const actorUserId = getActorUserIdFromAccessToken();
+
+  if (!actorUserId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.ADMINPANEL.EXTENDCLIENTFREETRIAL14DAYS, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor_user_id: actorUserId,
+      profile_id: profileId,
+      reason: reason || "Extending free trial to 7 days",
     }),
   });
 };

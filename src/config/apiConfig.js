@@ -106,6 +106,7 @@ export const API_ENDPOINTS = {
     REVOKECLIENTSUBSCRIPTIONINVITE: "/dietitian/api/web/revoke-client-subscription-invite.php",
     RESENDCLIENTSUBSCRIPTIONINVITE: "/dietitian/api/web/resend-client-subscription-invite.php",
     EXTENDCLIENTFREETRIAL14DAYS: "/dietitian/api/web/extend-client-free-trial-14days.php",
+    TRAINERSALESANALYTICS: "/dietitian/api/web/trainer-sales-analytics.php",
 
 
     VALIDATEINVITETOKEN: "/dietitian/api/web/validate-invite-token.php",

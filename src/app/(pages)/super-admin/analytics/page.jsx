@@ -95,14 +95,17 @@ function Ico({ type, color }) {
   );
 }
 
-function Donut({ pct, size = 120, thickness = 10, color = R.blue, label }) {
+function Donut({ pct, size = 120, thickness = 10, color = R.blue, label, bg, track, textColor }) {
   const [animPct, setAnimPct] = useState(0);
   useEffect(() => { const t = setTimeout(() => setAnimPct(pct), 50); return () => clearTimeout(t); }, [pct]);
+  const innerBg = bg || R.white;
+  const trackColor = track || R.surface;
+  const ringBorder = bg ? "none" : `0 0 0 3px ${R.white}, 0 0 0 4px ${R.border}`;
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="rounded-full flex items-center justify-center" style={{ width: size, height: size, background: `conic-gradient(${color} 0% ${animPct}%, ${R.surface} ${animPct}% 100%)`, transition: "background 0.8s ease-out", boxShadow: `0 0 0 3px ${R.white}, 0 0 0 4px ${R.border}` }}>
-        <div className="rounded-full flex items-center justify-center" style={{ width: size - thickness * 2, height: size - thickness * 2, backgroundColor: R.white }}>
-          <span className="font-extrabold" style={{ fontSize: size * 0.25, color: R.tp, letterSpacing: "-0.4px" }}>{animPct}%</span>
+      <div className="rounded-full flex items-center justify-center" style={{ width: size, height: size, background: `conic-gradient(${color} 0% ${animPct}%, ${trackColor} ${animPct}% 100%)`, transition: "background 0.8s ease-out", boxShadow: ringBorder }}>
+        <div className="rounded-full flex items-center justify-center" style={{ width: size - thickness * 2, height: size - thickness * 2, backgroundColor: innerBg }}>
+          <span className="font-extrabold" style={{ fontSize: size * 0.25, color: textColor || R.tp, letterSpacing: "-0.4px" }}>{animPct}%</span>
         </div>
       </div>
       {label && <span style={{ fontSize: "12px", color: R.tm, letterSpacing: "-0.24px" }}>{label}</span>}
@@ -599,7 +602,7 @@ export default function AnalyticsDashboard() {
                   ))}
                 </div>
               </div>
-              <Donut pct={avgActivity} size={52} thickness={5} color="#60A5FA" />
+              <Donut pct={avgActivity} size={52} thickness={5} color="#60A5FA" bg="#1a1a2e" track="rgba(255,255,255,0.1)" textColor="#ffffff" />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
               {[

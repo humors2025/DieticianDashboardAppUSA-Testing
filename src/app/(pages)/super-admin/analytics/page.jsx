@@ -586,7 +586,7 @@ export default function AnalyticsDashboard() {
             </div>
           </div>
 
-          {/* Card: Period + Adoption — dark themed */}
+          {/* Card: Period — dark themed */}
           <div className="analytics-card-animate" style={{ borderRadius: "16px", padding: "20px 24px", background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%)", color: "#ffffff", position: "relative", overflow: "hidden", transition: "box-shadow 0.3s ease, transform 0.3s ease" }}
             onMouseEnter={e => Object.assign(e.currentTarget.style, { boxShadow: "0 8px 32px rgba(0,0,0,0.2)", transform: "translateY(-2px)" })}
             onMouseLeave={e => Object.assign(e.currentTarget.style, { boxShadow: "none", transform: "none" })}>
@@ -602,15 +602,14 @@ export default function AnalyticsDashboard() {
                   ))}
                 </div>
               </div>
-              <Donut pct={avgActivity} size={52} thickness={5} color="#60A5FA" bg="#1a1a2e" track="rgba(255,255,255,0.1)" textColor="#ffffff" />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
               {[
                 { icon: "person-add", val: pm.newTrainers, label: "Trainers Onboarded" },
                 { icon: "person-add", val: pm.newClients, label: "Clients Onboarded" },
                 { icon: "trend", val: periodTotalReads, label: "Total Readings" },
-              ].map((item, i) => (
-                <div key={item.label} className="flex items-center gap-2.5" style={i === 2 ? { gridColumn: "1 / -1" } : {}}>
+              ].map((item) => (
+                <div key={item.label} className="flex items-center gap-2.5">
                   <div className="flex items-center justify-center shrink-0" style={{ width: "36px", height: "36px", borderRadius: "10px", backgroundColor: "rgba(255,255,255,0.08)" }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       {item.icon === "person-add" && <><circle cx="10" cy="7" r="3.5"/><path d="M3 21v-1a5 5 0 0110 0"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></>}
@@ -630,6 +629,14 @@ export default function AnalyticsDashboard() {
                 <span style={{ opacity: 0.5 }}>By Clients: <span style={{ opacity: 1, fontWeight: 600 }}>{periodClientReads}</span> ({Math.round((periodClientReads / periodTotalReads) * 100)}%)</span>
               </div>
             )}
+            {/* Device Adoption */}
+            <div className="flex items-center gap-4 mt-4 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+              <Donut pct={avgActivity} size={48} thickness={5} color="#60A5FA" bg="#1a1a2e" track="rgba(255,255,255,0.1)" textColor="#ffffff" />
+              <div>
+                <div style={{ fontSize: "11px", opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.4px", fontWeight: 600 }}>Device Adoption</div>
+                <div style={{ fontSize: "13px", fontWeight: 600, marginTop: "2px" }}>Avg Reading Rate across all clients</div>
+              </div>
+            </div>
           </div>
 
         </div>

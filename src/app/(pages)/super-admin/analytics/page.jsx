@@ -468,15 +468,6 @@ export default function AnalyticsDashboard() {
 
         {/* ── Right: Controls ── */}
         <div className="flex items-center gap-3">
-          {/* Period + Compare cluster */}
-          <div className="flex items-center" style={{ backgroundColor: "rgba(255,255,255,0.6)", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.7)", padding: "4px", gap: "2px" }}>
-            {[["today", "Today"], ["week", "Week"], ["month", "Month"]].map(([k, l]) => (
-              <button key={k} onClick={() => setPeriod(k)}
-                className="cursor-pointer transition-all duration-200"
-                style={{ padding: "6px 16px", fontSize: "12px", fontWeight: period === k ? 600 : 400, letterSpacing: "-0.24px", backgroundColor: period === k ? R.blue : "transparent", color: period === k ? R.white : R.ts, border: "none", borderRadius: "10px", boxShadow: period === k ? `0 2px 8px ${R.blue}35` : "none" }}>{l}</button>
-            ))}
-          </div>
-
           {/* Refresh */}
           <button onClick={loadData} className="flex items-center justify-center cursor-pointer transition-all duration-200"
             style={{ width: 36, height: 36, borderRadius: "10px", backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.7)", color: R.tm }}
@@ -528,113 +519,91 @@ export default function AnalyticsDashboard() {
           const dT = ppm ? pm.newTrainers - ppm.newTrainers : 0;
           const dC = ppm ? pm.newClients - ppm.newClients : 0;
           const dR = ppm ? periodTotalReads - prevTotalReads : 0;
-          const Delta = ({ val, suffix }) => {
-            const up = val >= 0;
-            return <span style={{ fontSize: "11px", fontWeight: 600, color: up ? R.green : R.red }}>{up ? "+" : ""}{val} {suffix}</span>;
-          };
           const pLabel = period === "today" ? "today" : period === "week" ? "this week" : "this month";
           const prevLabel = period === "today" ? "yesterday" : period === "week" ? "last week" : "last month";
 
-          return <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.2fr", gap: "12px" }}>
-
-            {/* Card 1: Trainers */}
-            <div className="p-4 analytics-card-animate" style={CS}
+          const MetricCard = ({ icon, accent, value, label, sub1, sub2, barPct, barGrad, badge }) => (
+            <div className="analytics-card-animate" style={{ ...CS, padding: "20px", display: "flex", flexDirection: "column" }}
               onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
               onMouseLeave={e => Object.assign(e.currentTarget.style, csReset)}>
-              <div className="flex items-center justify-between mb-3">
-                <Ico type="people" />
-                <span style={{ fontSize: "9px", fontWeight: 600, padding: "3px 8px", borderRadius: R.rPill, backgroundColor: "rgba(245,247,250,0.7)", color: R.tm, textTransform: "uppercase", letterSpacing: "0.3px" }}>All Time</span>
-              </div>
-              <div style={{ fontSize: "32px", fontWeight: 700, color: R.tp, letterSpacing: "-0.5px", lineHeight: 1 }}>{tTotal}</div>
-              <div style={{ fontSize: "12px", color: R.ts, marginTop: "2px" }}>Total Trainers</div>
-              <div className="mt-3 flex items-center justify-between">
-                <span style={{ fontSize: "11px", fontWeight: 600, color: R.green }}>{tActive} Active</span>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: R.tp }}>{adoptionRate}%</span>
-              </div>
-              <div className="mt-1" style={{ height: 4, borderRadius: 2, backgroundColor: "rgba(245,247,250,0.8)", overflow: "hidden" }}>
-                <div style={{ width: `${adoptionRate}%`, height: "100%", borderRadius: 2, background: `linear-gradient(90deg, ${R.blue}, ${R.green})`, transition: "width 0.6s ease" }} />
-              </div>
-              {pm.newTrainers > 0 && (
-                <div className="mt-3" style={{ padding: "4px 8px", borderRadius: "8px", backgroundColor: "rgba(63,175,88,0.08)" }}>
-                  <Delta val={pm.newTrainers} suffix={pLabel} />
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: "10px", background: `linear-gradient(135deg, ${accent}15, ${accent}08)` }}>
+                  <Ico type={icon} />
                 </div>
-              )}
+                <span style={{ fontSize: "12px", fontWeight: 500, color: R.tm, letterSpacing: "-0.24px" }}>{label}</span>
+              </div>
+              <div style={{ fontSize: "36px", fontWeight: 700, color: R.tp, letterSpacing: "-1px", lineHeight: 1 }}>{value}</div>
+              {sub1 && <div className="flex items-center gap-3 mt-3">
+                <span style={{ fontSize: "12px", fontWeight: 600, color: R.green }}>{sub1}</span>
+                {sub2 && <span style={{ fontSize: "12px", fontWeight: 700, color: R.tp }}>{sub2}</span>}
+              </div>}
+              {barPct !== undefined && <div className="mt-2" style={{ height: 4, borderRadius: 2, backgroundColor: "rgba(245,247,250,0.8)", overflow: "hidden" }}>
+                <div style={{ width: `${barPct}%`, height: "100%", borderRadius: 2, background: barGrad, transition: "width 0.6s ease" }} />
+              </div>}
+              {badge && <div className="mt-auto pt-3">{badge}</div>}
+            </div>
+          );
+
+          return <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+
+            {/* Left: 3 metric cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+              <MetricCard icon="people" accent={R.blue} value={tTotal} label="Trainers"
+                sub1={`${tActive} Active`} sub2={`${adoptionRate}%`}
+                barPct={adoptionRate} barGrad={`linear-gradient(90deg, ${R.blue}, ${R.green})`}
+                badge={pm.newTrainers > 0 ? <span style={{ display: "inline-block", fontSize: "11px", fontWeight: 600, color: R.green, padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(63,175,88,0.08)" }}>+{pm.newTrainers} {pLabel}</span> : null}
+              />
+              <MetricCard icon="person" accent={R.green} value={cTotal} label="Clients"
+                sub1={`${cActive} Active`} sub2={`${engagementRate}%`}
+                barPct={engagementRate} barGrad={`linear-gradient(90deg, ${R.green}, ${R.blue})`}
+                badge={pm.newClients > 0 ? <span style={{ display: "inline-block", fontSize: "11px", fontWeight: 600, color: R.green, padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(63,175,88,0.08)" }}>+{pm.newClients} {pLabel}</span> : null}
+              />
+              <MetricCard icon="trend" accent="#7c3aed" value={allTimeTotalReads} label="Readings"
+                badge={<div className="flex flex-col gap-1.5">
+                  {[["Trainers", allTimeTrainerReads, R.blue], ["Clients", allTimeClientReads, R.green]].map(([l, v, c]) => (
+                    <div key={l} className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c }} />
+                      <span style={{ fontSize: "11px", color: R.ts }}>{l}</span>
+                      <span className="ml-auto" style={{ fontSize: "12px", fontWeight: 600, color: R.tp }}>{v}</span>
+                    </div>
+                  ))}
+                  {periodTotalReads > 0 && <div className="mt-1" style={{ padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(124,58,237,0.06)" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 600, color: "#7c3aed" }}>{periodTotalReads} {pLabel}</span>
+                  </div>}
+                </div>}
+              />
             </div>
 
-            {/* Card 2: Clients */}
-            <div className="p-4 analytics-card-animate" style={CS}
+            {/* Right: Period Comparison with embedded picker */}
+            <div className="analytics-card-animate" style={{ ...CS, padding: "20px", display: "flex", flexDirection: "column", background: "linear-gradient(145deg, rgba(48,139,249,0.03), rgba(255,255,255,0.6))" }}
               onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
               onMouseLeave={e => Object.assign(e.currentTarget.style, csReset)}>
-              <div className="flex items-center justify-between mb-3">
-                <Ico type="person" />
-                <span style={{ fontSize: "9px", fontWeight: 600, padding: "3px 8px", borderRadius: R.rPill, backgroundColor: "rgba(245,247,250,0.7)", color: R.tm, textTransform: "uppercase", letterSpacing: "0.3px" }}>All Time</span>
-              </div>
-              <div style={{ fontSize: "32px", fontWeight: 700, color: R.tp, letterSpacing: "-0.5px", lineHeight: 1 }}>{cTotal}</div>
-              <div style={{ fontSize: "12px", color: R.ts, marginTop: "2px" }}>Total Clients</div>
-              <div className="mt-3 flex items-center justify-between">
-                <span style={{ fontSize: "11px", fontWeight: 600, color: R.green }}>{cActive} Active</span>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: R.tp }}>{engagementRate}%</span>
-              </div>
-              <div className="mt-1" style={{ height: 4, borderRadius: 2, backgroundColor: "rgba(245,247,250,0.8)", overflow: "hidden" }}>
-                <div style={{ width: `${engagementRate}%`, height: "100%", borderRadius: 2, background: `linear-gradient(90deg, ${R.green}, ${R.blue})`, transition: "width 0.6s ease" }} />
-              </div>
-              {pm.newClients > 0 && (
-                <div className="mt-3" style={{ padding: "4px 8px", borderRadius: "8px", backgroundColor: "rgba(63,175,88,0.08)" }}>
-                  <Delta val={pm.newClients} suffix={pLabel} />
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center" style={{ backgroundColor: "rgba(245,247,250,0.8)", borderRadius: "10px", padding: "3px", gap: "2px" }}>
+                  {[["today", "Today"], ["week", "Week"], ["month", "Month"]].map(([k, l]) => (
+                    <button key={k} onClick={() => setPeriod(k)}
+                      className="cursor-pointer transition-all duration-200"
+                      style={{ padding: "5px 14px", fontSize: "11px", fontWeight: period === k ? 600 : 400, letterSpacing: "-0.22px", backgroundColor: period === k ? R.blue : "transparent", color: period === k ? R.white : R.ts, border: "none", borderRadius: "8px", boxShadow: period === k ? `0 2px 6px ${R.blue}30` : "none" }}>{l}</button>
+                  ))}
                 </div>
-              )}
-            </div>
-
-            {/* Card 3: Readings */}
-            <div className="p-4 analytics-card-animate" style={CS}
-              onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
-              onMouseLeave={e => Object.assign(e.currentTarget.style, csReset)}>
-              <div className="flex items-center justify-between mb-3">
-                <Ico type="trend" />
-                <span style={{ fontSize: "9px", fontWeight: 600, padding: "3px 8px", borderRadius: R.rPill, backgroundColor: "rgba(245,247,250,0.7)", color: R.tm, textTransform: "uppercase", letterSpacing: "0.3px" }}>All Time</span>
-              </div>
-              <div style={{ fontSize: "32px", fontWeight: 700, color: R.tp, letterSpacing: "-0.5px", lineHeight: 1 }}>{allTimeTotalReads}</div>
-              <div style={{ fontSize: "12px", color: R.ts, marginTop: "2px" }}>Total Readings</div>
-              <div className="mt-3 flex flex-col gap-1.5">
-                {[["Trainers", allTimeTrainerReads, R.blue], ["Clients", allTimeClientReads, R.green]].map(([l, v, c]) => (
-                  <div key={l} className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c }} />
-                    <span style={{ fontSize: "11px", color: R.ts }}>{l}</span>
-                    <span className="ml-auto" style={{ fontSize: "11px", fontWeight: 600, color: R.tp }}>{v}</span>
-                  </div>
-                ))}
-              </div>
-              {periodTotalReads > 0 && (
-                <div className="mt-3" style={{ padding: "4px 8px", borderRadius: "8px", backgroundColor: "rgba(124,58,237,0.06)" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 600, color: "#7c3aed" }}>{periodTotalReads} {pLabel}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Card 4: Period Comparison */}
-            <div className="p-4 analytics-card-animate" style={CS}
-              onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
-              onMouseLeave={e => Object.assign(e.currentTarget.style, csReset)}>
-              <div className="flex items-center justify-between mb-3">
-                <span style={{ fontSize: "11px", fontWeight: 700, color: R.blue, letterSpacing: "0.3px", textTransform: "uppercase" }}>{period === "today" ? "Today" : period === "week" ? "This Week" : "This Month"}</span>
                 <Donut pct={avgActivity} size={44} thickness={5} />
               </div>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2.5 flex-1">
                 {[
-                  { label: "New Trainers", cur: pm.newTrainers, prev: ppm ? ppm.newTrainers : 0, delta: dT, icon: "person-add" },
-                  { label: "New Clients", cur: pm.newClients, prev: ppm ? ppm.newClients : 0, delta: dC, icon: "person-add" },
-                  { label: "Readings", cur: periodTotalReads, prev: prevTotalReads, delta: dR, icon: "trend" },
+                  { label: "New Trainers", cur: pm.newTrainers, prev: ppm ? ppm.newTrainers : 0, delta: dT, color: R.blue },
+                  { label: "New Clients", cur: pm.newClients, prev: ppm ? ppm.newClients : 0, delta: dC, color: R.green },
+                  { label: "Readings", cur: periodTotalReads, prev: prevTotalReads, delta: dR, color: "#7c3aed" },
                 ].map(row => (
-                  <div key={row.label} className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span style={{ fontSize: "18px", fontWeight: 700, color: R.tp, letterSpacing: "-0.36px" }}>{row.cur}</span>
-                        <span style={{ fontSize: "11px", color: R.ts }}>{row.label}</span>
-                      </div>
+                  <div key={row.label} className="flex items-center gap-3" style={{ padding: "10px 12px", borderRadius: "12px", backgroundColor: "rgba(245,247,250,0.5)" }}>
+                    <div className="flex items-center justify-center shrink-0" style={{ width: 32, height: 32, borderRadius: "8px", background: `linear-gradient(135deg, ${row.color}15, ${row.color}08)` }}>
+                      <span style={{ fontSize: "16px", fontWeight: 700, color: row.color }}>{row.cur}</span>
+                    </div>
+                    <div className="flex-1">
+                      <div style={{ fontSize: "12px", fontWeight: 500, color: R.tp }}>{row.label}</div>
                       <span style={{ fontSize: "10px", color: R.tm }}>{prevLabel}: {row.prev}</span>
                     </div>
-                    <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "8px", backgroundColor: row.delta >= 0 ? "rgba(63,175,88,0.1)" : "rgba(231,76,60,0.1)", color: row.delta >= 0 ? R.green : R.red }}>
-                      {row.delta >= 0 ? "↑" : "↓"}{Math.abs(row.delta)}
+                    <span style={{ fontSize: "11px", fontWeight: 600, padding: "4px 10px", borderRadius: "8px", backgroundColor: row.delta >= 0 ? "rgba(63,175,88,0.1)" : "rgba(231,76,60,0.1)", color: row.delta >= 0 ? R.green : R.red }}>
+                      {row.delta >= 0 ? "+" : ""}{row.delta}
                     </span>
                   </div>
                 ))}

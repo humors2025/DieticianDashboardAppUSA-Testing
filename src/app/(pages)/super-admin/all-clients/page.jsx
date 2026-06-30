@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -89,6 +90,18 @@ function ZoneBadge({ zone }) {
 
 export default function SuperAdminAllClientsPage() {
   const dispatch = useDispatch();
+  const router = useRouter();
+
+  const goToClientProfile = useCallback(
+    (c) => {
+      if (!c?.profile_id) return;
+      const params = new URLSearchParams({ profile_id: c.profile_id });
+      const partnerCode = c.partner_code || c.dietitian_id;
+      if (partnerCode) params.set("partner_code", partnerCode);
+      router.push(`/superadmin-trainer/clients-profile?${params.toString()}`);
+    },
+    [router]
+  );
 
   const actor = useSelector(selectAllClientsActor);
   const filters = useSelector(selectAllClientsFilters);
@@ -170,13 +183,25 @@ export default function SuperAdminAllClientsPage() {
     loadData({ force: true });
   }, [loadData]);
 
+  // The API's pagination object key names can vary; fall back gracefully so the
+  // footer always has sane numbers to work with.
+  const totalCount =
+    pagination?.total ??
+    pagination?.total_count ??
+    pagination?.count ??
+    clients.length;
+
+  const pageLimit = pagination?.limit || PAGE_LIMIT;
+  const currentPage = pagination?.page || page;
+
   const totalPages = useMemo(() => {
-    if (!pagination?.total) return 1;
-    return Math.max(
-      1,
-      Math.ceil(pagination.total / (pagination.limit || PAGE_LIMIT))
-    );
-  }, [pagination]);
+    if (!totalCount) return 1;
+    return Math.max(1, Math.ceil(totalCount / pageLimit));
+  }, [totalCount, pageLimit]);
+
+  // Prefer the API's explicit flag, otherwise infer from the page math.
+  const hasMore =
+    pagination?.has_more != null ? pagination.has_more : currentPage < totalPages;
 
   return (
     <div className="flex flex-col gap-6">
@@ -316,8 +341,11 @@ export default function SuperAdminAllClientsPage() {
                     key={c.profile_id}
                     className="border-t border-[#F5F7FA] hover:bg-[#F5F7FA]"
                   >
-                    <td className="py-2.5 px-4">
-                      <div className="text-[#252525] font-semibold">
+                    <td
+                      className="py-2.5 px-4 cursor-pointer"
+                      onClick={() => goToClientProfile(c)}
+                    >
+                      <div className="text-[#252525] font-semibold hover:text-[#308BF9]">
                         {c.name || "-"}
                       </div>
                       <div className="text-[#A1A1A1] text-[11px]">
@@ -384,40 +412,38 @@ export default function SuperAdminAllClientsPage() {
         </table>
       </div>
 
-      {pagination?.total > 0 && (
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="text-[#A1A1A1] text-[11px]">
             Showing{" "}
             <span className="text-[#252525] font-semibold">
-              {(pagination.offset ?? (pagination.page - 1) * pagination.limit) +
-                1}
+              {clients.length === 0
+                ? 0
+                : (pagination?.offset ?? (currentPage - 1) * pageLimit) + 1}
               {"–"}
               {Math.min(
-                (pagination.offset ??
-                  (pagination.page - 1) * pagination.limit) + clients.length,
-                pagination.total
+                (pagination?.offset ?? (currentPage - 1) * pageLimit) +
+                  clients.length,
+                totalCount
               )}
             </span>{" "}
             of{" "}
-            <span className="text-[#252525] font-semibold">
-              {pagination.total}
-            </span>
+            <span className="text-[#252525] font-semibold">{totalCount}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              disabled={page <= 1 || loading}
+              disabled={currentPage <= 1 || loading}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               className="rounded-full border border-[#E1E6ED] text-[#535359] text-[11px] font-semibold px-3 py-1 disabled:opacity-40 cursor-pointer"
             >
               Prev
             </button>
             <span className="text-[#535359] text-[11px]">
-              Page {pagination.page} of {totalPages}
+              Page {currentPage} of {totalPages}
             </span>
             <button
               type="button"
-              disabled={!pagination.has_more || loading}
+              disabled={!hasMore || loading}
               onClick={() => setPage((p) => p + 1)}
               className="rounded-full border border-[#E1E6ED] text-[#535359] text-[11px] font-semibold px-3 py-1 disabled:opacity-40 cursor-pointer"
             >
@@ -425,7 +451,6 @@ export default function SuperAdminAllClientsPage() {
             </button>
           </div>
         </div>
-      )}
     </div>
   );
 }

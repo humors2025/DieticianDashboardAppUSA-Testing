@@ -402,18 +402,18 @@ export default function AnalyticsDashboard() {
     { key: "pct", label: "Rate %", align: "right", render: r => <span style={rateStyle(r.pct)}>{r.pct}%</span> },
   ];
 
-  const CS = { backgroundColor: "rgba(255,255,255,0.6)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderRadius: "20px", border: "1px solid rgba(255,255,255,0.7)", boxShadow: "0 2px 8px rgba(37,37,37,0.04)", transition: "box-shadow 0.3s ease, transform 0.3s ease", position: "relative", overflow: "hidden" };
-  const csHover = { boxShadow: "0 12px 32px rgba(37,37,37,0.1), 0 4px 12px rgba(37,37,37,0.05)", transform: "translateY(-2px)" };
-  const csReset = { boxShadow: "0 2px 8px rgba(37,37,37,0.04)", transform: "none" };
+  const CS = { backgroundColor: "#ffffff", borderRadius: "16px", border: "1px solid #EEF2F6", boxShadow: "0 1px 4px rgba(0,0,0,0.04)", transition: "box-shadow 0.3s ease, transform 0.3s ease", position: "relative", overflow: "hidden" };
+  const csHover = { boxShadow: "0 8px 24px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)", transform: "translateY(-2px)" };
+  const csReset = { boxShadow: "0 1px 4px rgba(0,0,0,0.04)", transform: "none" };
 
   const maxGoal = Math.max(curGoals.fat_loss, curGoals.muscle_gain, curGoals.weight_loss, 1);
 
   const deltaStyle = (v) => ({ borderRadius: "10px", padding: "8px 12px", fontSize: "12px", letterSpacing: "-0.24px", fontWeight: 500, backgroundColor: v >= 0 ? R.greenLight : "#fef2f2", color: v >= 0 ? R.green : R.red });
 
   return (
-    <div className="overflow-y-scroll custom-scrollbar" style={{ height: "calc(100vh - 130px)", fontFamily: "'Poppins', sans-serif", background: "linear-gradient(135deg, #e9f3ff 0%, #f5f0ff 35%, #fef2f8 65%, #f5f7fa 100%)" }}>
+    <div className="overflow-y-scroll custom-scrollbar" style={{ height: "calc(100vh - 130px)", fontFamily: "'Poppins', sans-serif", backgroundColor: "#F5F7FA" }}>
       {/* ═══ HEADER ═══ */}
-      <div className="flex items-center justify-between py-3 sticky top-0 z-10" style={{ backgroundColor: "rgba(255,255,255,0.45)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.5)" }}>
+      <div className="flex items-center justify-between py-3 sticky top-0 z-10" style={{ backgroundColor: "#F5F7FA", borderBottom: "1px solid #EEF2F6" }}>
         {/* ── Left: Page title as dropdown ── */}
         <div ref={tabDdRef} style={{ position: "relative" }}>
           <button onClick={() => setTabDdOpen(o => !o)}
@@ -426,7 +426,7 @@ export default function AnalyticsDashboard() {
           </button>
 
           {tabDdOpen && (
-            <div className="absolute left-0 z-50" style={{ top: "calc(100% + 6px)", minWidth: 220, backgroundColor: R.white, borderRadius: R.rCard, border: `1px solid ${R.border}`, boxShadow: "0 12px 40px rgba(37,37,37,0.12), 0 4px 12px rgba(37,37,37,0.06)", padding: "6px", animation: "fadeSlideUp 0.15s ease-out" }}>
+            <div className="absolute left-0 z-50" style={{ top: "calc(100% + 6px)", minWidth: 220, backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #EEF2F6", boxShadow: "0 12px 40px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.05)", padding: "6px", animation: "fadeSlideUp 0.15s ease-out" }}>
               <div style={{ padding: "4px 10px 6px", fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: R.tm }}>View</div>
               <button onClick={() => { setActiveTab("overview"); setTabDdOpen(false); }}
                 className="flex items-center gap-2.5 w-full cursor-pointer transition-all duration-150"
@@ -470,14 +470,14 @@ export default function AnalyticsDashboard() {
         <div className="flex items-center gap-3">
           {/* Refresh */}
           <button onClick={loadData} className="flex items-center justify-center cursor-pointer transition-all duration-200"
-            style={{ width: 36, height: 36, borderRadius: "10px", backgroundColor: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.7)", color: R.tm }}
+            style={{ width: 36, height: 36, borderRadius: "10px", backgroundColor: "#ffffff", border: "1px solid #EEF2F6", color: R.tm }}
             onMouseEnter={e => { e.currentTarget.style.backgroundColor = R.blueLight; e.currentTarget.style.color = R.blue; e.currentTarget.style.borderColor = R.blue + "40"; }}
-            onMouseLeave={e => { e.currentTarget.style.backgroundColor = R.white; e.currentTarget.style.color = R.tm; e.currentTarget.style.borderColor = R.border; }}>
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#ffffff"; e.currentTarget.style.color = R.tm; e.currentTarget.style.borderColor = "#EEF2F6"; }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
           </button>
 
           {/* Timezone + Clock cluster */}
-          <div className="flex items-center gap-2" style={{ backgroundColor: "rgba(255,255,255,0.6)", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.7)", padding: "6px 12px" }}>
+          <div className="flex items-center gap-2" style={{ backgroundColor: "#ffffff", borderRadius: "10px", border: "1px solid #EEF2F6", padding: "6px 12px" }}>
             <div className="flex items-center" style={{ backgroundColor: R.surface, borderRadius: "8px", padding: "2px", gap: "2px" }}>
               {Object.entries(TIMEZONES).map(([tz, label]) => (
                 <button key={tz} onClick={() => setTimezone(tz)}
@@ -537,7 +537,7 @@ export default function AnalyticsDashboard() {
                 <span style={{ fontSize: "12px", fontWeight: 600, color: R.green }}>{sub1}</span>
                 {sub2 && <span style={{ fontSize: "12px", fontWeight: 700, color: R.tp }}>{sub2}</span>}
               </div>}
-              {barPct !== undefined && <div className="mt-2" style={{ height: 4, borderRadius: 2, backgroundColor: "rgba(245,247,250,0.8)", overflow: "hidden" }}>
+              {barPct !== undefined && <div className="mt-2" style={{ height: 4, borderRadius: 2, backgroundColor: "#F1F5F9", overflow: "hidden" }}>
                 <div style={{ width: `${barPct}%`, height: "100%", borderRadius: 2, background: barGrad, transition: "width 0.6s ease" }} />
               </div>}
               {badge && <div className="mt-auto pt-3">{badge}</div>}
@@ -575,11 +575,11 @@ export default function AnalyticsDashboard() {
             </div>
 
             {/* Right: Period Comparison with embedded picker */}
-            <div className="analytics-card-animate" style={{ ...CS, padding: "20px", display: "flex", flexDirection: "column", background: "linear-gradient(145deg, rgba(48,139,249,0.03), rgba(255,255,255,0.6))" }}
+            <div className="analytics-card-animate" style={{ ...CS, padding: "20px", display: "flex", flexDirection: "column" }}
               onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
               onMouseLeave={e => Object.assign(e.currentTarget.style, csReset)}>
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center" style={{ backgroundColor: "rgba(245,247,250,0.8)", borderRadius: "10px", padding: "3px", gap: "2px" }}>
+                <div className="flex items-center" style={{ backgroundColor: "#F1F5F9", borderRadius: "10px", padding: "3px", gap: "2px" }}>
                   {[["today", "Today"], ["week", "Week"], ["month", "Month"]].map(([k, l]) => (
                     <button key={k} onClick={() => setPeriod(k)}
                       className="cursor-pointer transition-all duration-200"
@@ -594,7 +594,7 @@ export default function AnalyticsDashboard() {
                   { label: "New Clients", cur: pm.newClients, prev: ppm ? ppm.newClients : 0, delta: dC, color: R.green },
                   { label: "Readings", cur: periodTotalReads, prev: prevTotalReads, delta: dR, color: "#7c3aed" },
                 ].map(row => (
-                  <div key={row.label} className="flex items-center gap-3" style={{ padding: "10px 12px", borderRadius: "12px", backgroundColor: "rgba(245,247,250,0.5)" }}>
+                  <div key={row.label} className="flex items-center gap-3" style={{ padding: "10px 12px", borderRadius: "12px", backgroundColor: "#F8FAFC" }}>
                     <div className="flex items-center justify-center shrink-0" style={{ width: 32, height: 32, borderRadius: "8px", background: `linear-gradient(135deg, ${row.color}15, ${row.color}08)` }}>
                       <span style={{ fontSize: "16px", fontWeight: 700, color: row.color }}>{row.cur}</span>
                     </div>
@@ -666,7 +666,7 @@ export default function AnalyticsDashboard() {
                     ? `conic-gradient(${R.blue} 0% ${Math.round((periodTrainerReads / periodTotalReads) * 100)}%, ${R.blueLight} ${Math.round((periodTrainerReads / periodTotalReads) * 100)}% 100%)`
                     : R.border
                 }}>
-                  <div className="rounded-full flex items-center justify-center" style={{ width: 86, height: 86, backgroundColor: "rgba(255,255,255,0.8)" }}>
+                  <div className="rounded-full flex items-center justify-center" style={{ width: 86, height: 86, backgroundColor: "#ffffff" }}>
                     <span style={{ fontSize: "20px", fontWeight: 700, color: R.tp, letterSpacing: "-0.4px" }}>{periodTotalReads}</span>
                   </div>
                 </div>
@@ -809,7 +809,7 @@ export default function AnalyticsDashboard() {
         </div>
 
         {/* ═══ FOOTER ═══ */}
-        <div className="flex items-center gap-2 pt-2" style={{ fontSize: "11px", color: R.tm, letterSpacing: "-0.22px", borderTop: "1px solid rgba(255,255,255,0.5)" }}>
+        <div className="flex items-center gap-2 pt-2" style={{ fontSize: "11px", color: R.tm, letterSpacing: "-0.22px", borderTop: "1px solid #EEF2F6" }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={R.tm} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           <span>Active = Reading rate {"≥"} {ACTIVE_THRESHOLD}% {"·"} Reading Rate = Reading days / Days since onboarded {"·"} Self-test by trainers are excluded from client counts but included in trainer adoption.</span>
         </div>

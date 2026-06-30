@@ -514,104 +514,119 @@ export default function AnalyticsDashboard() {
           </div>
         )}
 
-        {/* ═══ EXECUTIVE SNAPSHOT — Bento Cards ═══ */}
-        {(() => {
-          const dT = ppm ? pm.newTrainers - ppm.newTrainers : 0;
-          const dC = ppm ? pm.newClients - ppm.newClients : 0;
-          const dR = ppm ? periodTotalReads - prevTotalReads : 0;
-          const pLabel = period === "today" ? "today" : period === "week" ? "this week" : "this month";
-          const prevLabel = period === "today" ? "yesterday" : period === "week" ? "last week" : "last month";
+        {/* ═══ EXECUTIVE SNAPSHOT ═══ */}
+        <div className="analytics-card-animate" style={{ ...CS, padding: 0 }}
+          onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
+          onMouseLeave={e => Object.assign(e.currentTarget.style, csReset)}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.8fr 1fr auto", gap: 0 }}>
 
-          const MetricCard = ({ icon, accent, value, label, sub1, sub2, barPct, barGrad, badge }) => (
-            <div className="analytics-card-animate" style={{ ...CS, padding: "20px", display: "flex", flexDirection: "column" }}
-              onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
-              onMouseLeave={e => Object.assign(e.currentTarget.style, csReset)}>
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="flex items-center justify-center" style={{ width: 36, height: 36, borderRadius: "10px", background: `linear-gradient(135deg, ${accent}15, ${accent}08)` }}>
-                  <Ico type={icon} />
-                </div>
-                <span style={{ fontSize: "12px", fontWeight: 500, color: R.tm, letterSpacing: "-0.24px" }}>{label}</span>
+            {/* LEFT: Overall (All Time) */}
+            <div style={{ padding: "20px 24px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: R.tp, marginBottom: "16px" }}>
+                Overall <span style={{ color: R.tm }}>(All Time)</span>
               </div>
-              <div style={{ fontSize: "36px", fontWeight: 700, color: R.tp, letterSpacing: "-1px", lineHeight: 1 }}>{value}</div>
-              {sub1 && <div className="flex items-center gap-3 mt-3">
-                <span style={{ fontSize: "12px", fontWeight: 600, color: R.green }}>{sub1}</span>
-                {sub2 && <span style={{ fontSize: "12px", fontWeight: 700, color: R.tp }}>{sub2}</span>}
-              </div>}
-              {barPct !== undefined && <div className="mt-2" style={{ height: 4, borderRadius: 2, backgroundColor: "#F1F5F9", overflow: "hidden" }}>
-                <div style={{ width: `${barPct}%`, height: "100%", borderRadius: 2, background: barGrad, transition: "width 0.6s ease" }} />
-              </div>}
-              {badge && <div className="mt-auto pt-3">{badge}</div>}
-            </div>
-          );
-
-          return <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-
-            {/* Left: 3 metric cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
-              <MetricCard icon="people" accent={R.blue} value={tTotal} label="Trainers"
-                sub1={`${tActive} Active`} sub2={`${adoptionRate}%`}
-                barPct={adoptionRate} barGrad={`linear-gradient(90deg, ${R.blue}, ${R.green})`}
-                badge={pm.newTrainers > 0 ? <span style={{ display: "inline-block", fontSize: "11px", fontWeight: 600, color: R.green, padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(63,175,88,0.08)" }}>+{pm.newTrainers} {pLabel}</span> : null}
-              />
-              <MetricCard icon="person" accent={R.green} value={cTotal} label="Clients"
-                sub1={`${cActive} Active`} sub2={`${engagementRate}%`}
-                barPct={engagementRate} barGrad={`linear-gradient(90deg, ${R.green}, ${R.blue})`}
-                badge={pm.newClients > 0 ? <span style={{ display: "inline-block", fontSize: "11px", fontWeight: 600, color: R.green, padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(63,175,88,0.08)" }}>+{pm.newClients} {pLabel}</span> : null}
-              />
-              <MetricCard icon="trend" accent="#7c3aed" value={allTimeTotalReads} label="Readings"
-                badge={<div className="flex flex-col gap-1.5">
-                  {[["Trainers", allTimeTrainerReads, R.blue], ["Clients", allTimeClientReads, R.green]].map(([l, v, c]) => (
-                    <div key={l} className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c }} />
-                      <span style={{ fontSize: "11px", color: R.ts }}>{l}</span>
-                      <span className="ml-auto" style={{ fontSize: "12px", fontWeight: 600, color: R.tp }}>{v}</span>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
+                {/* Trainers */}
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <Ico type="people" />
+                    <div>
+                      <div style={{ fontSize: "28px", fontWeight: 800, color: R.tp, letterSpacing: "-0.5px", lineHeight: 1 }}>{tTotal}</div>
+                      <div style={{ fontSize: "12px", color: R.ts, marginTop: "2px" }}>Total Trainers</div>
                     </div>
-                  ))}
-                  {periodTotalReads > 0 && <div className="mt-1" style={{ padding: "4px 10px", borderRadius: "8px", backgroundColor: "rgba(124,58,237,0.06)" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 600, color: "#7c3aed" }}>{periodTotalReads} {pLabel}</span>
-                  </div>}
-                </div>}
-              />
+                  </div>
+                  <div style={{ fontSize: "12px", marginTop: "8px" }}>
+                    <span style={{ fontWeight: 700, color: R.green }}>{tActive} Active</span>
+                    <span style={{ color: R.tm, marginLeft: "4px" }}>({"≥"}{ACTIVE_THRESHOLD}%)</span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: R.ts, marginTop: "2px" }}>{adoptionRate}% Adoption Rate</div>
+                </div>
+                {/* Clients */}
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <Ico type="person" />
+                    <div>
+                      <div style={{ fontSize: "28px", fontWeight: 800, color: R.tp, letterSpacing: "-0.5px", lineHeight: 1 }}>{cTotal}</div>
+                      <div style={{ fontSize: "12px", color: R.ts, marginTop: "2px" }}>Total Clients</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: "12px", marginTop: "8px" }}>
+                    <span style={{ fontWeight: 700, color: R.green }}>{cActive} Active</span>
+                    <span style={{ color: R.tm, marginLeft: "4px" }}>({"≥"}{ACTIVE_THRESHOLD}%)</span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: R.ts, marginTop: "2px" }}>{engagementRate}% Engagement Rate</div>
+                </div>
+                {/* Readings */}
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <Ico type="trend" />
+                    <div>
+                      <div style={{ fontSize: "28px", fontWeight: 800, color: R.tp, letterSpacing: "-0.5px", lineHeight: 1 }}>{allTimeTotalReads}</div>
+                      <div style={{ fontSize: "12px", color: R.ts, marginTop: "2px" }}>Total Readings</div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 mt-2" style={{ fontSize: "11px" }}>
+                    <span style={{ color: R.ts }}>By Trainers: <span style={{ fontWeight: 600, color: R.tp }}>{allTimeTrainerReads}</span>{allTimeTotalReads > 0 && <span style={{ color: R.tm }}> ({Math.round((allTimeTrainerReads / allTimeTotalReads) * 100)}%)</span>}</span>
+                    <span style={{ color: R.ts }}>By Clients: <span style={{ fontWeight: 600, color: R.tp }}>{allTimeClientReads}</span>{allTimeTotalReads > 0 && <span style={{ color: R.tm }}> ({Math.round((allTimeClientReads / allTimeTotalReads) * 100)}%)</span>}</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Right: Period Comparison with embedded picker */}
-            <div className="analytics-card-animate" style={{ ...CS, padding: "20px", display: "flex", flexDirection: "column" }}
-              onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
-              onMouseLeave={e => Object.assign(e.currentTarget.style, csReset)}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center" style={{ backgroundColor: "#F1F5F9", borderRadius: "10px", padding: "3px", gap: "2px" }}>
-                  {[["today", "Today"], ["week", "Week"], ["month", "Month"]].map(([k, l]) => (
+            {/* MIDDLE: Period Stats with picker */}
+            <div style={{ padding: "20px 24px", borderLeft: "1px solid #EEF2F6" }}>
+              <div className="flex items-center justify-between" style={{ marginBottom: "16px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: R.tp }}>{periodLabel}</div>
+                <div className="flex items-center" style={{ backgroundColor: "#F1F5F9", borderRadius: "8px", padding: "2px", gap: "2px" }}>
+                  {[["today", "D"], ["week", "W"], ["month", "M"]].map(([k, l]) => (
                     <button key={k} onClick={() => setPeriod(k)}
                       className="cursor-pointer transition-all duration-200"
-                      style={{ padding: "5px 14px", fontSize: "11px", fontWeight: period === k ? 600 : 400, letterSpacing: "-0.22px", backgroundColor: period === k ? R.blue : "transparent", color: period === k ? R.white : R.ts, border: "none", borderRadius: "8px", boxShadow: period === k ? `0 2px 6px ${R.blue}30` : "none" }}>{l}</button>
+                      style={{ padding: "3px 8px", fontSize: "10px", fontWeight: period === k ? 700 : 500, backgroundColor: period === k ? R.blue : "transparent", color: period === k ? "#ffffff" : R.ts, border: "none", borderRadius: "6px" }}>{l}</button>
                   ))}
                 </div>
-                <Donut pct={avgActivity} size={44} thickness={5} />
               </div>
-              <div className="flex flex-col gap-2.5 flex-1">
-                {[
-                  { label: "New Trainers", cur: pm.newTrainers, prev: ppm ? ppm.newTrainers : 0, delta: dT, color: R.blue },
-                  { label: "New Clients", cur: pm.newClients, prev: ppm ? ppm.newClients : 0, delta: dC, color: R.green },
-                  { label: "Readings", cur: periodTotalReads, prev: prevTotalReads, delta: dR, color: "#7c3aed" },
-                ].map(row => (
-                  <div key={row.label} className="flex items-center gap-3" style={{ padding: "10px 12px", borderRadius: "12px", backgroundColor: "#F8FAFC" }}>
-                    <div className="flex items-center justify-center shrink-0" style={{ width: 32, height: 32, borderRadius: "8px", background: `linear-gradient(135deg, ${row.color}15, ${row.color}08)` }}>
-                      <span style={{ fontSize: "16px", fontWeight: 700, color: row.color }}>{row.cur}</span>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", alignItems: "start" }}>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <Ico type="person-add" />
+                    <div>
+                      <div style={{ fontSize: "22px", fontWeight: 800, color: R.tp, lineHeight: 1, letterSpacing: "-0.44px" }}>{pm.newTrainers}</div>
+                      <div style={{ fontSize: "11px", color: R.ts, marginTop: "1px" }}>Trainers Onboarded</div>
                     </div>
-                    <div className="flex-1">
-                      <div style={{ fontSize: "12px", fontWeight: 500, color: R.tp }}>{row.label}</div>
-                      <span style={{ fontSize: "10px", color: R.tm }}>{prevLabel}: {row.prev}</span>
-                    </div>
-                    <span style={{ fontSize: "11px", fontWeight: 600, padding: "4px 10px", borderRadius: "8px", backgroundColor: row.delta >= 0 ? "rgba(63,175,88,0.1)" : "rgba(231,76,60,0.1)", color: row.delta >= 0 ? R.green : R.red }}>
-                      {row.delta >= 0 ? "+" : ""}{row.delta}
-                    </span>
                   </div>
-                ))}
+                  <div className="flex items-center gap-2.5">
+                    <Ico type="person-add" />
+                    <div>
+                      <div style={{ fontSize: "22px", fontWeight: 800, color: R.tp, lineHeight: 1, letterSpacing: "-0.44px" }}>{pm.newClients}</div>
+                      <div style={{ fontSize: "11px", color: R.ts, marginTop: "1px" }}>Clients Onboarded</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <Ico type="people" />
+                    <div>
+                      <div style={{ fontSize: "22px", fontWeight: 800, color: R.tp, lineHeight: 1, letterSpacing: "-0.44px" }}>{periodTotalReads}</div>
+                      <div style={{ fontSize: "11px", color: R.ts, marginTop: "1px" }}>Total Readings</div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1" style={{ fontSize: "11px", paddingLeft: "28px" }}>
+                    <span style={{ color: R.ts }}>By Trainers: <span style={{ fontWeight: 600, color: R.tp }}>{periodTrainerReads}</span>{periodTotalReads > 0 && <span style={{ color: R.tm }}> ({Math.round((periodTrainerReads / periodTotalReads) * 100)}%)</span>}</span>
+                    <span style={{ color: R.ts }}>By Clients: <span style={{ fontWeight: 600, color: R.tp }}>{periodClientReads}</span>{periodTotalReads > 0 && <span style={{ color: R.tm }}> ({Math.round((periodClientReads / periodTotalReads) * 100)}%)</span>}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-          </div>;
-        })()}
+            {/* RIGHT: Overall Device Adoption */}
+            <div className="flex flex-col items-center justify-center" style={{ padding: "20px 28px", borderLeft: "1px solid #EEF2F6" }}>
+              <div style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: R.tm, marginBottom: "10px" }}>Overall Device Adoption</div>
+              <Donut pct={avgActivity} size={100} thickness={10} />
+              <div style={{ fontSize: "11px", color: R.ts, marginTop: "6px" }}>Average Reading Rate</div>
+            </div>
+
+          </div>
+        </div>
 
         {/* ═══ ROW 2: TRAINER ADOPTION (wide) + READING SPLIT ═══ */}
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "16px" }}>

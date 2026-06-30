@@ -180,6 +180,8 @@ export default function AnalyticsDashboard() {
   const [timezone, setTimezone] = useState(DEFAULT_TZ);
   const [clock, setClock] = useState("");
   const [openAcc, setOpenAcc] = useState(new Set());
+  const [trainerTab, setTrainerTab] = useState("atrisk");
+  const [cohortTab, setCohortTab] = useState(0);
 
   useEffect(() => {
     const tick = () => setClock(new Date().toLocaleString("en-US", { timeZone: timezone, weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }));
@@ -644,41 +646,55 @@ export default function AnalyticsDashboard() {
         {/* ═══ ROW 2: TRAINER ADOPTION (wide) + READING SPLIT ═══ */}
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "16px" }}>
           {/* Trainer Adoption */}
-          <div className="p-5 analytics-card-animate" style={{ ...CS, overflow: "visible" }}
+          <div className="p-5 analytics-card-animate" style={CS}
             onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
             onMouseLeave={e => Object.assign(e.currentTarget.style, csReset)}>
 
-            <h2 style={{ fontSize: "18px", fontWeight: 600, color: R.tp, letterSpacing: "-0.36px" }}>Trainer Adoption</h2>
-            <p className="mt-0.5" style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Are trainers using the device?</p>
-            <div className="flex items-center gap-5 mt-4">
-              <Donut pct={adoptionRate} size={100} thickness={10} label="Overall Adoption" />
-              <div className="flex flex-col gap-2 flex-1">
-                <div className="flex items-center gap-2"><span style={{ fontSize: "20px", fontWeight: 700, color: R.tp, letterSpacing: "-0.4px" }}>{tTotal}</span><span style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Total Trainers</span></div>
-                {[
-                  { key: "active", dotColor: R.green, pulse: true, count: tActive, label: `Active (≥${ACTIVE_THRESHOLD}%)`, list: activeTrainers },
-                  { key: "elite", dotColor: R.green, pulse: false, count: eliteCount, label: "Elite (100%)", list: eliteTrainers },
-                  { key: "atrisk", dotColor: R.red, pulse: true, count: atRiskTrainerCount, label: "At Risk (<30%)", list: atRiskTrainers },
-                ].map(g => (
-                  <div key={g.key} style={{ position: "relative" }}>
-                    <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => g.count > 0 && toggleAcc(g.key)}>
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: g.dotColor, boxShadow: g.pulse && g.count > 0 ? `0 0 0 3px ${g.dotColor}25` : "none", animation: g.pulse && g.count > 0 ? "pulse-dot 2s ease-in-out infinite" : "none" }} /><span style={{ fontSize: "13px", fontWeight: 600, color: R.tp, letterSpacing: "-0.26px" }}>{g.count}</span><span style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>{g.label}</span>
-                      {g.count > 0 && <svg className={`w-3 h-3 transition-transform ${openAcc.has(g.key) ? "rotate-180" : ""}`} style={{ color: R.tm }} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 4.5l3 3 3-3"/></svg>}
-                    </div>
-                    {openAcc.has(g.key) && g.list.length > 0 && (
-                      <div className="absolute z-50" style={{ top: "calc(100% + 6px)", left: 0, right: "-200px", maxHeight: "280px", overflowY: "auto", overflowX: "auto", backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #EEF2F6", boxShadow: "0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)", padding: "12px", animation: "fadeSlideUp 0.15s ease-out" }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span style={{ fontSize: "12px", fontWeight: 700, color: R.tp }}>{g.label} ({g.count})</span>
-                          <button onClick={(e) => { e.stopPropagation(); toggleAcc(g.key); }} className="cursor-pointer flex items-center justify-center" style={{ width: 24, height: 24, borderRadius: "6px", border: "none", backgroundColor: "#F1F5F9", color: R.tm }}>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                          </button>
-                        </div>
-                        <AccTable rows={g.list} cols={trainerCols} />
-                      </div>
-                    )}
-                  </div>
-                ))}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 style={{ fontSize: "18px", fontWeight: 600, color: R.tp, letterSpacing: "-0.36px" }}>Trainer Adoption</h2>
+                <p className="mt-0.5" style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Are trainers using the device?</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Donut pct={adoptionRate} size={56} thickness={6} />
+                <div>
+                  <div style={{ fontSize: "20px", fontWeight: 700, color: R.tp, lineHeight: 1 }}>{tTotal}</div>
+                  <div style={{ fontSize: "11px", color: R.ts }}>Total Trainers</div>
+                </div>
               </div>
             </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 mt-4 p-1" style={{ backgroundColor: "#F1F5F9", borderRadius: "10px" }}>
+              {[
+                { key: "active", dotColor: R.green, count: tActive, label: `Active (≥${ACTIVE_THRESHOLD}%)`, list: activeTrainers },
+                { key: "elite", dotColor: "#10B981", count: eliteCount, label: "Elite (100%)", list: eliteTrainers },
+                { key: "atrisk", dotColor: R.red, count: atRiskTrainerCount, label: "At Risk (<30%)", list: atRiskTrainers },
+              ].map(t => (
+                <button key={t.key} onClick={() => setTrainerTab(t.key)} className="flex-1 flex items-center justify-center gap-1.5 cursor-pointer" style={{
+                  padding: "7px 10px", borderRadius: "8px", border: "none", fontSize: "12px", fontWeight: 600, letterSpacing: "-0.24px", transition: "all 0.2s ease",
+                  backgroundColor: trainerTab === t.key ? "#ffffff" : "transparent",
+                  color: trainerTab === t.key ? R.tp : R.tm,
+                  boxShadow: trainerTab === t.key ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                }}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.dotColor }} />
+                  <span>{t.count}</span>
+                  <span style={{ fontWeight: 500 }}>{t.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Tab content — table */}
+            <div className="mt-3 overflow-x-auto" style={{ maxHeight: "220px", overflowY: "auto" }}>
+              {(() => {
+                const tabs = { active: activeTrainers, elite: eliteTrainers, atrisk: atRiskTrainers };
+                const list = tabs[trainerTab] || [];
+                return list.length > 0
+                  ? <AccTable rows={list} cols={trainerCols} />
+                  : <div className="flex items-center justify-center py-6" style={{ fontSize: "13px", color: R.tm }}>No trainers in this group</div>;
+              })()}
+            </div>
+
             <div className="mt-2 italic" style={{ fontSize: "10px", color: R.tm, letterSpacing: "-0.2px" }}>Adoption = Trainers with reading rate {"≥"} {ACTIVE_THRESHOLD}% / Total trainers ({tActive}/{tTotal} = {adoptionRate}%)</div>
             <div className="mt-2" style={deltaStyle(trainerWeekDelta)}>
               {trainerWeekDelta >= 0 ? "↑" : "↓"} {Math.abs(trainerWeekDelta)} {trainerWeekDelta === 1 || trainerWeekDelta === -1 ? "trainer" : "trainers"} this week vs last
@@ -760,45 +776,44 @@ export default function AnalyticsDashboard() {
             </div>
           </div>
 
-          {/* Reading Rate Cohorts — moved here, wider */}
-          <div className="p-5 analytics-card-animate" style={{ ...CS, overflow: "visible" }}
+          {/* Reading Rate Cohorts */}
+          <div className="p-5 analytics-card-animate" style={CS}
             onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
             onMouseLeave={e => Object.assign(e.currentTarget.style, csReset)}>
 
             <h2 style={{ fontSize: "18px", fontWeight: 600, color: R.tp, letterSpacing: "-0.36px" }}>Reading Rate Cohorts</h2>
             <p className="mt-0.5" style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Where do your clients & trainers stand?</p>
-            <div className="flex flex-col gap-2.5 mt-4">
+
+            {/* Bar chart overview */}
+            <div className="flex flex-col gap-2 mt-4">
               {cohortData.map((tier, i) => (
-                <div key={i} style={{ position: "relative" }}>
-                  <div className="flex items-center gap-2 cursor-pointer" onClick={() => tier.count > 0 && toggleAcc(`cohort-${i}`)}>
-                    <span className="w-[70px] shrink-0" style={{ fontSize: "11px", fontWeight: 500, color: R.tp, letterSpacing: "-0.22px" }}>{tier.label}</span>
-                    <div className="flex-1 h-[8px] rounded-full overflow-hidden" style={{ backgroundColor: "#F1F5F9" }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${(tier.count / maxCohortCount) * 100}%`, backgroundColor: tier.color }} />
-                    </div>
-                    <span className="text-right shrink-0 whitespace-nowrap" style={{ fontSize: "11px", letterSpacing: "-0.22px" }}><span style={{ fontWeight: 700, color: R.tp }}>{tier.count}</span> <span style={{ color: R.tm }}>({tier.pctOfTotal}%)</span></span>
-                    {tier.count > 0 && <svg className={`w-3 h-3 transition-transform ${openAcc.has(`cohort-${i}`) ? "rotate-180" : ""}`} style={{ color: R.tm }} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 4.5l3 3 3-3"/></svg>}
+                <div key={i} className="flex items-center gap-2 cursor-pointer" onClick={() => setCohortTab(i)} style={{ opacity: cohortTab === i ? 1 : 0.6, transition: "opacity 0.2s" }}>
+                  <span className="w-[70px] shrink-0" style={{ fontSize: "11px", fontWeight: cohortTab === i ? 700 : 500, color: R.tp, letterSpacing: "-0.22px" }}>{tier.label}</span>
+                  <div className="flex-1 h-[8px] rounded-full overflow-hidden" style={{ backgroundColor: "#F1F5F9" }}>
+                    <div className="h-full rounded-full transition-all" style={{ width: `${(tier.count / maxCohortCount) * 100}%`, backgroundColor: tier.color }} />
                   </div>
-                  {openAcc.has(`cohort-${i}`) && (
-                    <div className="absolute z-50" style={{ top: "calc(100% + 6px)", left: 0, right: 0, maxHeight: "300px", overflowY: "auto", overflowX: "auto", backgroundColor: "#ffffff", borderRadius: "12px", border: "1px solid #EEF2F6", boxShadow: "0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)", padding: "12px", animation: "fadeSlideUp 0.15s ease-out" }}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span style={{ fontSize: "12px", fontWeight: 700, color: R.tp }}>{tier.label} — {tier.count} people</span>
-                        <button onClick={(e) => { e.stopPropagation(); toggleAcc(`cohort-${i}`); }} className="cursor-pointer flex items-center justify-center" style={{ width: 24, height: 24, borderRadius: "6px", border: "none", backgroundColor: "#F1F5F9", color: R.tm }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                        </button>
-                      </div>
-                      {tier.trainersIn.length > 0 && <>
-                        <div className="uppercase" style={{ fontSize: "9px", fontWeight: 600, color: R.tm, letterSpacing: "-0.2px" }}>Trainers</div>
-                        <AccTable rows={tier.trainersIn} cols={trainerCols} />
-                      </>}
-                      {tier.clientsIn.length > 0 && <>
-                        <div className={`uppercase ${tier.trainersIn.length > 0 ? "mt-2" : ""}`} style={{ fontSize: "9px", fontWeight: 600, color: R.tm, letterSpacing: "-0.2px" }}>Clients</div>
-                        <AccTable rows={tier.clientsIn} cols={clientCols} />
-                      </>}
-                    </div>
-                  )}
+                  <span className="text-right shrink-0 whitespace-nowrap" style={{ fontSize: "11px", letterSpacing: "-0.22px" }}><span style={{ fontWeight: 700, color: R.tp }}>{tier.count}</span> <span style={{ color: R.tm }}>({tier.pctOfTotal}%)</span></span>
                 </div>
               ))}
             </div>
+
+            {/* Selected cohort table */}
+            {cohortData[cohortTab] && (
+              <div className="mt-3 pt-3 overflow-x-auto" style={{ borderTop: "1px solid #EEF2F6", maxHeight: "200px", overflowY: "auto" }}>
+                {cohortData[cohortTab].count === 0 ? (
+                  <div className="flex items-center justify-center py-4" style={{ fontSize: "13px", color: R.tm }}>No one in this cohort</div>
+                ) : (<>
+                  {cohortData[cohortTab].trainersIn.length > 0 && <>
+                    <div className="uppercase mb-1" style={{ fontSize: "9px", fontWeight: 600, color: R.tm, letterSpacing: "-0.2px" }}>Trainers</div>
+                    <AccTable rows={cohortData[cohortTab].trainersIn} cols={trainerCols} />
+                  </>}
+                  {cohortData[cohortTab].clientsIn.length > 0 && <>
+                    <div className={`uppercase mb-1 ${cohortData[cohortTab].trainersIn.length > 0 ? "mt-2" : ""}`} style={{ fontSize: "9px", fontWeight: 600, color: R.tm, letterSpacing: "-0.2px" }}>Clients</div>
+                    <AccTable rows={cohortData[cohortTab].clientsIn} cols={clientCols} />
+                  </>}
+                </>)}
+              </div>
+            )}
           </div>
         </div>
 

@@ -1,0 +1,844 @@
+"use client";
+
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { toast } from "sonner";
+import {
+  fetchTrainerAdminListService,
+  fetchDownstreamUsersService,
+  fetchSuperAdminAllClientsOverviewService,
+  fetchClientProfileDatesList,
+} from "@/services/authService";
+
+const TIMEZONES = { "America/Chicago": "Houston, TX", "Asia/Kolkata": "India (IST)" };
+const DEFAULT_TZ = "America/Chicago";
+const ACTIVE_THRESHOLD = 60;
+const EXECUTIVE_TAS = ["Derek", "Evan"];
+const BLUE = "#308BF9";
+const R = {
+  dark: "#252525", blue: "#308bf9", blueLight: "#e9f3ff",
+  green: "#3faf58", greenLight: "#eaffef", red: "#e74c3c", orange: "#e48326", amber: "#ffbf2d",
+  tp: "#252525", ts: "#535359", tm: "#738298", td: "#a1a1a1",
+  border: "#e1e6ed", surface: "#f5f7fa", white: "#ffffff",
+  rCard: "15px", rBadge: "6px", rPill: "33px",
+  shadow: "0 20px 60px rgba(37,37,37,0.08), 0 6px 16px rgba(37,37,37,0.04), 0 1px 3px rgba(37,37,37,0.03)",
+};
+
+function tzNow(tz) { return new Date(new Date().toLocaleString("en-US", { timeZone: tz })); }
+function fmtDate(d) { if (!d) return "—"; return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
+function fmtRange(r) { if (!r) return ""; return `${fmtDate(r.start)} – ${fmtDate(r.end)}`; }
+function daysBetween(a, b) {
+  const da = new Date(a), db = new Date(b);
+  if (isNaN(da) || isNaN(db)) return 0;
+  return Math.max(0, Math.round((new Date(da.getFullYear(), da.getMonth(), da.getDate()) - new Date(db.getFullYear(), db.getMonth(), db.getDate())) / -86400000));
+}
+
+const COHORTS = [90, 70, 50, 25, 10];
+function getCohort(pct) { for (const t of COHORTS) if (pct >= t) return `${t}%+`; return "<10%"; }
+function goalColor(g) { if (!g) return R.tm; const l = g.toLowerCase(); if (l.includes("fat")) return R.orange; if (l.includes("loss")) return R.red; if (l.includes("gain") || l.includes("muscle")) return R.green; return R.blue; }
+function goalLabel(g) { if (!g) return "—"; const l = g.toLowerCase(); if (l.includes("fat")) return "Fat Loss"; if (l.includes("weight")) return "Weight Loss"; if (l.includes("muscle") || l.includes("gain")) return "Muscle Gain"; return g; }
+
+function isMaskedMatch(m, r) {
+  if (!m || !r) return false;
+  const mp = m.toLowerCase().split("@"), rp = r.toLowerCase().split("@");
+  if (mp.length !== 2 || rp.length !== 2 || mp[1] !== rp[1]) return false;
+  if (mp[0].length < 2 || rp[0].length < 2) return false;
+  return mp[0][0] === rp[0][0] && mp[0][1] === rp[0][1] && mp[0].slice(-1) === rp[0].slice(-1);
+}
+function isMaskedNameMatch(m, r) {
+  if (!m || !r) return false;
+  const mw = m.toLowerCase().trim().split(/\s+/), rw = r.toLowerCase().trim().split(/\s+/);
+  if (!mw.length || mw.length !== rw.length) return false;
+  return mw.every((w, i) => w.length >= 2 && rw[i].length >= 2 && w[0] === rw[i][0] && w[1] === rw[i][1] && w.slice(-1) === rw[i].slice(-1));
+}
+function isSelfTest(client, trainers) {
+  const ce = (client.email || "").toLowerCase().trim(), cn = (client.name || "").trim();
+  return trainers.some(t => { const te = (t.email || "").toLowerCase().trim(), tn = (t.name || "").trim(); return ce === te || isMaskedMatch(ce, te) || isMaskedNameMatch(cn, tn); });
+}
+
+function getPeriodRange(p, now) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (p === "today") return { start: today, end: today };
+  if (p === "week") { const d = today.getDay(), m = new Date(today); m.setDate(today.getDate() - ((d + 6) % 7)); return { start: m, end: today }; }
+  if (p === "month") return { start: new Date(today.getFullYear(), today.getMonth(), 1), end: today };
+  return null;
+}
+function getPrevRange(p, now) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (p === "today") { const y = new Date(today); y.setDate(y.getDate() - 1); return { start: y, end: y }; }
+  if (p === "week") { const d = today.getDay(), m = new Date(today); m.setDate(today.getDate() - ((d + 6) % 7)); const ps = new Date(m); ps.setDate(m.getDate() - 1); const pm = new Date(ps); pm.setDate(ps.getDate() - 6); return { start: pm, end: ps }; }
+  if (p === "month") return { start: new Date(today.getFullYear(), today.getMonth() - 1, 1), end: new Date(today.getFullYear(), today.getMonth(), 0) };
+  return null;
+}
+function inRange(ds, r) { if (!r) return true; if (!ds) return false; const d = new Date(ds); if (isNaN(d)) return false; const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return day >= r.start && day <= r.end; }
+function prevLbl(p, now) { if (p === "today") return "yesterday"; if (p === "week") return "last week"; if (p === "month") return new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleString("en-US", { month: "short" }); return null; }
+
+function periodMetrics(clients, trainers, rdm, range) {
+  const nT = !range ? trainers.length : trainers.filter(t => inRange(t.created_at, range)).length;
+  const nC = !range ? clients.length : clients.filter(c => inRange(c.onboardedDate, range)).length;
+  let reads = 0, readers = 0;
+  clients.forEach(c => { const d = rdm[c.profile_id] || []; const n = !range ? d.length : d.filter(x => inRange(x.date, range)).length; reads += n; if (n > 0) readers++; });
+  return { newTrainers: nT, newClients: nC, reads, readers, adoption: clients.length > 0 ? Math.round((readers / clients.length) * 100) : 0 };
+}
+
+const ICO_COLORS = { people: R.blue, person: R.green, "person-add": R.orange, trend: "#7c3aed" };
+function Ico({ type, color }) {
+  const c = color || ICO_COLORS[type] || R.blue;
+  return (
+    <div className="w-10 h-10 flex items-center justify-center shrink-0 transition-transform duration-200 hover:scale-110" style={{ background: `linear-gradient(135deg, ${c}18, ${c}08)`, borderRadius: R.rCard, border: `1px solid ${c}15` }}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        {type === "person" && <><circle cx="12" cy="8" r="4"/><path d="M5 21v-1a7 7 0 0114 0v1"/></>}
+        {type === "people" && <><circle cx="9" cy="7" r="3.5"/><path d="M2 21v-1a5 5 0 0110 0v1"/><circle cx="18" cy="9" r="3"/><path d="M22 21v-1a4 4 0 00-3-3.87"/></>}
+        {type === "person-add" && <><circle cx="10" cy="7" r="3.5"/><path d="M3 21v-1a5 5 0 0110 0"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></>}
+        {type === "trend" && <><polyline points="22 12 18 8 14 12 10 8 2 16"/></>}
+      </svg>
+    </div>
+  );
+}
+
+function Donut({ pct, size = 120, thickness = 10, color = R.blue, label }) {
+  const [animPct, setAnimPct] = useState(0);
+  useEffect(() => { const t = setTimeout(() => setAnimPct(pct), 50); return () => clearTimeout(t); }, [pct]);
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="rounded-full flex items-center justify-center" style={{ width: size, height: size, background: `conic-gradient(${color} 0% ${animPct}%, ${R.surface} ${animPct}% 100%)`, transition: "background 0.8s ease-out", boxShadow: `0 0 0 3px ${R.white}, 0 0 0 4px ${R.border}` }}>
+        <div className="rounded-full flex items-center justify-center" style={{ width: size - thickness * 2, height: size - thickness * 2, backgroundColor: R.white }}>
+          <span className="font-extrabold" style={{ fontSize: size * 0.25, color: R.tp, letterSpacing: "-0.4px" }}>{animPct}%</span>
+        </div>
+      </div>
+      {label && <span style={{ fontSize: "12px", color: R.tm, letterSpacing: "-0.24px" }}>{label}</span>}
+    </div>
+  );
+}
+
+function AccTable({ rows, cols }) {
+  const [sort, setSort] = useState({ key: null, asc: true });
+  const sorted = sort.key ? [...rows].sort((a, b) => {
+    const av = typeof cols.find(c => c.key === sort.key)?.val === "function" ? cols.find(c => c.key === sort.key).val(a) : a[sort.key];
+    const bv = typeof cols.find(c => c.key === sort.key)?.val === "function" ? cols.find(c => c.key === sort.key).val(b) : b[sort.key];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    const cmp = typeof av === "string" ? av.localeCompare(bv) : av - bv;
+    return sort.asc ? cmp : -cmp;
+  }) : rows;
+  const toggle = (key) => setSort(s => s.key === key ? { key, asc: !s.asc } : { key, asc: true });
+  const arrow = (key) => sort.key !== key ? "↕" : sort.asc ? "↑" : "↓";
+  return (
+    <table className="w-full" style={{ fontSize: "12px", letterSpacing: "-0.24px" }}>
+      <thead>
+        <tr style={{ fontSize: "10px", color: R.tm, letterSpacing: "-0.2px", borderBottom: `1px solid ${R.border}` }} className="uppercase">
+          {cols.map(c => (
+            <th key={c.key} className={`pb-1.5 font-semibold cursor-pointer select-none ${c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : "text-left"}`}
+              style={{ fontWeight: 500 }}
+              onClick={() => toggle(c.key)}>
+              {c.label} <span style={{ fontSize: "9px" }}>{arrow(c.key)}</span>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {sorted.map((r, i) => (
+          <tr key={i} className="transition-colors duration-150" style={{ borderBottom: `1px solid ${R.surface}`, backgroundColor: i % 2 === 1 ? `${R.surface}80` : "transparent" }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = `${R.blueLight}60`}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = i % 2 === 1 ? `${R.surface}80` : "transparent"}>
+            {cols.map(c => (
+              <td key={c.key} className={`py-2 ${c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : ""}`}
+                style={{ color: c.className?.includes("text-muted") || c.className?.includes("text-secondary") ? R.ts : R.tp }}>
+                {c.render ? c.render(r) : (typeof c.val === "function" ? c.val(r) : r[c.key])}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function pctChange(cur, prev) {
+  if (prev === 0 && cur === 0) return { val: 0, label: "0%" };
+  if (prev === 0) return { val: 100, label: "100%" };
+  const v = Math.round(((cur - prev) / prev) * 100);
+  return { val: v, label: `${Math.abs(v)}%` };
+}
+
+export default function AnalyticsDashboard() {
+  const [taList, setTaList] = useState([]);
+  const [trainersMap, setTrainersMap] = useState({});
+  const [allClients, setAllClients] = useState([]);
+  const [readingDatesMap, setReadingDatesMap] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [loadingPhase, setLoadingPhase] = useState("Connecting...");
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [tabDdOpen, setTabDdOpen] = useState(false);
+  const tabDdRef = useRef(null);
+  const [period, setPeriod] = useState("today");
+  const [compare, setCompare] = useState(true);
+  const [timezone, setTimezone] = useState(DEFAULT_TZ);
+  const [clock, setClock] = useState("");
+  const [openAcc, setOpenAcc] = useState(new Set());
+
+  useEffect(() => {
+    const tick = () => setClock(new Date().toLocaleString("en-US", { timeZone: timezone, weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }));
+    tick();
+    const id = setInterval(tick, 10000);
+    return () => clearInterval(id);
+  }, [timezone]);
+
+  useEffect(() => {
+    const handler = (e) => { if (tabDdRef.current && !tabDdRef.current.contains(e.target)) setTabDdOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      setLoadingPhase("Fetching Trainer Admins...");
+      const taRes = await fetchTrainerAdminListService();
+      const tas = (taRes?.existing || []).filter(t => EXECUTIVE_TAS.some(n => (t.name || "").toLowerCase().includes(n.toLowerCase())));
+      setTaList(tas);
+      setLoadingPhase("Fetching trainer networks...");
+      const tMap = {};
+      await Promise.all(tas.map(async ta => { try { const r = await fetchDownstreamUsersService(ta.user_id); tMap[ta.user_id] = { trainers: r?.network?.trainers || [] }; } catch { tMap[ta.user_id] = { trainers: [] }; } }));
+      setTrainersMap(tMap);
+      setLoadingPhase("Fetching all clients...");
+      let arr = [], pg = 1, more = true;
+      while (more) { setLoadingPhase(`Fetching clients (page ${pg})...`); const r = await fetchSuperAdminAllClientsOverviewService({ page: pg, limit: 50, type: "all" }); const b = r?.clients || []; arr = arr.concat(b); more = r?.pagination?.has_more === true && b.length > 0; pg++; if (pg > 20) break; }
+      setAllClients(arr);
+      setLoadingPhase("Fetching reading history...");
+      const dm = {};
+      const batches = []; for (let i = 0; i < arr.length; i += 5) batches.push(arr.slice(i, i + 5));
+      let f = 0;
+      for (const batch of batches) { await Promise.all(batch.map(async c => { if (!c.profile_id) return; try { const r = await fetchClientProfileDatesList(c.profile_id, c.dietitian_id || ""); dm[c.profile_id] = r?.data?.dates || []; } catch { dm[c.profile_id] = []; } })); f += batch.length; setLoadingPhase(`Reading history (${f}/${arr.length})...`); }
+      setReadingDatesMap(dm);
+    } catch (e) { setError(e?.message || "Failed to load"); toast.error(e?.message || "Failed"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+  const now = tzNow(timezone);
+
+  const computeTa = useCallback((ta) => {
+    if (!ta) return null;
+    const all = (trainersMap[ta.user_id] || { trainers: [] }).trainers;
+    const nonSelf = all.filter(t => !t.is_self);
+    const codes = new Set(all.map(t => (t.partner_code || t.dietician_id || "").toUpperCase()));
+    const taCl = allClients.filter(c => codes.has((c.dietitian_id || c.partner_code || "").toUpperCase()));
+    const real = taCl.filter(c => !isSelfTest(c, all));
+    const selfT = taCl.filter(c => isSelfTest(c, all));
+
+    const enrich = c => {
+      const dates = readingDatesMap[c.profile_id] || [];
+      const rd = dates.length;
+      const sorted = dates.map(d => d.date).filter(Boolean).sort();
+      const last = sorted.length ? sorted[sorted.length - 1] : null;
+      const onb = c.client?.joined_dttm || (sorted.length ? sorted[0] : null);
+      const lastT = c.test_history?.last_test_date_time || last;
+      const ds = onb ? daysBetween(onb, now) : 0;
+      const pct = ds > 0 ? Math.min(100, Math.round((rd / ds) * 100)) : 0;
+      const code = (c.dietitian_id || "").toUpperCase();
+      const tr = all.find(t => (t.partner_code || t.dietician_id || "").toUpperCase() === code);
+      return { ...c, trainerName: tr?.name || c.associated_dietitian?.name || "—", readingDays: rd, onboardedDate: onb, daysSince: ds, pct, cohort: getCohort(pct), lastDate: lastT };
+    };
+
+    const clients = real.map(enrich).sort((a, b) => b.pct - a.pct);
+    const trainers = nonSelf.map(t => {
+      const te = (t.email || "").toLowerCase().trim(), tn = (t.name || "").trim();
+      const tc = (t.partner_code || t.dietician_id || "").toUpperCase();
+      const sc = selfT.find(c => { const ce = (c.email || "").toLowerCase().trim(), cn = (c.name || "").trim(); return ce === te || isMaskedMatch(ce, te) || isMaskedNameMatch(cn, tn); });
+      const allDates = sc ? (readingDatesMap[sc.profile_id] || []) : [];
+      const ds = t.created_at ? daysBetween(t.created_at, now) : 0;
+      const dates = t.created_at ? allDates.filter(d => !d.date || new Date(d.date) >= new Date(new Date(t.created_at).getFullYear(), new Date(t.created_at).getMonth(), new Date(t.created_at).getDate())) : allDates;
+      const rd = dates.length;
+      const pct = ds > 0 ? Math.min(100, Math.round((rd / ds) * 100)) : 0;
+      return { ...t, daysSince: ds, readingDays: rd, pct, cohort: getCohort(pct), realClientCount: clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc).length, hasSelfTest: !!sc, selfProfileId: sc?.profile_id || null };
+    }).sort((a, b) => b.pct - a.pct || b.realClientCount - a.realClientCount);
+
+    const goals = { weight_loss: 0, fat_loss: 0, muscle_gain: 0 };
+    clients.forEach(c => { const g = (c.fitness_goal || "").toLowerCase(); if (g in goals) goals[g]++; });
+    return { ta, trainers, clients, totalTrainers: nonSelf.length, activeTrainers: trainers.filter(t => t.pct >= ACTIVE_THRESHOLD).length, totalClients: clients.length, activeClients: clients.filter(c => c.pct >= ACTIVE_THRESHOLD).length, goals };
+  }, [trainersMap, allClients, readingDatesMap, now]);
+
+  const taData = useMemo(() => { const m = {}; taList.forEach(ta => { m[ta.user_id] = computeTa(ta); }); return m; }, [taList, computeTa]);
+  const allTrainers = useMemo(() => taList.flatMap(ta => { const d = taData[ta.user_id]; return d ? d.trainers.map(t => ({ ...t, taName: ta.name })) : []; }).sort((a, b) => b.pct - a.pct || b.realClientCount - a.realClientCount), [taList, taData]);
+  const allRealClients = useMemo(() => taList.flatMap(ta => { const d = taData[ta.user_id]; return d ? d.clients : []; }).sort((a, b) => b.pct - a.pct), [taList, taData]);
+  const totals = useMemo(() => {
+    const v = Object.values(taData).filter(Boolean);
+    return { trainers: v.reduce((s, x) => s + x.totalTrainers, 0), activeT: v.reduce((s, x) => s + x.activeTrainers, 0), clients: v.reduce((s, x) => s + x.totalClients, 0), activeC: v.reduce((s, x) => s + x.activeClients, 0), goals: { fat_loss: v.reduce((s, x) => s + x.goals.fat_loss, 0), muscle_gain: v.reduce((s, x) => s + x.goals.muscle_gain, 0), weight_loss: v.reduce((s, x) => s + x.goals.weight_loss, 0) } };
+  }, [taData]);
+
+  const selTa = activeTab !== "overview" ? taList.find(t => t.user_id === activeTab) : null;
+  const selData = selTa ? taData[selTa.user_id] : null;
+  const tabCl = activeTab === "overview" ? allRealClients : (selData?.clients || []);
+  const tabTr = activeTab === "overview" ? allTrainers : (selData?.trainers || []);
+  const avgActivity = useMemo(() => { if (!tabCl.length) return 0; return Math.round(tabCl.reduce((s, c) => s + c.pct, 0) / tabCl.length); }, [tabCl]);
+
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center gap-5" style={{ height: "calc(100vh - 130px)" }}>
+      <div className="flex items-center gap-2">
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: R.blue, animation: `loaderBounce 1.2s ease-in-out ${i * 0.15}s infinite` }} />
+        ))}
+      </div>
+      <div style={{ fontSize: "13px", color: R.ts, fontWeight: 500, letterSpacing: "-0.26px" }}>{loadingPhase}</div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex flex-col items-center justify-center gap-3" style={{ height: "calc(100vh - 130px)" }}>
+      <div className="max-w-md text-center" style={{ background: "#fef2f2", border: `1px solid ${R.red}30`, color: R.red, borderRadius: R.rCard, padding: "16px", fontSize: "13px", letterSpacing: "-0.26px" }}>{error}</div>
+      <button onClick={loadData} className="cursor-pointer" style={{ borderRadius: R.rPill, background: R.blueLight, color: R.blue, fontSize: "12px", fontWeight: 600, padding: "8px 20px", letterSpacing: "-0.24px", border: "none" }}>Retry</button>
+    </div>
+  );
+
+  const tTotal = activeTab === "overview" ? totals.trainers : (selData?.totalTrainers ?? 0);
+  const tActive = activeTab === "overview" ? totals.activeT : (selData?.activeTrainers ?? 0);
+  const cTotal = activeTab === "overview" ? totals.clients : (selData?.totalClients ?? 0);
+  const cActive = activeTab === "overview" ? totals.activeC : (selData?.activeClients ?? 0);
+  const curGoals = activeTab === "overview" ? totals.goals : (selData?.goals || { fat_loss: 0, muscle_gain: 0, weight_loss: 0 });
+
+  const range = getPeriodRange(period, now);
+  const prevR = compare ? getPrevRange(period, now) : null;
+  const pm = periodMetrics(tabCl, tabTr, readingDatesMap, range);
+  const ppm = prevR ? periodMetrics(tabCl, tabTr, readingDatesMap, prevR) : null;
+
+  const adoptionRate = tTotal > 0 ? Math.round((tActive / tTotal) * 100) : 0;
+  const engagementRate = cTotal > 0 ? Math.round((cActive / cTotal) * 100) : 0;
+  const activeTrainers = tabTr.filter(t => t.pct >= ACTIVE_THRESHOLD);
+  const eliteTrainers = tabTr.filter(t => t.pct >= 100);
+  const atRiskTrainers = tabTr.filter(t => t.pct < 30);
+  const eliteCount = eliteTrainers.length;
+  const atRiskTrainerCount = atRiskTrainers.length;
+  const highestRate = tabCl.length > 0 ? Math.max(...tabCl.map(c => c.pct)) : 0;
+  const lowestRate = tabCl.length > 0 ? Math.min(...tabCl.map(c => c.pct)) : 0;
+
+  const todayR = getPeriodRange("today", now);
+  const yesterdayR = getPrevRange("today", now);
+  const todayStats = periodMetrics(tabCl, tabTr, readingDatesMap, todayR);
+  const yesterdayStats = periodMetrics(tabCl, tabTr, readingDatesMap, yesterdayR);
+
+  const wkR = getPeriodRange("week", now);
+  const pwkR = getPrevRange("week", now);
+  const wkStats = periodMetrics(tabCl, tabTr, readingDatesMap, wkR);
+  const pwkStats = periodMetrics(tabCl, tabTr, readingDatesMap, pwkR);
+
+  const trainerWeekDelta = wkStats.newTrainers - pwkStats.newTrainers;
+  const readingsWeekDelta = wkStats.reads - pwkStats.reads;
+
+  const allTimeTrainerReads = tabTr.reduce((s, t) => {
+    if (!t.selfProfileId) return s;
+    return s + (readingDatesMap[t.selfProfileId] || []).length;
+  }, 0);
+  const allTimeClientReads = tabCl.reduce((s, c) => s + (c.readingDays || 0), 0);
+  const allTimeTotalReads = allTimeTrainerReads + allTimeClientReads;
+  const periodTrainerReads = range ? tabTr.reduce((s, t) => {
+    if (!t.selfProfileId) return s;
+    const dates = readingDatesMap[t.selfProfileId] || [];
+    return s + dates.filter(x => inRange(x.date, range)).length;
+  }, 0) : allTimeTrainerReads;
+  const periodClientReads = pm.reads;
+  const periodTotalReads = periodTrainerReads + periodClientReads;
+  const periodLabel = period === "today" ? `TODAY (${fmtDate(range?.start).toUpperCase()})`
+    : period === "week" ? `THIS WEEK (${fmtRange(range).toUpperCase()})`
+    : period === "month" ? `THIS MONTH (${fmtRange(range).toUpperCase()})`
+    : "ALL TIME";
+
+  const CTIERS = [
+    { label: "100%", min: 100, max: 100, color: R.blue },
+    { label: "90% – 99%", min: 90, max: 99, color: R.blue },
+    { label: "70% – 89%", min: 70, max: 89, color: R.blue },
+    { label: "50% – 69%", min: 50, max: 69, color: R.blue },
+    { label: "<30%", min: 0, max: 29, color: R.red },
+  ];
+  const totalPeople = tabTr.length + tabCl.length;
+  const cohortData = CTIERS.map(tier => {
+    const trainersIn = tabTr.filter(t => t.pct >= tier.min && t.pct <= tier.max);
+    const clientsIn = tabCl.filter(c => c.pct >= tier.min && c.pct <= tier.max);
+    const count = trainersIn.length + clientsIn.length;
+    return { ...tier, count, trainersIn, clientsIn, pctOfTotal: totalPeople > 0 ? Math.round((count / totalPeople) * 100) : 0 };
+  });
+  const maxCohortCount = Math.max(...cohortData.map(c => c.count), 1);
+
+  const onboardedTrainersToday = tabTr.filter(t => inRange(t.created_at, todayR));
+  const onboardedClientsToday = tabCl.filter(c => inRange(c.onboardedDate, todayR));
+  const readingsToday = tabCl.filter(c => { const d = readingDatesMap[c.profile_id] || []; return d.some(x => inRange(x.date, todayR)); });
+  const onboardedTrainersYesterday = tabTr.filter(t => inRange(t.created_at, yesterdayR));
+  const onboardedClientsYesterday = tabCl.filter(c => inRange(c.onboardedDate, yesterdayR));
+
+  const toggleAcc = (key) => setOpenAcc(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+
+  const riskyTrainers = tabTr.filter(t => t.pct < ACTIVE_THRESHOLD).sort((a, b) => a.pct - b.pct);
+  const riskyClients = tabCl.filter(c => c.pct < ACTIVE_THRESHOLD).sort((a, b) => a.pct - b.pct);
+
+  const tChange = pctChange(todayStats.newTrainers, yesterdayStats.newTrainers);
+  const cChange = pctChange(todayStats.newClients, yesterdayStats.newClients);
+  const rChange = pctChange(todayStats.reads, yesterdayStats.reads);
+
+  const rateStyle = (pct) => ({ fontWeight: 600, color: pct >= ACTIVE_THRESHOLD ? R.green : pct > 0 ? R.orange : R.red });
+  const badgeStyle = (bg, fg) => ({ fontSize: "10px", fontWeight: 500, padding: "2px 8px", borderRadius: R.rBadge, backgroundColor: bg, color: fg, letterSpacing: "-0.2px" });
+
+  const trainerCols = [
+    { key: "name", label: "Name", render: r => <span>{r.name || "—"} <span style={badgeStyle(R.blueLight, R.blue)}>Trainer</span></span> },
+    { key: "partner_code", label: "Code", val: r => r.partner_code || "—", className: "text-muted font-mono" },
+    ...(activeTab === "overview" ? [{ key: "taName", label: "TA", val: r => r.taName || "—", className: "text-secondary" }] : []),
+    { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
+    { key: "readingDays", label: "Readings", align: "center", val: r => r.readingDays ?? 0 },
+    { key: "pct", label: "Rate %", align: "right", render: r => <span style={rateStyle(r.pct)}>{r.pct}%</span> },
+  ];
+  const clientCols = [
+    { key: "name", label: "Name", render: r => <span>{r.name || "—"} <span style={badgeStyle(R.blueLight, R.blue)}>Client</span></span> },
+    { key: "trainerName", label: "Trainer", val: r => r.trainerName || "—", className: "text-secondary" },
+    { key: "fitness_goal", label: "Goal", render: r => <span style={{ fontSize: "11px", fontWeight: 600, padding: "4px 12px", borderRadius: R.rPill, color: goalColor(r.fitness_goal), backgroundColor: goalColor(r.fitness_goal) + "15", letterSpacing: "-0.22px" }}>{goalLabel(r.fitness_goal)}</span> },
+    { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
+    { key: "readingDays", label: "Readings", align: "center", val: r => r.readingDays ?? 0 },
+    { key: "pct", label: "Rate %", align: "right", render: r => <span style={rateStyle(r.pct)}>{r.pct}%</span> },
+  ];
+
+  const CS = { backgroundColor: R.white, borderRadius: R.rCard, border: `1px solid ${R.border}`, boxShadow: "0 1px 3px rgba(37,37,37,0.04)", transition: "box-shadow 0.25s ease, transform 0.25s ease", position: "relative", overflow: "hidden" };
+  const csHover = { boxShadow: "0 8px 24px rgba(37,37,37,0.1), 0 2px 8px rgba(37,37,37,0.05)", transform: "translateY(-1px)" };
+
+  const maxGoal = Math.max(curGoals.fat_loss, curGoals.muscle_gain, curGoals.weight_loss, 1);
+
+  const deltaStyle = (v) => ({ borderRadius: "10px", padding: "8px 12px", fontSize: "12px", letterSpacing: "-0.24px", fontWeight: 500, backgroundColor: v >= 0 ? R.greenLight : "#fef2f2", color: v >= 0 ? R.green : R.red });
+
+  return (
+    <div className="overflow-y-scroll custom-scrollbar" style={{ height: "calc(100vh - 130px)", fontFamily: "'Poppins', sans-serif" }}>
+      {/* ═══ HEADER ═══ */}
+      <div className="flex items-center justify-between py-3 sticky top-0 z-10" style={{ backgroundColor: "rgba(245,247,250,0.85)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderBottom: `1px solid ${R.border}40` }}>
+        {/* ── Left: Page title as dropdown ── */}
+        <div ref={tabDdRef} style={{ position: "relative" }}>
+          <button onClick={() => setTabDdOpen(o => !o)}
+            className="flex items-center gap-2 cursor-pointer transition-all duration-200"
+            style={{ background: "none", border: "none", padding: "4px 0", outline: "none" }}>
+            <span style={{ fontSize: "18px", fontWeight: 700, color: R.tp, letterSpacing: "-0.36px" }}>
+              {activeTab === "overview" ? "Overview" : taList.find(t => t.user_id === activeTab)?.name || "—"}
+            </span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={R.tm} strokeWidth="2.5" strokeLinecap="round" style={{ transition: "transform 0.2s", transform: tabDdOpen ? "rotate(180deg)" : "none" }}><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+
+          {tabDdOpen && (
+            <div className="absolute left-0 z-50" style={{ top: "calc(100% + 6px)", minWidth: 220, backgroundColor: R.white, borderRadius: R.rCard, border: `1px solid ${R.border}`, boxShadow: "0 12px 40px rgba(37,37,37,0.12), 0 4px 12px rgba(37,37,37,0.06)", padding: "6px", animation: "fadeSlideUp 0.15s ease-out" }}>
+              <div style={{ padding: "4px 10px 6px", fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: R.tm }}>View</div>
+              <button onClick={() => { setActiveTab("overview"); setTabDdOpen(false); }}
+                className="flex items-center gap-2.5 w-full cursor-pointer transition-all duration-150"
+                style={{ padding: "8px 10px", borderRadius: "10px", border: "none", backgroundColor: activeTab === "overview" ? R.blueLight : "transparent", color: activeTab === "overview" ? R.blue : R.ts, fontSize: "13px", fontWeight: activeTab === "overview" ? 600 : 400, letterSpacing: "-0.26px" }}
+                onMouseEnter={e => { if (activeTab !== "overview") e.currentTarget.style.backgroundColor = R.surface; }}
+                onMouseLeave={e => { if (activeTab !== "overview") e.currentTarget.style.backgroundColor = "transparent"; }}>
+                <span className="flex items-center justify-center" style={{ width: 26, height: 26, borderRadius: "8px", backgroundColor: activeTab === "overview" ? R.blue + "18" : R.surface }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={activeTab === "overview" ? R.blue : R.tm} strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                </span>
+                Overview
+              </button>
+              {taList.length > 0 && <>
+                <div style={{ height: "1px", backgroundColor: R.border, margin: "6px 10px" }} />
+                <div style={{ padding: "4px 10px 6px", fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", color: R.tm }}>Trainer Admins</div>
+              </>}
+              {taList.map((t, i) => {
+                const isActive = activeTab === t.user_id;
+                const dotColor = [R.blue, R.green, R.orange, "#7c3aed"][i % 4];
+                return (
+                  <button key={t.user_id} onClick={() => { setActiveTab(t.user_id); setTabDdOpen(false); }}
+                    className="flex items-center gap-2.5 w-full cursor-pointer transition-all duration-150"
+                    style={{ padding: "8px 10px", borderRadius: "10px", border: "none", backgroundColor: isActive ? R.blueLight : "transparent", color: isActive ? R.blue : R.ts, fontSize: "13px", fontWeight: isActive ? 600 : 400, letterSpacing: "-0.26px" }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.backgroundColor = R.surface; }}
+                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.backgroundColor = "transparent"; }}>
+                    <span className="flex items-center justify-center shrink-0" style={{ width: 26, height: 26, borderRadius: "8px", background: isActive ? `linear-gradient(135deg, ${R.blue}, ${R.dark})` : R.surface, color: isActive ? R.white : R.ts, fontSize: "11px", fontWeight: 700 }}>
+                      {(t.name || "?")[0]}
+                    </span>
+                    <div className="flex-1 text-left">
+                      <div className="truncate">{t.name}</div>
+                      {t.email && <div className="truncate" style={{ fontSize: "11px", color: R.tm, fontWeight: 400 }}>{t.email}</div>}
+                    </div>
+                    <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Right: Controls ── */}
+        <div className="flex items-center gap-3">
+          {/* Period + Compare cluster */}
+          <div className="flex items-center" style={{ backgroundColor: R.white, borderRadius: R.rCard, border: `1px solid ${R.border}`, padding: "4px", gap: "2px" }}>
+            {[["today", "Today"], ["week", "Week"], ["month", "Month"], ["all", "All"]].map(([k, l]) => (
+              <button key={k} onClick={() => { setPeriod(k); if (k === "all") setCompare(false); }}
+                className="cursor-pointer transition-all duration-200"
+                style={{ padding: "6px 16px", fontSize: "12px", fontWeight: period === k ? 600 : 400, letterSpacing: "-0.24px", backgroundColor: period === k ? R.blue : "transparent", color: period === k ? R.white : R.ts, border: "none", borderRadius: "10px", boxShadow: period === k ? `0 2px 8px ${R.blue}35` : "none" }}>{l}</button>
+            ))}
+            <div style={{ width: "1px", height: "20px", backgroundColor: R.border, margin: "0 4px" }} />
+            <div className="flex items-center gap-1.5 cursor-pointer select-none" style={{ padding: "4px 8px" }} onClick={() => { if (period !== "all") setCompare(c => !c); }}>
+              <span style={{ fontSize: "11px", color: R.tm, letterSpacing: "-0.22px", fontWeight: 500 }}>Compare</span>
+              <div className="relative" style={{ width: 32, height: 18 }}>
+                <div className="rounded-full transition-colors duration-200" style={{ width: 32, height: 18, backgroundColor: compare && period !== "all" ? R.green : R.border }} />
+                <div className="absolute rounded-full shadow transition-all duration-200" style={{ width: 14, height: 14, top: 2, backgroundColor: R.white, left: compare && period !== "all" ? 16 : 2 }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Refresh */}
+          <button onClick={loadData} className="flex items-center justify-center cursor-pointer transition-all duration-200"
+            style={{ width: 36, height: 36, borderRadius: "10px", backgroundColor: R.white, border: `1px solid ${R.border}`, color: R.tm }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = R.blueLight; e.currentTarget.style.color = R.blue; e.currentTarget.style.borderColor = R.blue + "40"; }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = R.white; e.currentTarget.style.color = R.tm; e.currentTarget.style.borderColor = R.border; }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+          </button>
+
+          {/* Timezone + Clock cluster */}
+          <div className="flex items-center gap-2" style={{ backgroundColor: R.white, borderRadius: R.rCard, border: `1px solid ${R.border}`, padding: "6px 12px" }}>
+            <div className="flex items-center" style={{ backgroundColor: R.surface, borderRadius: "8px", padding: "2px", gap: "2px" }}>
+              {Object.entries(TIMEZONES).map(([tz, label]) => (
+                <button key={tz} onClick={() => setTimezone(tz)}
+                  className="cursor-pointer transition-all duration-200"
+                  style={{ padding: "4px 10px", fontSize: "11px", fontWeight: timezone === tz ? 600 : 500, letterSpacing: "-0.22px", backgroundColor: timezone === tz ? R.dark : "transparent", color: timezone === tz ? R.white : R.ts, border: "none", borderRadius: "6px" }}
+                  onMouseEnter={e => { if (timezone !== tz) { e.currentTarget.style.backgroundColor = R.border; e.currentTarget.style.color = R.tp; } }}
+                  onMouseLeave={e => { if (timezone !== tz) { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = R.ts; } }}>{label}</button>
+              ))}
+            </div>
+            <div style={{ width: "1px", height: "20px", backgroundColor: R.border }} />
+            <div className="flex items-center gap-1.5 whitespace-nowrap" style={{ fontSize: "11px", color: R.tm, letterSpacing: "-0.22px" }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={R.blue} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              <span>{clock}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-5 pb-8">
+
+        {/* ═══ TA PROFILE (individual tabs only) ═══ */}
+        {selTa && (
+          <div className="flex items-center gap-4 text-white" style={{ borderRadius: R.rCard, padding: "16px 24px", background: `linear-gradient(135deg, ${R.dark} 0%, ${R.blue} 100%)` }}>
+            <div className="w-10 h-10 flex items-center justify-center font-bold" style={{ borderRadius: R.rCard, backgroundColor: "rgba(255,255,255,0.15)", fontSize: "18px", letterSpacing: "-0.36px" }}>{(selTa.name || "?")[0]}</div>
+            <div className="flex-1">
+              <div style={{ fontSize: "15px", fontWeight: 600, letterSpacing: "-0.3px" }}>{selTa.name}</div>
+              <div style={{ fontSize: "12px", opacity: 0.5, letterSpacing: "-0.24px" }}>{selTa.email}</div>
+            </div>
+            <div className="flex gap-8 shrink-0">
+              <div className="text-center"><div style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", opacity: 0.4, letterSpacing: "-0.2px" }}>Code</div><div className="font-mono" style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "-0.26px" }}>{selTa.partner_code}</div></div>
+              <div className="text-center"><div style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", opacity: 0.4, letterSpacing: "-0.2px" }}>Since</div><div style={{ fontSize: "13px", fontWeight: 600, letterSpacing: "-0.26px" }}>{fmtDate(selTa.created_at)}</div></div>
+              <div className="text-center"><div style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", opacity: 0.4, letterSpacing: "-0.2px" }}>Days Active</div><div style={{ fontSize: "20px", fontWeight: 700, letterSpacing: "-0.4px" }}>{selTa.created_at ? daysBetween(selTa.created_at, now) : "—"}</div></div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ EXECUTIVE SNAPSHOT — 4 Cards ═══ */}
+        <div className="grid grid-cols-4 gap-4">
+          {/* Card 1: Trainers */}
+          <div className="p-5 analytics-card-animate" style={CS}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = R.shadow; e.currentTarget.style.transform = "none"; }}>
+
+            <div className="flex items-center justify-between mb-4">
+              <Ico type="people" />
+              <span style={{ fontSize: "10px", fontWeight: 600, padding: "3px 8px", borderRadius: R.rPill, backgroundColor: R.surface, color: R.tm, letterSpacing: "0.3px", textTransform: "uppercase" }}>All Time</span>
+            </div>
+            <div className="leading-none" style={{ fontSize: "32px", fontWeight: 700, color: R.tp, letterSpacing: "-0.5px" }}>{tTotal}</div>
+            <div style={{ fontSize: "13px", color: R.ts, letterSpacing: "-0.26px", marginTop: "2px" }}>Total Trainers</div>
+            <div className="mt-4 flex items-center justify-between">
+              <span style={{ fontSize: "12px", fontWeight: 600, color: R.green, letterSpacing: "-0.24px" }}>{tActive} Active <span style={{ fontWeight: 400, color: R.tm }}>({"≥"}{ACTIVE_THRESHOLD}%)</span></span>
+            </div>
+            <div className="mt-2" style={{ height: 5, borderRadius: 3, backgroundColor: R.surface, overflow: "hidden" }}>
+              <div style={{ width: `${adoptionRate}%`, height: "100%", borderRadius: 3, background: `linear-gradient(90deg, ${R.blue}, ${R.green})`, transition: "width 0.6s ease" }} />
+            </div>
+            <div className="flex items-center justify-between mt-1.5">
+              <span style={{ fontSize: "11px", color: R.tm, letterSpacing: "-0.22px" }}>Adoption Rate</span>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: R.tp, letterSpacing: "-0.24px" }}>{adoptionRate}%</span>
+            </div>
+            {pm.newTrainers > 0 && (
+              <div className="mt-3 flex items-center gap-1.5" style={{ padding: "5px 8px", borderRadius: R.rBadge, backgroundColor: R.greenLight }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={R.green} strokeWidth="3" strokeLinecap="round"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: R.green, letterSpacing: "-0.22px" }}>+{pm.newTrainers} onboarded {periodLabel.toLowerCase()}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Card 2: Clients */}
+          <div className="p-5 analytics-card-animate" style={CS}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = R.shadow; e.currentTarget.style.transform = "none"; }}>
+
+            <div className="flex items-center justify-between mb-4">
+              <Ico type="person" />
+              <span style={{ fontSize: "10px", fontWeight: 600, padding: "3px 8px", borderRadius: R.rPill, backgroundColor: R.surface, color: R.tm, letterSpacing: "0.3px", textTransform: "uppercase" }}>All Time</span>
+            </div>
+            <div className="leading-none" style={{ fontSize: "32px", fontWeight: 700, color: R.tp, letterSpacing: "-0.5px" }}>{cTotal}</div>
+            <div style={{ fontSize: "13px", color: R.ts, letterSpacing: "-0.26px", marginTop: "2px" }}>Total Clients</div>
+            <div className="mt-4 flex items-center justify-between">
+              <span style={{ fontSize: "12px", fontWeight: 600, color: R.green, letterSpacing: "-0.24px" }}>{cActive} Active <span style={{ fontWeight: 400, color: R.tm }}>({"≥"}{ACTIVE_THRESHOLD}%)</span></span>
+            </div>
+            <div className="mt-2" style={{ height: 5, borderRadius: 3, backgroundColor: R.surface, overflow: "hidden" }}>
+              <div style={{ width: `${engagementRate}%`, height: "100%", borderRadius: 3, background: `linear-gradient(90deg, ${R.green}, ${R.blue})`, transition: "width 0.6s ease" }} />
+            </div>
+            <div className="flex items-center justify-between mt-1.5">
+              <span style={{ fontSize: "11px", color: R.tm, letterSpacing: "-0.22px" }}>Engagement Rate</span>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: R.tp, letterSpacing: "-0.24px" }}>{engagementRate}%</span>
+            </div>
+            {pm.newClients > 0 && (
+              <div className="mt-3 flex items-center gap-1.5" style={{ padding: "5px 8px", borderRadius: R.rBadge, backgroundColor: R.greenLight }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={R.green} strokeWidth="3" strokeLinecap="round"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: R.green, letterSpacing: "-0.22px" }}>+{pm.newClients} onboarded {periodLabel.toLowerCase()}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Card 3: Readings */}
+          <div className="p-5 analytics-card-animate" style={CS}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = R.shadow; e.currentTarget.style.transform = "none"; }}>
+
+            <div className="flex items-center justify-between mb-4">
+              <Ico type="trend" />
+              <span style={{ fontSize: "10px", fontWeight: 600, padding: "3px 8px", borderRadius: R.rPill, backgroundColor: R.surface, color: R.tm, letterSpacing: "0.3px", textTransform: "uppercase" }}>All Time</span>
+            </div>
+            <div className="leading-none" style={{ fontSize: "32px", fontWeight: 700, color: R.tp, letterSpacing: "-0.5px" }}>{allTimeTotalReads}</div>
+            <div style={{ fontSize: "13px", color: R.ts, letterSpacing: "-0.26px", marginTop: "2px" }}>Total Readings</div>
+            <div className="mt-4 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span style={{ fontSize: "11px", color: R.ts, letterSpacing: "-0.22px" }}>By Trainers</span>
+                <span style={{ fontSize: "12px", fontWeight: 600, color: R.tp, letterSpacing: "-0.24px" }}>{allTimeTrainerReads} {allTimeTotalReads > 0 && <span style={{ color: R.tm, fontWeight: 400 }}>({Math.round((allTimeTrainerReads / allTimeTotalReads) * 100)}%)</span>}</span>
+              </div>
+              <div style={{ height: 5, borderRadius: 3, backgroundColor: R.surface, overflow: "hidden" }}>
+                <div style={{ width: allTimeTotalReads > 0 ? `${Math.round((allTimeTrainerReads / allTimeTotalReads) * 100)}%` : "0%", height: "100%", borderRadius: 3, backgroundColor: R.blue, transition: "width 0.6s ease" }} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span style={{ fontSize: "11px", color: R.ts, letterSpacing: "-0.22px" }}>By Clients</span>
+                <span style={{ fontSize: "12px", fontWeight: 600, color: R.tp, letterSpacing: "-0.24px" }}>{allTimeClientReads} {allTimeTotalReads > 0 && <span style={{ color: R.tm, fontWeight: 400 }}>({Math.round((allTimeClientReads / allTimeTotalReads) * 100)}%)</span>}</span>
+              </div>
+              <div style={{ height: 5, borderRadius: 3, backgroundColor: R.surface, overflow: "hidden" }}>
+                <div style={{ width: allTimeTotalReads > 0 ? `${Math.round((allTimeClientReads / allTimeTotalReads) * 100)}%` : "0%", height: "100%", borderRadius: 3, backgroundColor: R.green, transition: "width 0.6s ease" }} />
+              </div>
+            </div>
+            {periodTotalReads > 0 && (
+              <div className="mt-3 flex items-center gap-1.5" style={{ padding: "5px 8px", borderRadius: R.rBadge, backgroundColor: "#f3e8ff" }}>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#7c3aed", letterSpacing: "-0.22px" }}>{periodTotalReads} readings {periodLabel.toLowerCase()}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Card 4: Adoption Donut */}
+          <div className="p-5 analytics-card-animate flex flex-col items-center" style={CS}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = R.shadow; e.currentTarget.style.transform = "none"; }}>
+
+            <div className="w-full flex items-center justify-between mb-3">
+              <span style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "-0.22px", color: R.tp, textTransform: "uppercase" }}>Device Adoption</span>
+            </div>
+            <div className="flex-1 flex items-center justify-center">
+              <Donut pct={avgActivity} size={120} thickness={12} />
+            </div>
+            <div style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px", marginTop: "8px" }}>Average Reading Rate</div>
+            <div className="w-full mt-3 grid grid-cols-2 gap-2">
+              <div className="text-center" style={{ padding: "6px 0", borderRadius: R.rBadge, backgroundColor: R.surface }}>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: R.tp, letterSpacing: "-0.32px" }}>{pm.newTrainers}</div>
+                <div style={{ fontSize: "10px", color: R.tm, letterSpacing: "-0.2px" }}>New Trainers</div>
+              </div>
+              <div className="text-center" style={{ padding: "6px 0", borderRadius: R.rBadge, backgroundColor: R.surface }}>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: R.tp, letterSpacing: "-0.32px" }}>{pm.newClients}</div>
+                <div style={{ fontSize: "10px", color: R.tm, letterSpacing: "-0.2px" }}>New Clients</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ═══ ROW 2: TRAINER ADOPTION + CLIENT ENGAGEMENT + READING SPLIT ═══ */}
+        <div className="grid grid-cols-3 gap-4">
+          {/* Trainer Adoption */}
+          <div className="p-5 analytics-card-animate" style={CS}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = R.shadow; e.currentTarget.style.transform = "none"; }}>
+
+            <h2 style={{ fontSize: "18px", fontWeight: 600, color: R.tp, letterSpacing: "-0.36px" }}>Trainer Adoption</h2>
+            <p className="mt-0.5" style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Are trainers using the device?</p>
+            <div className="flex items-center gap-5 mt-4">
+              <Donut pct={adoptionRate} size={100} thickness={10} label="Overall Adoption" />
+              <div className="flex flex-col gap-2 flex-1">
+                <div className="flex items-center gap-2"><span style={{ fontSize: "20px", fontWeight: 700, color: R.tp, letterSpacing: "-0.4px" }}>{tTotal}</span><span style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Total Trainers</span></div>
+                {[
+                  { key: "active", dotColor: R.green, pulse: true, count: tActive, label: `Active (≥${ACTIVE_THRESHOLD}%)`, list: activeTrainers },
+                  { key: "elite", dotColor: R.green, pulse: false, count: eliteCount, label: "Elite (100%)", list: eliteTrainers },
+                  { key: "atrisk", dotColor: R.red, pulse: true, count: atRiskTrainerCount, label: "At Risk (<30%)", list: atRiskTrainers },
+                ].map(g => (
+                  <div key={g.key}>
+                    <div className="flex items-center gap-1.5 cursor-pointer" onClick={() => g.count > 0 && toggleAcc(g.key)}>
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: g.dotColor, boxShadow: g.pulse && g.count > 0 ? `0 0 0 3px ${g.dotColor}25` : "none", animation: g.pulse && g.count > 0 ? "pulse-dot 2s ease-in-out infinite" : "none" }} /><span style={{ fontSize: "13px", fontWeight: 600, color: R.tp, letterSpacing: "-0.26px" }}>{g.count}</span><span style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>{g.label}</span>
+                      {g.count > 0 && <svg className={`w-3 h-3 transition-transform ${openAcc.has(g.key) ? "rotate-180" : ""}`} style={{ color: R.tm }} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 4.5l3 3 3-3"/></svg>}
+                    </div>
+                    {openAcc.has(g.key) && g.list.length > 0 && (
+                      <div className="mt-1.5 p-2 overflow-x-auto" style={{ backgroundColor: R.surface, borderRadius: "8px" }}>
+                        <AccTable rows={g.list} cols={trainerCols} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mt-2 italic" style={{ fontSize: "10px", color: R.tm, letterSpacing: "-0.2px" }}>Adoption = Trainers with reading rate {"≥"} {ACTIVE_THRESHOLD}% / Total trainers ({tActive}/{tTotal} = {adoptionRate}%)</div>
+            <div className="mt-2" style={deltaStyle(trainerWeekDelta)}>
+              {trainerWeekDelta >= 0 ? "↑" : "↓"} {Math.abs(trainerWeekDelta)} {trainerWeekDelta === 1 || trainerWeekDelta === -1 ? "trainer" : "trainers"} this week vs last
+            </div>
+          </div>
+
+          {/* Client Engagement */}
+          <div className="p-5 analytics-card-animate" style={CS}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = R.shadow; e.currentTarget.style.transform = "none"; }}>
+
+            <h2 style={{ fontSize: "18px", fontWeight: 600, color: R.tp, letterSpacing: "-0.36px" }}>Client Engagement</h2>
+            <p className="mt-0.5" style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Are clients engaged and consistent?</p>
+            <div className="flex gap-5 mt-4">
+              <div className="flex flex-col gap-2">
+                <div><span className="leading-none" style={{ fontSize: "34px", fontWeight: 700, color: R.blue, letterSpacing: "-0.4px" }}>{avgActivity}%</span></div>
+                <div style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Average Reading Rate</div>
+                <div className="flex gap-4 mt-1">
+                  <div><span style={{ fontSize: "18px", fontWeight: 700, color: R.green, letterSpacing: "-0.36px" }}>{highestRate}%</span><div style={{ fontSize: "10px", color: R.tm, letterSpacing: "-0.2px" }}>Highest</div></div>
+                  <div><span style={{ fontSize: "18px", fontWeight: 700, color: R.red, letterSpacing: "-0.36px" }}>{lowestRate}%</span><div style={{ fontSize: "10px", color: R.tm, letterSpacing: "-0.2px" }}>Lowest</div></div>
+                </div>
+              </div>
+              <div className="pl-5 flex-1" style={{ borderLeft: `1px solid ${R.border}` }}>
+                <div className="mb-2" style={{ fontSize: "12px", fontWeight: 600, color: R.tp, letterSpacing: "-0.24px" }}>Clients by Goal</div>
+                {[["fat_loss", "Fat Loss"], ["muscle_gain", "Muscle Gain"], ["weight_loss", "Weight Loss"]].map(([k, l]) => (
+                  <div key={k} className="flex items-center gap-2 mb-2">
+                    <span className="w-5" style={{ fontSize: "15px", fontWeight: 700, color: R.tp, letterSpacing: "-0.3px" }}>{curGoals[k] || 0}</span>
+                    <span className="w-[70px]" style={{ fontSize: "11px", color: R.ts, letterSpacing: "-0.22px" }}>{l}</span>
+                    <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ backgroundColor: R.surface }}>
+                      <div className="h-full rounded-full" style={{ width: `${((curGoals[k] || 0) / maxGoal) * 100}%`, backgroundColor: R.blue }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mt-3" style={deltaStyle(readingsWeekDelta)}>
+              {readingsWeekDelta >= 0 ? "↑" : "↓"} {Math.abs(readingsWeekDelta)} readings this week vs last week
+            </div>
+          </div>
+
+          {/* Reading Split */}
+          <div className="p-5 analytics-card-animate" style={CS}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = R.shadow; e.currentTarget.style.transform = "none"; }}>
+
+            <h2 style={{ fontSize: "18px", fontWeight: 600, color: R.tp, letterSpacing: "-0.36px" }}>Reading Split ({period === "today" ? "Today" : period === "week" ? "This Week" : period === "month" ? "This Month" : "All Time"})</h2>
+            <p className="mt-0.5" style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Who submitted the readings?</p>
+            <div className="flex items-center gap-5 mt-4">
+              <div className="shrink-0">
+                <div className="rounded-full flex items-center justify-center" style={{
+                  width: 110, height: 110,
+                  background: periodTotalReads > 0
+                    ? `conic-gradient(${R.blue} 0% ${Math.round((periodTrainerReads / periodTotalReads) * 100)}%, ${R.blueLight} ${Math.round((periodTrainerReads / periodTotalReads) * 100)}% 100%)`
+                    : R.border
+                }}>
+                  <div className="rounded-full flex items-center justify-center" style={{ width: 86, height: 86, backgroundColor: R.white }}>
+                    <span style={{ fontSize: "20px", fontWeight: 700, color: R.tp, letterSpacing: "-0.4px" }}>{periodTotalReads}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="mb-2.5" style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Total Readings</div>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: R.blue }} />
+                    <span style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>By Trainers</span>
+                    <span className="ml-auto" style={{ fontSize: "13px", fontWeight: 700, color: R.tp, letterSpacing: "-0.26px" }}>{periodTrainerReads} ({periodTotalReads > 0 ? Math.round((periodTrainerReads / periodTotalReads) * 100) : 0}%)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: R.blueLight }} />
+                    <span style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>By Clients</span>
+                    <span className="ml-auto" style={{ fontSize: "13px", fontWeight: 700, color: R.tp, letterSpacing: "-0.26px" }}>{periodClientReads} ({periodTotalReads > 0 ? Math.round((periodClientReads / periodTotalReads) * 100) : 0}%)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ═══ ROW 3: TRAINER ANALYTICS + CLIENT ANALYTICS + READING RATE COHORTS ═══ */}
+        <div className="grid grid-cols-3 gap-4">
+          {/* Trainer Analytics */}
+          <div className="p-5 analytics-card-animate" style={CS}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = R.shadow; e.currentTarget.style.transform = "none"; }}>
+
+            <h2 style={{ fontSize: "18px", fontWeight: 600, color: R.tp, letterSpacing: "-0.36px" }}>Trainer Analytics</h2>
+            <p className="mt-0.5" style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>{tabTr.length} trainers</p>
+            <div className="mt-3 overflow-x-auto">
+              <AccTable rows={tabTr} cols={[
+                { key: "name", label: "Trainer", val: r => r.name || "—" },
+                { key: "realClientCount", label: "Clients", align: "center", val: r => r.realClientCount ?? 0 },
+                { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
+                { key: "readingDays", label: "Tests", align: "center", val: r => r.readingDays ?? 0 },
+                { key: "pct", label: "Rate", align: "center", render: r => <span style={rateStyle(r.pct)}>{r.pct}%</span> },
+                { key: "status", label: "Status", align: "right", val: r => r.pct >= 100 ? 2 : r.pct >= ACTIVE_THRESHOLD ? 1 : 0, render: r => r.pct >= 100
+                  ? <span style={badgeStyle(R.greenLight, R.green)}>Elite</span>
+                  : r.pct >= ACTIVE_THRESHOLD
+                    ? <span style={badgeStyle(R.blueLight, R.blue)}>Active</span>
+                    : <span style={{ ...badgeStyle("#fef2f2", R.red) }}>At Risk</span>
+                },
+              ]} />
+            </div>
+          </div>
+
+          {/* Client Analytics */}
+          <div className="p-5 analytics-card-animate" style={CS}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = R.shadow; e.currentTarget.style.transform = "none"; }}>
+
+            <h2 style={{ fontSize: "18px", fontWeight: 600, color: R.tp, letterSpacing: "-0.36px" }}>Client Analytics</h2>
+            <p className="mt-0.5" style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>{tabCl.length} clients</p>
+            <div className="mt-3 overflow-x-auto">
+              <AccTable rows={tabCl} cols={[
+                { key: "name", label: "Client", val: r => r.name || "—" },
+                { key: "fitness_goal", label: "Goal", val: r => goalLabel(r.fitness_goal), render: r => <span style={{ fontSize: "11px", fontWeight: 500, padding: "4px 12px", borderRadius: R.rPill, color: goalColor(r.fitness_goal), backgroundColor: goalColor(r.fitness_goal) + "15", letterSpacing: "-0.22px" }}>{goalLabel(r.fitness_goal)}</span> },
+                { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
+                { key: "readingDays", label: "Tests", align: "center", val: r => r.readingDays ?? 0 },
+                { key: "pct", label: "Rate", align: "right", render: r => <span style={rateStyle(r.pct)}>{r.pct}%</span> },
+              ]} />
+            </div>
+          </div>
+
+          {/* Reading Rate Cohorts */}
+          <div className="p-5 analytics-card-animate" style={CS}
+            onMouseEnter={e => Object.assign(e.currentTarget.style, csHover)}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = R.shadow; e.currentTarget.style.transform = "none"; }}>
+
+            <h2 style={{ fontSize: "18px", fontWeight: 600, color: R.tp, letterSpacing: "-0.36px" }}>Reading Rate Cohorts</h2>
+            <p className="mt-0.5" style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Where do your clients & trainers stand?</p>
+            <div className="flex flex-col gap-2.5 mt-4">
+              {cohortData.map((tier, i) => (
+                <div key={i}>
+                  <div className="flex items-center gap-2 cursor-pointer" onClick={() => tier.count > 0 && toggleAcc(`cohort-${i}`)}>
+                    <span className="w-[70px] shrink-0" style={{ fontSize: "11px", fontWeight: 500, color: R.tp, letterSpacing: "-0.22px" }}>{tier.label}</span>
+                    <div className="flex-1 h-[8px] rounded-full overflow-hidden" style={{ backgroundColor: R.surface }}>
+                      <div className="h-full rounded-full transition-all" style={{ width: `${(tier.count / maxCohortCount) * 100}%`, backgroundColor: tier.color }} />
+                    </div>
+                    <span className="text-right shrink-0 whitespace-nowrap" style={{ fontSize: "11px", letterSpacing: "-0.22px" }}><span style={{ fontWeight: 700, color: R.tp }}>{tier.count}</span> <span style={{ color: R.tm }}>({tier.pctOfTotal}%)</span></span>
+                    {tier.count > 0 && <svg className={`w-3 h-3 transition-transform ${openAcc.has(`cohort-${i}`) ? "rotate-180" : ""}`} style={{ color: R.tm }} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 4.5l3 3 3-3"/></svg>}
+                  </div>
+                  {openAcc.has(`cohort-${i}`) && (
+                    <div className="mt-1.5 p-2 flex flex-col gap-1.5 overflow-x-auto" style={{ backgroundColor: R.surface, borderRadius: "8px" }}>
+                      {tier.trainersIn.length > 0 && <>
+                        <div className="uppercase" style={{ fontSize: "9px", fontWeight: 600, color: R.tm, letterSpacing: "-0.2px" }}>Trainers</div>
+                        <AccTable rows={tier.trainersIn} cols={trainerCols} />
+                      </>}
+                      {tier.clientsIn.length > 0 && <>
+                        <div className={`uppercase ${tier.trainersIn.length > 0 ? "mt-1" : ""}`} style={{ fontSize: "9px", fontWeight: 600, color: R.tm, letterSpacing: "-0.2px" }}>Clients</div>
+                        <AccTable rows={tier.clientsIn} cols={clientCols} />
+                      </>}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ═══ FOOTER ═══ */}
+        <div className="flex items-center gap-2 pt-2" style={{ fontSize: "11px", color: R.tm, letterSpacing: "-0.22px", borderTop: `1px solid ${R.border}` }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={R.tm} strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Active = Reading rate {"≥"} {ACTIVE_THRESHOLD}% {"·"} Reading Rate = Reading days / Days since onboarded {"·"} Self-test by trainers are excluded from client counts but included in trainer adoption.</span>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -146,34 +146,32 @@ function AccTable({ rows, cols }) {
   }) : rows;
   const toggle = (key) => setSort(s => s.key === key ? { key, asc: !s.asc } : { key, asc: true });
   const arrow = (key) => sort.key !== key ? "↕" : sort.asc ? "↑" : "↓";
+  const thBase = { fontWeight: 500, padding: "8px 0", fontSize: "10px", color: R.tm, letterSpacing: "-0.2px", borderBottom: `1px solid ${R.border}` };
   return (
-    <table className="w-full" style={{ fontSize: "12px", letterSpacing: "-0.24px" }}>
-      <thead>
-        <tr style={{ fontSize: "10px", color: R.tm, letterSpacing: "-0.2px", borderBottom: `1px solid ${R.border}` }} className="uppercase">
-          {cols.map(c => (
-            <th key={c.key} className={`pb-1.5 font-semibold cursor-pointer select-none ${c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : "text-left"}`}
-              style={{ fontWeight: 500 }}
-              onClick={() => toggle(c.key)}>
-              {c.label} <span style={{ fontSize: "9px" }}>{arrow(c.key)}</span>
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
+    <div style={{ display: "flex", flexDirection: "column", fontSize: "12px", letterSpacing: "-0.24px", flex: 1, minHeight: 0 }}>
+      <div className="uppercase" style={{ display: "flex", backgroundColor: "#ffffff", position: "relative", zIndex: 2, flexShrink: 0 }}>
+        {cols.map(c => (
+          <div key={c.key} className="font-semibold cursor-pointer select-none"
+            style={{ ...thBase, flex: 1, textAlign: c.align === "right" ? "right" : c.align === "center" ? "center" : "left" }}
+            onClick={() => toggle(c.key)}>
+            {c.label} <span style={{ fontSize: "9px" }}>{arrow(c.key)}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {sorted.map((r, i) => (
-          <tr key={i} className="transition-colors duration-150" style={{ borderBottom: `1px solid ${R.surface}`, backgroundColor: i % 2 === 1 ? `${R.surface}80` : "transparent" }}
+          <div key={i} className="transition-colors duration-150" style={{ display: "flex", borderBottom: `1px solid ${R.surface}`, backgroundColor: i % 2 === 1 ? `${R.surface}80` : "transparent", cursor: "default" }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = `${R.blueLight}60`}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = i % 2 === 1 ? `${R.surface}80` : "transparent"}>
             {cols.map(c => (
-              <td key={c.key} className={`py-2 ${c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : ""}`}
-                style={{ color: c.className?.includes("text-muted") || c.className?.includes("text-secondary") ? R.ts : R.tp }}>
+              <div key={c.key} style={{ flex: 1, padding: "8px 0", textAlign: c.align === "right" ? "right" : c.align === "center" ? "center" : "left", color: c.className?.includes("text-muted") || c.className?.includes("text-secondary") ? R.ts : R.tp }}>
                 {c.render ? c.render(r) : (typeof c.val === "function" ? c.val(r) : r[c.key])}
-              </td>
+              </div>
             ))}
-          </tr>
+          </div>
         ))}
-      </tbody>
-    </table>
+      </div>
+    </div>
   );
 }
 
@@ -202,6 +200,7 @@ export default function AnalyticsDashboard() {
   const [openAcc, setOpenAcc] = useState(new Set());
   const [trainerTab, setTrainerTab] = useState("all");
   const [cohortTab, setCohortTab] = useState(0);
+  const [cohortSubTab, setCohortSubTab] = useState("trainers");
 
   useEffect(() => {
     const tick = () => setClock(new Date().toLocaleString("en-US", { timeZone: timezone, weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }));
@@ -454,7 +453,7 @@ export default function AnalyticsDashboard() {
   const badgeStyle = (bg, fg) => ({ fontSize: "10px", fontWeight: 500, padding: "2px 8px", borderRadius: R.rBadge, backgroundColor: bg, color: fg, letterSpacing: "-0.2px" });
 
   const trainerCols = [
-    { key: "name", label: "Name", render: r => <span>{r.name || "—"} <span style={badgeStyle(R.blueLight, R.blue)}>Trainer</span></span> },
+    { key: "name", label: "Name", val: r => r.name || "—" },
     { key: "partner_code", label: "Code", val: r => r.partner_code || "—", className: "text-muted font-mono" },
     ...(activeTab === "overview" ? [{ key: "taName", label: "TA", val: r => r.taName || "—", className: "text-secondary" }] : []),
     { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
@@ -462,7 +461,7 @@ export default function AnalyticsDashboard() {
     { key: "pct", label: "Rate %", align: "right", render: r => <RateCell pct={r.pct} /> },
   ];
   const clientCols = [
-    { key: "name", label: "Name", render: r => <span>{r.name || "—"} <span style={badgeStyle(R.blueLight, R.blue)}>Client</span></span> },
+    { key: "name", label: "Name", val: r => r.name || "—" },
     { key: "trainerName", label: "Trainer", val: r => r.trainerName || "—", className: "text-secondary" },
     { key: "fitness_goal", label: "Goal", render: r => <span style={{ fontSize: "11px", fontWeight: 600, padding: "4px 12px", borderRadius: R.rPill, color: goalColor(r.fitness_goal), backgroundColor: goalColor(r.fitness_goal) + "15", letterSpacing: "-0.22px" }}>{goalLabel(r.fitness_goal)}</span> },
     { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
@@ -758,11 +757,15 @@ export default function AnalyticsDashboard() {
               {/* Reading Split — right column */}
               <div className="flex-1 flex flex-col items-center" style={{ paddingLeft: "4px" }}>
                 <div style={{ fontSize: "10px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.8px", fontWeight: 600, marginBottom: "16px" }}>Reading Split</div>
-                {periodTotalReads > 0 ? (
+                {(() => {
+                  const trPct = periodTotalReads > 0 ? Math.round((periodTrainerReads / periodTotalReads) * 100) : 0;
+                  return (
                   <div className="flex flex-col items-center gap-4 flex-1 w-full">
                     <div className="rounded-full flex items-center justify-center" style={{
                       width: 90, height: 90,
-                      background: `conic-gradient(${R.blue} 0% ${Math.round((periodTrainerReads / periodTotalReads) * 100)}%, ${R.green}80 ${Math.round((periodTrainerReads / periodTotalReads) * 100)}% 100%)`
+                      background: periodTotalReads > 0
+                        ? `conic-gradient(${R.blue} 0% ${trPct}%, ${R.green}80 ${trPct}% 100%)`
+                        : "rgba(148,163,184,0.12)"
                     }}>
                       <div className="rounded-full flex items-center justify-center" style={{ width: 70, height: 70, backgroundColor: "#0f172a" }}>
                         <div className="text-center">
@@ -772,9 +775,11 @@ export default function AnalyticsDashboard() {
                       </div>
                     </div>
 
-                    <div className="w-full" style={{ height: "5px", borderRadius: "3px", overflow: "hidden", display: "flex" }}>
-                      <div style={{ width: `${Math.round((periodTrainerReads / periodTotalReads) * 100)}%`, height: "100%", backgroundColor: R.blue, transition: "width 0.4s ease" }} />
-                      <div style={{ flex: 1, height: "100%", backgroundColor: `${R.green}80` }} />
+                    <div className="w-full" style={{ height: "5px", borderRadius: "3px", overflow: "hidden", display: "flex", backgroundColor: "rgba(148,163,184,0.12)" }}>
+                      {periodTotalReads > 0 && <>
+                        <div style={{ width: `${trPct}%`, height: "100%", backgroundColor: R.blue, transition: "width 0.4s ease" }} />
+                        <div style={{ flex: 1, height: "100%", backgroundColor: `${R.green}80` }} />
+                      </>}
                     </div>
 
                     <div className="flex flex-col gap-2 w-full">
@@ -786,22 +791,13 @@ export default function AnalyticsDashboard() {
                           <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: s.color, flexShrink: 0 }} />
                           <span style={{ fontSize: "11px", color: "#94a3b8", flex: 1 }}>{s.label}</span>
                           <span style={{ fontSize: "14px", fontWeight: 700 }}>{s.val}</span>
-                          <span style={{ fontSize: "10px", color: "#475569" }}>({Math.round((s.val / periodTotalReads) * 100)}%)</span>
+                          <span style={{ fontSize: "10px", color: "#475569" }}>({periodTotalReads > 0 ? Math.round((s.val / periodTotalReads) * 100) : 0}%)</span>
                         </div>
                       ))}
                     </div>
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center gap-3 flex-1">
-                    <div className="rounded-full flex items-center justify-center" style={{ width: 56, height: 56, backgroundColor: "rgba(148,163,184,0.06)", border: "1px solid rgba(148,163,184,0.1)" }}>
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="1.5" strokeLinecap="round"><path d="M9 17H5a2 2 0 0 0-2 2v0M15 17h4a2 2 0 0 1 2 2v0"/><rect x="7" y="13" width="4" height="8" rx="1"/><rect x="13" y="9" width="4" height="12" rx="1"/><line x1="7" y1="8" x2="7" y2="10"/><circle cx="7" cy="6" r="2"/></svg>
-                    </div>
-                    <div className="text-center">
-                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#cbd5e1" }}>No readings</div>
-                      <div style={{ fontSize: "10px", color: "#475569", marginTop: "4px" }}>All-time: {allTimeTotalReads}</div>
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -856,7 +852,7 @@ export default function AnalyticsDashboard() {
             </div>
 
             {/* Tab content — table fills available space */}
-            <div className="mt-3 flex-1 flex flex-col overflow-x-auto" style={{ overflowY: "auto" }}>
+            <div className="mt-3 flex-1 flex flex-col" style={{ overflow: "hidden" }}>
               {(() => {
                 const tabs = { all: tabTr, active: activeTrainers, elite: eliteTrainers, atrisk: atRiskTrainers };
                 const list = tabs[trainerTab] || [];
@@ -932,7 +928,7 @@ export default function AnalyticsDashboard() {
             </div>
 
             {/* Client table */}
-            <div className="mt-3 pt-3 overflow-x-auto" style={{ borderTop: "1px solid #EEF2F6", maxHeight: "200px", overflowY: "auto" }}>
+            <div className="mt-3 pt-3" style={{ borderTop: "1px solid #EEF2F6", height: "200px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
               <AccTable rows={tabCl} cols={[
                 { key: "name", label: "Client", val: r => r.name || "—" },
                 { key: "fitness_goal", label: "Goal", val: r => goalLabel(r.fitness_goal), render: r => <span style={{ fontSize: "11px", fontWeight: 500, padding: "3px 10px", borderRadius: R.rPill, color: goalColor(r.fitness_goal), backgroundColor: goalColor(r.fitness_goal) + "15", letterSpacing: "-0.22px" }}>{goalLabel(r.fitness_goal)}</span> },
@@ -954,27 +950,30 @@ export default function AnalyticsDashboard() {
             <h2 style={{ fontSize: "18px", fontWeight: 600, color: R.tp, letterSpacing: "-0.36px" }}>Reading Rate Cohorts</h2>
             <p className="mt-0.5" style={{ fontSize: "12px", color: R.ts, letterSpacing: "-0.24px" }}>Where do your clients & trainers stand?</p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: "24px", marginTop: "16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "28px", marginTop: "16px" }}>
 
-              {/* Left: Range bars */}
-              <div className="flex flex-col gap-2.5 pt-1">
-                {cohortData.map((tier, i) => (
-                  <div key={i} className="flex items-center gap-2 cursor-pointer" onClick={() => setCohortTab(i)}
-                    style={{ padding: "8px 12px", borderRadius: "10px", transition: "all 0.2s", backgroundColor: cohortTab === i ? `${tier.color}08` : "transparent", border: cohortTab === i ? `1px solid ${tier.color}25` : "1px solid transparent" }}>
-                    <span className="w-[65px] shrink-0" style={{ fontSize: "12px", fontWeight: cohortTab === i ? 700 : 500, color: cohortTab === i ? tier.color : R.tp, letterSpacing: "-0.22px" }}>{tier.label}</span>
-                    <div className="flex-1 h-[8px] rounded-full overflow-hidden" style={{ backgroundColor: "#F1F5F9" }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${(tier.count / maxCohortCount) * 100}%`, backgroundColor: tier.color, opacity: cohortTab === i ? 1 : 0.6 }} />
+              {/* Left: Distribution chart */}
+              <div className="flex flex-col gap-2 pt-1">
+                {cohortData.map((tier, i) => {
+                  const active = cohortTab === i;
+                  const barPct = maxCohortCount > 0 ? Math.max((tier.count / maxCohortCount) * 100, tier.count > 0 ? 8 : 0) : 0;
+                  return (
+                    <div key={i} className="cursor-pointer" onClick={() => setCohortTab(i)}
+                      style={{ padding: "6px 10px", borderRadius: "10px", transition: "all 0.2s", backgroundColor: active ? `${tier.color}08` : "transparent", border: active ? `1px solid ${tier.color}20` : "1px solid transparent" }}>
+                      <div className="flex items-center justify-between" style={{ marginBottom: "5px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: active ? 700 : 500, color: active ? tier.color : R.ts }}>{tier.label}</span>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: active ? tier.color : R.tp }}>{tier.count} <span style={{ fontSize: "10px", fontWeight: 500, color: R.tm }}>({tier.pctOfTotal}%)</span></span>
+                      </div>
+                      <div style={{ height: "6px", borderRadius: "3px", backgroundColor: "#F1F5F9", overflow: "hidden" }}>
+                        <div style={{ width: `${barPct}%`, height: "100%", borderRadius: "3px", backgroundColor: tier.color, opacity: active ? 1 : 0.5, transition: "all 0.3s ease" }} />
+                      </div>
                     </div>
-                    <span className="text-right shrink-0 whitespace-nowrap" style={{ fontSize: "12px", letterSpacing: "-0.22px" }}>
-                      <span style={{ fontWeight: 700, color: cohortTab === i ? tier.color : R.tp }}>{tier.count}</span>
-                      <span style={{ color: R.tm, fontSize: "11px" }}> ({tier.pctOfTotal}%)</span>
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Right: Selected cohort table */}
-              <div style={{ borderLeft: "1px solid #EEF2F6", paddingLeft: "24px", maxHeight: "280px", overflowY: "auto" }}>
+              <div style={{ borderLeft: "1px solid #EEF2F6", paddingLeft: "24px", display: "flex", flexDirection: "column" }}>
                 {cohortData[cohortTab] ? (
                   cohortData[cohortTab].count === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-3 py-8">
@@ -987,14 +986,38 @@ export default function AnalyticsDashboard() {
                       </div>
                     </div>
                   ) : (<>
-                    {cohortData[cohortTab].trainersIn.length > 0 && <>
-                      <div className="uppercase mb-1" style={{ fontSize: "9px", fontWeight: 600, color: R.tm, letterSpacing: "-0.2px" }}>Trainers</div>
-                      <AccTable rows={cohortData[cohortTab].trainersIn} cols={trainerCols} />
-                    </>}
-                    {cohortData[cohortTab].clientsIn.length > 0 && <>
-                      <div className={`uppercase mb-1 ${cohortData[cohortTab].trainersIn.length > 0 ? "mt-3" : ""}`} style={{ fontSize: "9px", fontWeight: 600, color: R.tm, letterSpacing: "-0.2px" }}>Clients</div>
-                      <AccTable rows={cohortData[cohortTab].clientsIn} cols={clientCols} />
-                    </>}
+                    <div className="flex gap-1 p-1 mb-3" style={{ backgroundColor: "#F1F5F9", borderRadius: "8px", alignSelf: "flex-start" }}>
+                      {[
+                        { key: "trainers", label: "Trainers", count: cohortData[cohortTab].trainersIn.length },
+                        { key: "clients", label: "Clients", count: cohortData[cohortTab].clientsIn.length },
+                      ].map(t => (
+                        <button key={t.key} onClick={() => setCohortSubTab(t.key)} className="cursor-pointer" style={{
+                          padding: "5px 12px", borderRadius: "6px", border: "none", fontSize: "11px", fontWeight: 600, letterSpacing: "-0.2px", transition: "all 0.2s ease",
+                          backgroundColor: cohortSubTab === t.key ? "#ffffff" : "transparent",
+                          color: cohortSubTab === t.key ? R.tp : R.tm,
+                          boxShadow: cohortSubTab === t.key ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                        }}>
+                          {t.label} <span style={{ color: cohortSubTab === t.key ? R.blue : R.tm, marginLeft: "2px" }}>{t.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ height: "240px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                      {cohortSubTab === "trainers" ? (
+                        cohortData[cohortTab].trainersIn.length > 0
+                          ? <AccTable rows={cohortData[cohortTab].trainersIn} cols={trainerCols} />
+                          : <div className="flex flex-col items-center justify-center gap-2 py-6">
+                              <div style={{ fontSize: "12px", fontWeight: 600, color: R.ts }}>No trainers in this range</div>
+                              <div style={{ fontSize: "11px", color: R.tm }}>Try selecting a different cohort</div>
+                            </div>
+                      ) : (
+                        cohortData[cohortTab].clientsIn.length > 0
+                          ? <AccTable rows={cohortData[cohortTab].clientsIn} cols={clientCols} />
+                          : <div className="flex flex-col items-center justify-center gap-2 py-6">
+                              <div style={{ fontSize: "12px", fontWeight: 600, color: R.ts }}>No clients in this range</div>
+                              <div style={{ fontSize: "11px", color: R.tm }}>Try selecting a different cohort</div>
+                            </div>
+                      )}
+                    </div>
                   </>)
                 ) : null}
               </div>

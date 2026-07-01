@@ -919,7 +919,7 @@ export default function AnalyticsDashboard() {
 
             {/* Clients by Goal — compact */}
             <div className="flex gap-3 mt-3">
-              {[["fat_loss", "Fat Loss", R.orange], ["muscle_gain", "Muscle Gain", R.green], ["weight_loss", "Weight Loss", R.red]].map(([k, l, c]) => (
+              {[["fat_loss", "Fat Loss", R.orange], ["muscle_gain", "Muscle Gain", R.green]].map(([k, l, c]) => (
                 <div key={k} className="flex-1 p-2.5" style={{ backgroundColor: "#F8FAFC", borderRadius: "8px", borderLeft: `3px solid ${c}` }}>
                   <div style={{ fontSize: "16px", fontWeight: 700, color: R.tp }}>{curGoals[k] || 0}</div>
                   <div style={{ fontSize: "10px", color: R.tm }}>{l}</div>

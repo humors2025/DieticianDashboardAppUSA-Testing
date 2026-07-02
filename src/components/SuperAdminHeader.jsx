@@ -50,7 +50,7 @@ const DROPDOWN_MENU = [
   { name: "Audit log", icon: "/icons/hugeicons_note-01.svg",      path: "/super-admin/audit-logs" },
   { name: "Settings",  icon: "/icons/hugeicons_settings-03.svg",  path: "/super-admin/settings" },
 ];
-
+ 
 export default function SuperAdminHeader() {
   const pathname = usePathname();
   const router = useRouter();

@@ -47,7 +47,7 @@ const MEAL_TYPES = [
   { key: "breakfast", label: "Breakfast" },
   { key: "lunch", label: "Lunch" },
   { key: "snacks", label: "Evening Snacks" },
-  { key: "dinner", label: "Dinner" },
+  { key: "dinner", label: "Dinner" }, 
 ];
 
 export default function DietPlanLargeSize() {
@@ -73,7 +73,7 @@ export default function DietPlanLargeSize() {
 
   // status_value (approval) only controls mobile app visibility — trainer
   // dashboard editing must work for both status=0 (draft) and status=1 (approved).
-  const canEdit = !isSuperAdmin;
+  const canEdit = true;
   const hasEdits = pendingOps.length > 0;
 
   useEffect(() => {
@@ -598,7 +598,7 @@ export default function DietPlanLargeSize() {
         )}
       </div>
 
-      {!isSuperAdmin && (
+    
         <div className="flex gap-2.5 justify-end mt-2">
           {!isApproved && (
             <p className="py-[11px] text-[#535359] text-[10px] font-normal leading-normal tracking-[-0.2px]">
@@ -641,7 +641,7 @@ export default function DietPlanLargeSize() {
             </div>
           </div>
         </div>
-      )}
+     
 
       {showApprovePopup && !isApproved && (
         <ApproveConfirmationPopup

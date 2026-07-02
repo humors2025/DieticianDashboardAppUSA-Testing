@@ -143,12 +143,22 @@ const transformDatesToDisplay = () => {
 };
 
 
+  // Maps a week's metabolism score (0-100) to its adherence label.
+  // 0-50 -> Building, 50-70 -> Steady, 70-100 -> Strong.
+  const getWeekRangeLabel = (value) => {
+    const score = Number(value);
+    if (value == null || value === "" || Number.isNaN(score)) return "NA";
+    if (score < 50) return "Building";
+    if (score < 70) return "Steady";
+    return "Strong";
+  };
+
   const transformWeeklyDatesToDisplay = () => {
     if (!weeklyDates || weeklyDates.length === 0) return [];
 
     return weeklyDates.map((weekObj) => ({
       week: weekObj.week_label,
-      range: weekObj.week_range,
+      range: getWeekRangeLabel(weekObj.week_range),
       weekStartDate: weekObj.week_start_date,
       weekEndDate: weekObj.week_end_date,
       monthLabel: weekObj.month_label,

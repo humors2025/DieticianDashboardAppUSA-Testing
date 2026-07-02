@@ -62,7 +62,8 @@ export default function DietPlan() {
 
   // status_value (approval) only controls mobile app visibility — trainer
   // dashboard editing must work for both status=0 (draft) and status=1 (approved).
-  const canEdit = !isSuperAdmin;
+  // const canEdit = !isSuperAdmin;
+   const canEdit = true;
   const hasEdits = pendingOps.length > 0;
 
   useEffect(() => {
@@ -786,7 +787,7 @@ export default function DietPlan() {
             </div>
           </div>
 
-          {!isSuperAdmin && (
+          {/* {!isSuperAdmin && ( */}
             <div className="flex gap-2.5 justify-end mt-2">
               {!isApproved && (
                 <p className="py-[11px] text-[#535359] text-[10px] xl:text-[11px] 2xl:text-[12px] font-normal leading-normal tracking-[-0.2px]">
@@ -828,7 +829,7 @@ export default function DietPlan() {
                 </div>
               </div>
             </div>
-          )}
+          {/* )} */}
         </div>
       </div>
 

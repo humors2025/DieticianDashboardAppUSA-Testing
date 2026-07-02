@@ -50,8 +50,13 @@ function decodeAccessTokenFromCookie() {
 
 function getActorUserIdFromAccessToken() {
   const decoded = decodeAccessTokenFromCookie();
-  if (decoded?.user_id || decoded?.email) {
-    return decoded.user_id ?? decoded.email;
+  // The access token has no top-level user_id/email; the user's email lives
+  // under the nested "dietician" object (e.g. dietician.email). The API uses
+  // that email as actor_user_id.
+  const fromToken =
+    decoded?.user_id ?? decoded?.email ?? decoded?.dietician?.email;
+  if (fromToken) {
+    return fromToken;
   }
 
   const userCookie = Cookies.get("user");
@@ -497,10 +502,9 @@ export const fetchClientsDashboard = async (
     date: date,
   };
 
-  // actor_user_id is the user_id decoded from the access_token cookie.
-  // Required by the API on both the normal and masked routes.
-  const decoded = decodeAccessTokenFromCookie();
-  const actorUserId = decoded?.user_id;
+  // actor_user_id is decoded from the access_token cookie (the email under
+  // token.dietician.email). Required by the API on both routes.
+  const actorUserId = getActorUserIdFromAccessToken();
   if (actorUserId) {
     body.actor_user_id = actorUserId;
   }
@@ -566,8 +570,9 @@ export const fetchClientIndividualProfile = async (profileId, date, dietitianId,
   };
 
   if (masking) {
-    const decoded = decodeAccessTokenFromCookie();
-    const actorUserId = decoded?.user_id;
+    // actor_user_id is required by the masking endpoint; it's the email
+    // decoded from the access_token (token.dietician.email).
+    const actorUserId = getActorUserIdFromAccessToken();
     if (actorUserId) {
       basePayload.actor_user_id = actorUserId;
     }

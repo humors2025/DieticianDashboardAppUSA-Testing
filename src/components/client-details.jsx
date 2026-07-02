@@ -33,6 +33,7 @@ import {
 } from "../services/authService";
 
 import { cookieManager } from "../lib/cookies";
+import { getSuperAdminPartnerCode } from "../lib/superAdminContext";
 
 function decodeJwt(token) {
   try {
@@ -110,7 +111,12 @@ export default function ClientDetails() {
 
   const profileId = searchParams.get("profile_id");
   const dietitianData = cookieManager.getJSON("dietician");
-  const dietitianId = dietitianData?.dietician_id || null;
+  // On the super-admin masking route the logged-in super admin has no
+  // "dietician" cookie, so fall back to the impersonated trainer's partner
+  // code. Without this the dietitianId gate below stays null and the
+  // (masking) profile APIs are never dispatched.
+  const partnerCode = isMaskingRoute ? getSuperAdminPartnerCode() : null;
+  const dietitianId = dietitianData?.dietician_id || partnerCode || null;
 
   const formatGoal = (goal) => {
     if (!goal || goal === "NA") return "NA";

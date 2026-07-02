@@ -826,6 +826,10 @@ function PendingInvites({
 
 export default function ReferralsPage() {
   const [dietician, setDietician] = useState(null);
+  // Cookie is read in an effect (after first render), so track when that read has
+  // happened. Fetching before it resolves would fire a request with an empty
+  // partner_code, then a second one once the real code loads.
+  const [isDieticianLoaded, setIsDieticianLoaded] = useState(false);
   const [invites, setInvites] = useState([]);
   const [summary, setSummary] = useState(null);
   const [pagination, setPagination] = useState(null);
@@ -846,6 +850,7 @@ export default function ReferralsPage() {
 
   useEffect(() => {
     setDietician(cookieManager.getJSON("dietician"));
+    setIsDieticianLoaded(true);
   }, []);
 
   const partnerCode = resolvePartnerCode(dietician);
@@ -911,8 +916,11 @@ export default function ReferralsPage() {
   );
 
   useEffect(() => {
+    // Wait until the dietician (and thus partnerCode) is resolved from the cookie,
+    // otherwise the first fetch would go out without partner_code.
+    if (!isDieticianLoaded) return;
     fetchReferralList(currentPage, debouncedSearch, { force: true });
-  }, [currentPage, debouncedSearch, fetchReferralList]);
+  }, [currentPage, debouncedSearch, fetchReferralList, isDieticianLoaded]);
 
   const handlePageChange = (newPage) => {
     const totalPages = Math.max(1, Math.ceil((summary?.total_count || 0) / limit));

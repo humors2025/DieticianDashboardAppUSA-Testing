@@ -227,10 +227,20 @@ export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCanc
     const base = baseMacrosRef.current;
     const totalBaseGrams = base.unit_grams * base.base_portion;
     if (totalBaseGrams > 0 && val > 0) {
-      const newQty = parseFloat((val / base.unit_grams).toFixed(2));
-      setPortionQty(newQty);
+      // Grams is edited independently of Qty: scale the macros to the new
+      // weight but leave the Qty value untouched. Qty only changes when the
+      // user edits the Qty field directly. The label keeps the current Qty and
+      // shows the manually entered grams.
       const ratio = val / totalBaseGrams;
-      scaleMacrosByRatio(ratio, newQty);
+      setMacros((prev) => ({
+        ...prev,
+        calories: Math.round(base.calories * ratio),
+        protein_g: parseFloat((base.protein_g * ratio).toFixed(1)),
+        carbs_g: parseFloat((base.carbs_g * ratio).toFixed(1)),
+        fat_g: parseFloat((base.fat_g * ratio).toFixed(1)),
+        fiber_g: parseFloat((base.fiber_g * ratio).toFixed(1)),
+        portion_with_metric: buildUnitLabel(portionQty, unit, val),
+      }));
     }
   };
 
@@ -258,8 +268,20 @@ export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCanc
       const newQty = gpu > 0 ? parseFloat((portionGrams / gpu).toFixed(2)) : portionQty;
       setUnit(newUnit);
       setPortionQty(newQty);
+      // Rebase the reference onto the selected unit so the Qty and Grams inputs
+      // can be edited manually afterward and stay consistent: one "unit" now
+      // weighs `gpu` grams and the current macros become the reference for this
+      // amount. Grams and macros themselves are unchanged ("keep amount").
       base.base_label = newUnit;
-      // "keep amount": grams and macros are unchanged, only the label changes.
+      if (gpu > 0 && newQty > 0) {
+        base.unit_grams = gpu;
+        base.base_portion = newQty;
+        base.calories = macros.calories;
+        base.protein_g = macros.protein_g;
+        base.carbs_g = macros.carbs_g;
+        base.fat_g = macros.fat_g;
+        base.fiber_g = macros.fiber_g;
+      }
       setMacros((prev) => ({
         ...prev,
         portion_with_metric: buildUnitLabel(newQty, newUnit, portionGrams),
@@ -270,22 +292,44 @@ export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCanc
     // "<unit>:<mult>" — set an exact amount of a unit.
     const newUnit = type;
     const mult = parseFloat(arg) || 1;
-    const newGrams = gramsPerUnit(newUnit) * mult;
+    const gpu = gramsPerUnit(newUnit);
+    const newGrams = gpu * mult;
     const totalBaseGrams = (base.unit_grams || 100) * (base.base_portion || 1);
+    const ratio = totalBaseGrams > 0 ? newGrams / totalBaseGrams : 1;
+
+    // Scale macros to the chosen amount. Keep the unrounded values as the new
+    // reference so later manual Qty/Grams edits scale cleanly without
+    // compounding rounding error; show the rounded values.
+    const scaled = {
+      calories: base.calories * ratio,
+      protein_g: base.protein_g * ratio,
+      carbs_g: base.carbs_g * ratio,
+      fat_g: base.fat_g * ratio,
+      fiber_g: base.fiber_g * ratio,
+    };
 
     setUnit(newUnit);
     setPortionQty(mult);
     setPortionGrams(Math.round(newGrams));
-    base.base_label = newUnit;
 
-    const ratio = totalBaseGrams > 0 ? newGrams / totalBaseGrams : 1;
+    // Rebase the reference onto the selected unit so the Qty and Grams inputs
+    // stay consistent when edited manually afterward.
+    base.base_label = newUnit;
+    base.unit_grams = gpu;
+    base.base_portion = mult;
+    base.calories = scaled.calories;
+    base.protein_g = scaled.protein_g;
+    base.carbs_g = scaled.carbs_g;
+    base.fat_g = scaled.fat_g;
+    base.fiber_g = scaled.fiber_g;
+
     setMacros((prev) => ({
       ...prev,
-      calories: Math.round(base.calories * ratio),
-      protein_g: parseFloat((base.protein_g * ratio).toFixed(1)),
-      carbs_g: parseFloat((base.carbs_g * ratio).toFixed(1)),
-      fat_g: parseFloat((base.fat_g * ratio).toFixed(1)),
-      fiber_g: parseFloat((base.fiber_g * ratio).toFixed(1)),
+      calories: Math.round(scaled.calories),
+      protein_g: parseFloat(scaled.protein_g.toFixed(1)),
+      carbs_g: parseFloat(scaled.carbs_g.toFixed(1)),
+      fat_g: parseFloat(scaled.fat_g.toFixed(1)),
+      fiber_g: parseFloat(scaled.fiber_g.toFixed(1)),
       portion_with_metric: buildUnitLabel(mult, newUnit, newGrams),
     }));
   };

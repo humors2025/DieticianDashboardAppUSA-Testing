@@ -2,6 +2,52 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 
+// Approximate grams (or ml, ~1g/ml) for one of each household unit. Tune these
+// to match your nutrition standards. "piece" has no fixed weight — it falls back
+// to the food's own per-unit grams.
+const UNIT_GRAMS = {
+  g: 1,
+  gram: 1,
+  ml: 1,
+  liter: 1000,
+  floz: 30,
+  oz: 28.35,
+  glass: 250,
+  cup: 200,
+  bowl: 200,
+  katori: 150,
+  plate: 300,
+  tablespoon: 15,
+  teaspoon: 5,
+};
+
+// Units expressed as a continuous weight/volume ("150 ml") rather than a count
+// of servings ("½ katori (100 g)").
+const CONTINUOUS_UNITS = ["g", "gram", "ml", "oz", "floz", "liter", "kg", "l"];
+
+// Liquid foods get the ml/glass/cup unit set; everything else gets bowl/katori/…
+const LIQUID_UNITS = ["ml", "glass", "liter", "floz", "l"];
+
+// Words in the food name or portion label that mark it as a liquid/beverage.
+// Used as a fallback when the food data doesn't carry an explicit category and
+// isn't already measured in a liquid unit.
+const LIQUID_KEYWORDS =
+  /\bml\b|milliliter|\blitre\b|\bliter\b|\bglass\b|smoothie|juice|shake|drink|lassi|milk|water|tea|coffee|soup|beverage/i;
+
+// Pretty fraction labels for the amounts used in the dropdown.
+const FRACTION_LABELS = {
+  1: "1",
+  0.75: "¾",
+  0.6667: "⅔",
+  0.5: "½",
+  0.3333: "⅓",
+  0.25: "¼",
+};
+function fractionLabel(n) {
+  if (FRACTION_LABELS[n]) return FRACTION_LABELS[n];
+  return Number.isInteger(n) ? String(n) : String(parseFloat(Number(n).toFixed(2)));
+}
+
 function parseGramsFromLabel(label) {
   if (!label) return null;
   const m = label.match(/\((\d+(?:\.\d+)?)\s*g\)/i);
@@ -48,11 +94,26 @@ function formatPortion(baseLabel, unitGrams, portion) {
   return label;
 }
 
+// Label for a portion chosen via the unit dropdown, e.g. "150 ml" for a
+// continuous unit or "½ katori (100 g)" for a count unit.
+function buildUnitLabel(qty, unit, grams) {
+  const roundedG = Math.round(grams);
+  if (CONTINUOUS_UNITS.includes(unit)) {
+    const display = unit === "gram" ? "g" : unit === "floz" ? "fl oz" : unit;
+    return `${roundedG} ${display}`;
+  }
+  let word = unit;
+  if (qty !== 1 && !word.endsWith("s")) word = `${word}s`;
+  return `${fractionLabel(qty)} ${word} (${roundedG} g)`;
+}
+
 export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCancel }) {
   const initialQty = parseFloat(food.portion) || parseFloat(food.base_portion) || 1;
   const initialUnitGrams = food.unit_grams || parseGramsFromLabel(food.portion_with_metric) || 100;
+  const initialUnit = parseBaseLabelFromMetric(food.portion_with_metric) || "g";
 
   const [portionQty, setPortionQty] = useState(initialQty);
+  const [unit, setUnit] = useState(initialUnit);
   const [portionGrams, setPortionGrams] = useState(Math.round(initialUnitGrams * initialQty));
   const [macros, setMacros] = useState({
     calories: food.calories || 0,
@@ -166,16 +227,111 @@ export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCanc
     const base = baseMacrosRef.current;
     const totalBaseGrams = base.unit_grams * base.base_portion;
     if (totalBaseGrams > 0 && val > 0) {
-      const newQty = parseFloat((val / base.unit_grams).toFixed(2));
-      setPortionQty(newQty);
+      // Grams is edited independently of Qty: scale the macros to the new
+      // weight but leave the Qty value untouched. Qty only changes when the
+      // user edits the Qty field directly. The label keeps the current Qty and
+      // shows the manually entered grams.
       const ratio = val / totalBaseGrams;
-      scaleMacrosByRatio(ratio, newQty);
+      setMacros((prev) => ({
+        ...prev,
+        calories: Math.round(base.calories * ratio),
+        protein_g: parseFloat((base.protein_g * ratio).toFixed(1)),
+        carbs_g: parseFloat((base.carbs_g * ratio).toFixed(1)),
+        fat_g: parseFloat((base.fat_g * ratio).toFixed(1)),
+        fiber_g: parseFloat((base.fiber_g * ratio).toFixed(1)),
+        portion_with_metric: buildUnitLabel(portionQty, unit, val),
+      }));
     }
   };
 
   const handleIncrement = () => handleQtyChange(Math.round((portionQty + 0.5) * 10) / 10);
   const handleDecrement = () => {
     if (portionQty > 0.5) handleQtyChange(Math.round((portionQty - 0.5) * 10) / 10);
+  };
+
+  // Grams for one of the given unit. "piece" (and anything unmapped) falls back
+  // to the food's own per-unit weight.
+  const gramsPerUnit = (u) => UNIT_GRAMS[u] || baseMacrosRef.current.unit_grams || 100;
+
+  // The unit dropdown emits action strings: "convert:<unit>" keeps the current
+  // gram amount and just relabels it in the new unit; "<unit>:<mult>" sets the
+  // portion to <mult> of <unit>. Both flow through the onChange effect so meal
+  // and day totals update live.
+  const handleUnitAction = (raw) => {
+    if (!raw) return;
+    const [type, arg] = raw.split(":");
+    const base = baseMacrosRef.current;
+
+    if (type === "convert") {
+      const newUnit = arg;
+      const gpu = gramsPerUnit(newUnit);
+      const newQty = gpu > 0 ? parseFloat((portionGrams / gpu).toFixed(2)) : portionQty;
+      setUnit(newUnit);
+      setPortionQty(newQty);
+      // Rebase the reference onto the selected unit so the Qty and Grams inputs
+      // can be edited manually afterward and stay consistent: one "unit" now
+      // weighs `gpu` grams and the current macros become the reference for this
+      // amount. Grams and macros themselves are unchanged ("keep amount").
+      base.base_label = newUnit;
+      if (gpu > 0 && newQty > 0) {
+        base.unit_grams = gpu;
+        base.base_portion = newQty;
+        base.calories = macros.calories;
+        base.protein_g = macros.protein_g;
+        base.carbs_g = macros.carbs_g;
+        base.fat_g = macros.fat_g;
+        base.fiber_g = macros.fiber_g;
+      }
+      setMacros((prev) => ({
+        ...prev,
+        portion_with_metric: buildUnitLabel(newQty, newUnit, portionGrams),
+      }));
+      return;
+    }
+
+    // "<unit>:<mult>" — set an exact amount of a unit.
+    const newUnit = type;
+    const mult = parseFloat(arg) || 1;
+    const gpu = gramsPerUnit(newUnit);
+    const newGrams = gpu * mult;
+    const totalBaseGrams = (base.unit_grams || 100) * (base.base_portion || 1);
+    const ratio = totalBaseGrams > 0 ? newGrams / totalBaseGrams : 1;
+
+    // Scale macros to the chosen amount. Keep the unrounded values as the new
+    // reference so later manual Qty/Grams edits scale cleanly without
+    // compounding rounding error; show the rounded values.
+    const scaled = {
+      calories: base.calories * ratio,
+      protein_g: base.protein_g * ratio,
+      carbs_g: base.carbs_g * ratio,
+      fat_g: base.fat_g * ratio,
+      fiber_g: base.fiber_g * ratio,
+    };
+
+    setUnit(newUnit);
+    setPortionQty(mult);
+    setPortionGrams(Math.round(newGrams));
+
+    // Rebase the reference onto the selected unit so the Qty and Grams inputs
+    // stay consistent when edited manually afterward.
+    base.base_label = newUnit;
+    base.unit_grams = gpu;
+    base.base_portion = mult;
+    base.calories = scaled.calories;
+    base.protein_g = scaled.protein_g;
+    base.carbs_g = scaled.carbs_g;
+    base.fat_g = scaled.fat_g;
+    base.fiber_g = scaled.fiber_g;
+
+    setMacros((prev) => ({
+      ...prev,
+      calories: Math.round(scaled.calories),
+      protein_g: parseFloat(scaled.protein_g.toFixed(1)),
+      carbs_g: parseFloat(scaled.carbs_g.toFixed(1)),
+      fat_g: parseFloat(scaled.fat_g.toFixed(1)),
+      fiber_g: parseFloat(scaled.fiber_g.toFixed(1)),
+      portion_with_metric: buildUnitLabel(mult, newUnit, newGrams),
+    }));
   };
 
   const handleMacroEdit = (key, value) => {
@@ -234,6 +390,7 @@ export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCanc
     };
 
     const newBaseLabel = newFood.portion_with_metric || newFood.portion_label || "";
+    setUnit(parseBaseLabelFromMetric(newBaseLabel) || "g");
     baseMacrosRef.current = {
       ...newMacros,
       base_portion: newPortion,
@@ -252,6 +409,108 @@ export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCanc
   const handleSave = () => {
     onSave(buildUpdatedFood());
   };
+
+  // Liquid foods (beverages, or anything currently measured in a liquid unit)
+  // get the ml/glass/cup set; everything else gets bowl/katori/plate.
+  // Detection order: explicit category → current liquid unit → keyword match on
+  // the food name / portion label (fallback for data with no category field).
+  const isLiquid =
+    String(foodRef.current?.category || "").toLowerCase() === "beverage" ||
+    LIQUID_UNITS.includes(unit) ||
+    LIQUID_KEYWORDS.test(
+      `${selectedFood || ""} ${macros.portion_with_metric || foodRef.current?.portion_with_metric || ""}`
+    );
+
+  const unitOptionsHtml = isLiquid ? (
+    <>
+      <optgroup label="Switch unit (keep amount)">
+        <option value="convert:ml">→ ml</option>
+        <option value="convert:glass">→ glass</option>
+        <option value="convert:cup">→ cup</option>
+        <option value="convert:tablespoon">→ tablespoon</option>
+        <option value="convert:teaspoon">→ teaspoon</option>
+        <option value="convert:floz">→ fl oz</option>
+        <option value="convert:liter">→ liter</option>
+      </optgroup>
+      <optgroup label="ml">
+        <option value="ml:1">ml</option>
+      </optgroup>
+      <optgroup label="Glass">
+        <option value="glass:1">1 glass</option>
+        <option value="glass:0.75">¾ glass</option>
+        <option value="glass:0.5">½ glass</option>
+        <option value="glass:0.25">¼ glass</option>
+      </optgroup>
+      <optgroup label="Cup">
+        <option value="cup:1">1 cup</option>
+        <option value="cup:0.75">¾ cup</option>
+        <option value="cup:0.5">½ cup</option>
+        <option value="cup:0.25">¼ cup</option>
+      </optgroup>
+      <optgroup label="Spoon">
+        <option value="tablespoon:1">1 tablespoon</option>
+        <option value="tablespoon:0.5">½ tablespoon</option>
+        <option value="teaspoon:1">1 teaspoon</option>
+      </optgroup>
+      <optgroup label="Other">
+        <option value="floz:1">1 fl oz</option>
+        <option value="liter:1">1 liter</option>
+        <option value="liter:0.5">½ liter</option>
+      </optgroup>
+    </>
+  ) : (
+    <>
+      <optgroup label="Switch unit (keep amount)">
+        <option value="convert:bowl">→ bowl</option>
+        <option value="convert:cup">→ cup</option>
+        <option value="convert:katori">→ katori</option>
+        <option value="convert:plate">→ plate</option>
+        <option value="convert:tablespoon">→ tablespoon</option>
+        <option value="convert:teaspoon">→ teaspoon</option>
+        <option value="convert:piece">→ piece</option>
+      </optgroup>
+      <optgroup label="Bowl">
+        <option value="bowl:1">1 bowl</option>
+        <option value="bowl:0.75">¾ bowl</option>
+        <option value="bowl:0.6667">⅔ bowl</option>
+        <option value="bowl:0.5">½ bowl</option>
+        <option value="bowl:0.3333">⅓ bowl</option>
+        <option value="bowl:0.25">¼ bowl</option>
+      </optgroup>
+      <optgroup label="Cup">
+        <option value="cup:1">1 cup</option>
+        <option value="cup:0.75">¾ cup</option>
+        <option value="cup:0.6667">⅔ cup</option>
+        <option value="cup:0.5">½ cup</option>
+        <option value="cup:0.3333">⅓ cup</option>
+        <option value="cup:0.25">¼ cup</option>
+      </optgroup>
+      <optgroup label="Katori">
+        <option value="katori:1">1 katori</option>
+        <option value="katori:0.75">¾ katori</option>
+        <option value="katori:0.5">½ katori</option>
+        <option value="katori:0.25">¼ katori</option>
+      </optgroup>
+      <optgroup label="Plate">
+        <option value="plate:1">1 plate</option>
+        <option value="plate:0.75">¾ plate</option>
+        <option value="plate:0.5">½ plate</option>
+        <option value="plate:0.25">¼ plate</option>
+      </optgroup>
+      <optgroup label="Spoon / Piece">
+        <option value="tablespoon:1">1 tablespoon</option>
+        <option value="tablespoon:0.5">½ tablespoon</option>
+        <option value="teaspoon:1">1 teaspoon</option>
+        <option value="teaspoon:0.5">½ teaspoon</option>
+        <option value="piece:1">1 piece</option>
+        <option value="piece:0.5">½ piece</option>
+      </optgroup>
+      <optgroup label="Weight">
+        <option value="oz:1">1 oz</option>
+        <option value="gram:1">1 gram</option>
+      </optgroup>
+    </>
+  );
 
   const macroFields = [
     { key: "calories", label: "kcal", color: "#252525", bg: "#F5F7FA", step: 1 },
@@ -334,6 +593,17 @@ export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCanc
             className="w-[56px] text-center text-[12px] font-semibold text-[#252525] outline-none border border-[#E1E6ED] rounded-[6px] bg-white py-1"
           />
           <span className="text-[10px] text-[#A1A1A1]">g</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-[#535359] font-medium">Unit:</span>
+          <select
+            value=""
+            onChange={(e) => handleUnitAction(e.target.value)}
+            className="text-[12px] font-semibold text-[#252525] outline-none border border-[#E1E6ED] rounded-[6px] bg-white py-1 px-2 cursor-pointer focus:border-[#308BF9] transition-colors"
+          >
+            <option value="">{`${fractionLabel(portionQty)} ${unit}`}</option>
+            {unitOptionsHtml}
+          </select>
         </div>
       </div>
 

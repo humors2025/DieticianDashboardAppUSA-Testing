@@ -158,7 +158,7 @@ const transformDatesToDisplay = () => {
 
     return weeklyDates.map((weekObj) => ({
       week: weekObj.week_label,
-      range: getWeekRangeLabel(weekObj.week_range),
+      range: weekObj.week_range,
       weekStartDate: weekObj.week_start_date,
       weekEndDate: weekObj.week_end_date,
       monthLabel: weekObj.month_label,
@@ -442,7 +442,6 @@ const transformDatesToDisplay = () => {
   };
 
   const visibleItems = currentData.slice(startIndex, startIndex + ITEMS_TO_SHOW);
-console.log("visibleItems410:", visibleItems);
 
   if (isLoadingWeeklyData) {
     return (
@@ -601,7 +600,7 @@ console.log("visibleItems410:", visibleItems);
 
 
                   <p className="text-[#535359] text-[12px] font-normal tracking-[-0.24px] leading-normal">
-                    {individualProfileData?.data?.total_test_taken ?? "—"} tests taken
+                    {individualProfileData?.data?.total_test_taken ?? "—"} test completed, including re-tests
                   </p>
                 </div>
 

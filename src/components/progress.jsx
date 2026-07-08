@@ -87,7 +87,6 @@ export default function Progress({ title = "Progress", showDetails = true, showC
     };
   }, [graphData]);
 
-  console.log("Overall Fat Loss Data90:", overallFatLossData);
 
   const chartData = useMemo(() => {
     if (!overallFatLossData || !Array.isArray(overallFatLossData.graph_points)) {

@@ -442,7 +442,7 @@ const transformDatesToDisplay = () => {
   };
 
   const visibleItems = currentData.slice(startIndex, startIndex + ITEMS_TO_SHOW);
-console.log("visibleItems410:", visibleItems);
+
 
   if (isLoadingWeeklyData) {
     return (

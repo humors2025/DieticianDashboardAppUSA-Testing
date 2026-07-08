@@ -28,6 +28,12 @@ const CONTINUOUS_UNITS = ["g", "gram", "ml", "oz", "floz", "liter", "kg", "l"];
 // Liquid foods get the ml/glass/cup unit set; everything else gets bowl/katori/…
 const LIQUID_UNITS = ["ml", "glass", "liter", "floz", "l"];
 
+// Words in the food name or portion label that mark it as a liquid/beverage.
+// Used as a fallback when the food data doesn't carry an explicit category and
+// isn't already measured in a liquid unit.
+const LIQUID_KEYWORDS =
+  /\bml\b|milliliter|\blitre\b|\bliter\b|\bglass\b|smoothie|juice|shake|drink|lassi|milk|water|tea|coffee|soup|beverage/i;
+
 // Pretty fraction labels for the amounts used in the dropdown.
 const FRACTION_LABELS = {
   1: "1",
@@ -362,9 +368,14 @@ export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCanc
 
   // Liquid foods (beverages, or anything currently measured in a liquid unit)
   // get the ml/glass/cup set; everything else gets bowl/katori/plate.
+  // Detection order: explicit category → current liquid unit → keyword match on
+  // the food name / portion label (fallback for data with no category field).
   const isLiquid =
     String(foodRef.current?.category || "").toLowerCase() === "beverage" ||
-    LIQUID_UNITS.includes(unit);
+    LIQUID_UNITS.includes(unit) ||
+    LIQUID_KEYWORDS.test(
+      `${selectedFood || ""} ${macros.portion_with_metric || foodRef.current?.portion_with_metric || ""}`
+    );
 
   const unitOptionsHtml = isLiquid ? (
     <>

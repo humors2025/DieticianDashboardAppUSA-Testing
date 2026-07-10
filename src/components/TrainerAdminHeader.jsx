@@ -32,8 +32,8 @@ const MENU = [
   { name: "View my clients",  icon: "/icons/hugeicons_user-group.png",     path: "/trainer/dashboard" },
   { name: "Client Directory", icon: "/icons/hugeicons_user-circle-02.svg", path: "/trainer/client-directory" },
   { name: "Invites Trainer",  icon: "/icons/hugeicons_award-01.svg",       path: "/trainer-admin/invites" },
+  { name: "TA Analytics",     icon: "/icons/hugeicons_view.svg",           path: "/trainer-admin/analytics" },
   { name: "Earnings",         icon: "/icons/hugeicons_award-01.svg",       path: "/trainer-admin/earnings" },
-  { name: "Settings",         icon: "/icons/hugeicons_settings-03.svg",    path: "/trainer-admin/settings" },
 ];
 
 export default function TrainerAdminHeader() {
@@ -114,10 +114,21 @@ export default function TrainerAdminHeader() {
             </div>
 
             {isDropdownOpen && (
-              <div className="absolute right-0 top-full w-48 bg-white rounded-[15px] shadow-lg p-1.5 z-50">
+              <div className="absolute right-0 top-full w-48 bg-white rounded-[15px] shadow-lg p-1.5 z-50 ">
+                <Link href="/trainer-admin/settings">
+                  <button
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="flex items-center cursor-pointer w-full px-4 py-3 text-sm text-[#A1A1A1] hover:bg-gray-100 transition-colors rounded-[12px]"
+                  >
+                    <MonoIcon src="/icons/hugeicons_settings-03.svg" color="#A1A1A1" size={18} alt="settings" />
+                    <span className="ml-3 cursor-pointer">Settings</span>
+                  </button> 
+                </Link>
+
+                <div className="my-1 border-t border-gray-100" />
                 <button
                   onClick={handleLogout}
-                  className="flex items-center cursor-pointer w-full px-4 py-3 text-sm text-[#A1A1A1] hover:bg-gray-100 transition-colors"
+                  className="flex items-center cursor-pointer w-full px-4 py-3 text-sm text-[#A1A1A1] hover:bg-gray-100 transition-colors rounded-[12px]"
                 >
                   <span className="ml-3 cursor-pointer">Logout</span>
                 </button>

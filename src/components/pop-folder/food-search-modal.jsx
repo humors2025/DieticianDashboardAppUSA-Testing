@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { searchFoodService } from "../../services/authService";
 
-export default function FoodSearchModal({ mealSlot, onAdd, onClose }) {
+export default function FoodSearchModal({ mealSlot, onAdd, onClose, dietType = "", country = "" }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -38,17 +39,14 @@ export default function FoodSearchModal({ mealSlot, onAdd, onClose }) {
     setLoading(true);
     setLookupFailed(false);
     try {
-      const res = await fetch(`/api/food/search?q=${encodeURIComponent(q)}&limit=8`, {
-        signal: controller.signal,
-      });
-      const data = await res.json();
+      const data = await searchFoodService(q, { limit: 8, dietType, country, signal: controller.signal });
       setResults(data.results || []);
     } catch (err) {
       if (err.name !== "AbortError") setResults([]);
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, []);
+  }, [dietType, country]);
 
   const handleInput = (e) => {
     const val = e.target.value;

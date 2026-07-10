@@ -23,6 +23,7 @@ import {
 } from "../services/authService";
 import { buildAddPayload, buildDeletePayload, buildUpdatePayload } from "../lib/food-update";
 import { cookieManager } from "../lib/cookies";
+import { useClientDietContext } from "../hooks/use-client-diet-context";
 
 function decodeJwt(token) {
   try {
@@ -75,6 +76,9 @@ export default function DietPlan() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const profileId = searchParams.get("profile_id");
+
+  // Client diet context (diet_type + country) used to tailor food search.
+  const { dietType, country } = useClientDietContext(profileId);
 
   const dispatch = useDispatch();
   const dietAnalysisData = useSelector(selectDietAnalysisData);
@@ -676,6 +680,8 @@ export default function DietPlan() {
                           {canEdit && editingFoodIndex === index ? (
                             <FoodEditPanel
                               food={food}
+                              dietType={dietType}
+                              country={country}
                               onChange={(updatedFood) =>
                                 updateFoodLive(activeDay - 1, currentMealKey, index, updatedFood)
                               }
@@ -852,6 +858,8 @@ export default function DietPlan() {
       {showAddFoodModal && canEdit && (
         <FoodSearchModal
           mealSlot={activeMeal}
+          dietType={dietType}
+          country={country}
           onAdd={addFoodToPlan}
           onClose={() => setShowAddFoodModal(false)}
         />

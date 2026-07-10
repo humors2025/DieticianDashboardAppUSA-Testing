@@ -2,12 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import {
-  fetchTrainerAdminListService,
-  fetchDownstreamUsersService,
-  fetchSuperAdminAllClientsOverviewService,
-  fetchClientProfileDatesList,
-} from "@/services/authService";
 
 const TIMEZONES = { "America/Chicago": "Houston, TX", "Asia/Kolkata": "India (IST)" };
 const DEFAULT_TZ = "America/Chicago";
@@ -78,6 +72,163 @@ function periodMetrics(clients, trainers, rdm, range) {
   let reads = 0, readers = 0;
   clients.forEach(c => { const d = rdm[c.profile_id] || []; const n = !range ? d.length : d.filter(x => inRange(x.date, range)).length; reads += n; if (n > 0) readers++; });
   return { newTrainers: nT, newClients: nC, reads, readers, adoption: clients.length > 0 ? Math.round((readers / clients.length) * 100) : 0 };
+}
+
+function pctChange(cur, prev) {
+  if (prev === 0 && cur === 0) return { val: 0, label: "0%" };
+  if (prev === 0) return { val: 100, label: "100%" };
+  const v = Math.round(((cur - prev) / prev) * 100);
+  return { val: v, label: `${Math.abs(v)}%` };
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   STATIC MOCK DATA
+   Replaces the previous API services. All dates are generated relative to
+   `new Date()` so the "today / this week / this month" panels stay accurate
+   whenever this component is opened.
+   ══════════════════════════════════════════════════════════════════════ */
+
+function daysAgoISO(n, now = new Date()) {
+  const d = new Date(now);
+  d.setDate(d.getDate() - n);
+  d.setHours(9, 0, 0, 0);
+  return d.toISOString();
+}
+
+// Spread `count` reading days across the last `spanDays` days (today = offset 0).
+function spread(count, spanDays, now = new Date()) {
+  const out = [];
+  if (count <= 0) return out;
+  const span = Math.max(spanDays, 1);
+  if (count === 1) return [{ date: daysAgoISO(0, now) }];
+  for (let i = 0; i < count; i++) {
+    const offset = Math.round((i * (span - 1)) / (count - 1));
+    out.push({ date: daysAgoISO(offset, now) });
+  }
+  return out;
+}
+
+function clientEmail(name) {
+  return name.toLowerCase().replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "") + "@clientmail.com";
+}
+
+// Declarative spec — trainer.self = trainer's own device readings (via a self-test
+// record), each client has a target reading count over a join window.
+const MOCK_SPEC = [
+  {
+    name: "Derek Chen", email: "derek.chen@respyr.ai", partner_code: "DRKC", user_id: "ta_derek", createdDaysAgo: 210,
+    trainers: [
+      { name: "Marcus Reed", email: "marcus.reed@fitpro.com", code: "MRCS", joined: 130, self: 128, clients: [
+        { name: "Ava Thompson", goal: "fat_loss", joined: 45, readings: 45 },
+        { name: "Liam Carter", goal: "muscle_gain", joined: 40, readings: 34 },
+        { name: "Sophia Nguyen", goal: "weight_loss", joined: 30, readings: 18 },
+        { name: "Noah Kim", goal: "fat_loss", joined: 50, readings: 9 },
+      ] },
+      { name: "Elena Cruz", email: "elena.cruz@fitpro.com", code: "ELNC", joined: 90, self: 70, clients: [
+        { name: "Mia Patel", goal: "muscle_gain", joined: 25, readings: 24 },
+        { name: "Jackson Lee", goal: "weight_loss", joined: 32, readings: 25 },
+        { name: "Chloe Rivera", goal: "fat_loss", joined: 20, readings: 3 },
+      ] },
+      { name: "David Okoro", email: "david.okoro@fitpro.com", code: "DVDO", joined: 60, self: 39, clients: [
+        { name: "Ethan Brooks", goal: "fat_loss", joined: 22, readings: 22 },
+        { name: "Grace Bell", goal: "muscle_gain", joined: 28, readings: 20 },
+      ] },
+      { name: "Priya Sharma", email: "priya.sharma@fitpro.com", code: "PRYS", joined: 20, self: 19, clients: [
+        { name: "Lucas Martin", goal: "weight_loss", joined: 18, readings: 11 },
+        { name: "Zoe Adams", goal: "fat_loss", joined: 5, readings: 5 },
+      ] },
+      { name: "Tom Becker", email: "tom.becker@fitpro.com", code: "TOMB", joined: 45, self: 0, clients: [
+        { name: "Ryan Hughes", goal: "muscle_gain", joined: 30, readings: 8 },
+      ] },
+      { name: "Nina Volkov", email: "nina.volkov@fitpro.com", code: "NINV", joined: 4, self: 4, clients: [
+        { name: "Ella Foster", goal: "fat_loss", joined: 3, readings: 3 },
+      ] },
+    ],
+  },
+  {
+    name: "Evan Walsh", email: "evan.walsh@respyr.ai", partner_code: "EVNW", user_id: "ta_evan", createdDaysAgo: 180,
+    trainers: [
+      { name: "Sara Lopez", email: "sara.lopez@fitpro.com", code: "SARL", joined: 100, self: 82, clients: [
+        { name: "Owen Scott", goal: "weight_loss", joined: 35, readings: 33 },
+        { name: "Isla Green", goal: "fat_loss", joined: 40, readings: 28 },
+        { name: "Mason Clark", goal: "muscle_gain", joined: 26, readings: 15 },
+      ] },
+      { name: "Raj Mehta", email: "raj.mehta@fitpro.com", code: "RAJM", joined: 75, self: 60, clients: [
+        { name: "Aria Bennett", goal: "fat_loss", joined: 30, readings: 30 },
+        { name: "Leo Turner", goal: "weight_loss", joined: 24, readings: 17 },
+        { name: "Nora Hill", goal: "muscle_gain", joined: 33, readings: 7 },
+      ] },
+      { name: "Kim Park", email: "kim.park@fitpro.com", code: "KIMP", joined: 55, self: 34, clients: [
+        { name: "Finn Doyle", goal: "muscle_gain", joined: 28, readings: 25 },
+        { name: "Ruby Evans", goal: "fat_loss", joined: 20, readings: 12 },
+      ] },
+      { name: "Omar Hassan", email: "omar.hassan@fitpro.com", code: "OMRH", joined: 40, self: 0, clients: [
+        { name: "Ivy Cooper", goal: "weight_loss", joined: 25, readings: 6 },
+        { name: "Max Porter", goal: "fat_loss", joined: 30, readings: 5 },
+      ] },
+      { name: "Lily Nguyen", email: "lily.nguyen@fitpro.com", code: "LILN", joined: 6, self: 6, clients: [
+        { name: "Jade Morgan", goal: "muscle_gain", joined: 4, readings: 4 },
+      ] },
+    ],
+  },
+];
+
+function buildMockData(now = new Date()) {
+  const taList = [];
+  const trainersMap = {};
+  const allClients = [];
+  const readingDatesMap = {};
+  let pid = 1000;
+
+  MOCK_SPEC.forEach(ta => {
+    taList.push({
+      user_id: ta.user_id, name: ta.name, email: ta.email,
+      partner_code: ta.partner_code, created_at: daysAgoISO(ta.createdDaysAgo, now),
+    });
+
+    const trainers = [];
+    ta.trainers.forEach(tr => {
+      trainers.push({
+        user_id: `tr_${tr.code}`, name: tr.name, email: tr.email,
+        partner_code: tr.code, dietician_id: tr.code,
+        created_at: daysAgoISO(tr.joined, now), is_self: false,
+      });
+
+      // Self-test record: gives the trainer their own device reading history.
+      if (tr.self > 0) {
+        const spid = `p_${pid++}`;
+        allClients.push({
+          profile_id: spid,
+          name: tr.name,           // same name + email → detected as self-test
+          email: tr.email,
+          dietitian_id: tr.code,
+          fitness_goal: "",
+          client: { joined_dttm: daysAgoISO(tr.joined, now) },
+        });
+        readingDatesMap[spid] = spread(tr.self, tr.joined, now);
+      }
+
+      // Real clients belonging to this trainer.
+      (tr.clients || []).forEach(cl => {
+        const cpid = `p_${pid++}`;
+        allClients.push({
+          profile_id: cpid,
+          name: cl.name,
+          email: clientEmail(cl.name),
+          dietitian_id: tr.code,
+          fitness_goal: cl.goal,
+          associated_dietitian: { name: tr.name },
+          client: { joined_dttm: daysAgoISO(cl.joined, now) },
+          test_history: { last_test_date_time: daysAgoISO(0, now) },
+        });
+        readingDatesMap[cpid] = spread(cl.readings, cl.joined, now);
+      });
+    });
+
+    trainersMap[ta.user_id] = { trainers };
+  });
+
+  return { taList, trainersMap, allClients, readingDatesMap };
 }
 
 const ICO_COLORS = { people: R.blue, person: R.green, "person-add": R.orange, trend: "#7c3aed" };
@@ -175,13 +326,6 @@ function AccTable({ rows, cols }) {
   );
 }
 
-function pctChange(cur, prev) {
-  if (prev === 0 && cur === 0) return { val: 0, label: "0%" };
-  if (prev === 0) return { val: 100, label: "100%" };
-  const v = Math.round(((cur - prev) / prev) * 100);
-  return { val: v, label: `${Math.abs(v)}%` };
-}
-
 export default function AnalyticsDashboard() {
   const [taList, setTaList] = useState([]);
   const [trainersMap, setTrainersMap] = useState({});
@@ -218,26 +362,18 @@ export default function AnalyticsDashboard() {
   const loadData = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      setLoadingPhase("Fetching Trainer Admins...");
-      const taRes = await fetchTrainerAdminListService();
-      const tas = (taRes?.existing || []).filter(t => EXECUTIVE_TAS.some(n => (t.name || "").toLowerCase().includes(n.toLowerCase())));
+      const now = new Date();
+      const { taList: tas, trainersMap: tMap, allClients: clients, readingDatesMap: dm } = buildMockData(now);
       setTaList(tas);
-      setLoadingPhase("Fetching trainer networks...");
-      const tMap = {};
-      await Promise.all(tas.map(async ta => { try { const r = await fetchDownstreamUsersService(ta.user_id); tMap[ta.user_id] = { trainers: r?.network?.trainers || [] }; } catch { tMap[ta.user_id] = { trainers: [] }; } }));
       setTrainersMap(tMap);
-      setLoadingPhase("Fetching all clients...");
-      let arr = [], pg = 1, more = true;
-      while (more) { setLoadingPhase(`Fetching clients (page ${pg})...`); const r = await fetchSuperAdminAllClientsOverviewService({ page: pg, limit: 50, type: "all" }); const b = r?.clients || []; arr = arr.concat(b); more = r?.pagination?.has_more === true && b.length > 0; pg++; if (pg > 20) break; }
-      setAllClients(arr);
-      setLoadingPhase("Fetching reading history...");
-      const dm = {};
-      const batches = []; for (let i = 0; i < arr.length; i += 5) batches.push(arr.slice(i, i + 5));
-      let f = 0;
-      for (const batch of batches) { await Promise.all(batch.map(async c => { if (!c.profile_id) return; try { const r = await fetchClientProfileDatesList(c.profile_id, c.dietitian_id || ""); dm[c.profile_id] = r?.data?.dates || []; } catch { dm[c.profile_id] = []; } })); f += batch.length; setLoadingPhase(`Reading history (${f}/${arr.length})...`); }
+      setAllClients(clients);
       setReadingDatesMap(dm);
-    } catch (e) { setError(e?.message || "Failed to load"); toast.error(e?.message || "Failed"); }
-    finally { setLoading(false); }
+    } catch (e) {
+      setError(e?.message || "Failed to load");
+      toast.error(e?.message || "Failed");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);

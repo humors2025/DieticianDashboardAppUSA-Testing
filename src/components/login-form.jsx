@@ -4,12 +4,14 @@
 
 import Link from "next/link";
 import React, { useState } from "react";
-import { loginService, updateDietPlanStatusService } from "@/services/authService";
+import { loginService, updateDietPlanStatusService, fetchAdminGroupsService } from "@/services/authService";
 import { cookieManager } from "@/lib/cookies";
 import { persistLoginResponse, landingPathForUser, getCurrentUser } from "@/lib/user";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { useDispatch } from "react-redux";
+import { setAdminGroups, clearAdminGroups } from "@/store/adminGroupsSlice";
 
 // Map ?role= query param → headline copy. Invite emails include the param so
 // the recipient lands on a heading that matches their role. Default (no param)
@@ -24,6 +26,7 @@ const ROLE_HEADINGS = {
 
 export function LoginForm({ className, ...props }) {
   const router = useRouter();
+  const dispatch = useDispatch();
   const searchParams = useSearchParams();
   const roleParam = searchParams.get("role");
   const heading = ROLE_HEADINGS[roleParam] || "Welcome!";
@@ -113,6 +116,29 @@ const handleSubmit = async (e) => {
 
     // Persist access_token + both cookie shapes (new + legacy mirror).
     persistLoginResponse(res);
+
+    // Best-effort: fetch the admin groups the user can manage. actor_user_id is
+    // decoded from the access_token cookie inside the service. Non-blocking so a
+    // failure here never prevents the user from landing on their dashboard.
+    // TA Analytics is gated on having at least one group: when the response's
+    // `groups` array is non-empty we flag it so TrainerAdminHeader shows the
+    // tab; an empty array (or any failure) clears the flag and hides the tab.
+    try {
+      const adminGroupsRes = await fetchAdminGroupsService();
+      // Store the full response in Redux so the trainer-admin AnalyticsDashboard
+      // can consume it after the client-side navigation below.
+      dispatch(setAdminGroups(adminGroupsRes));
+      const hasGroups = Array.isArray(adminGroupsRes?.groups) && adminGroupsRes.groups.length > 0;
+      if (hasGroups) {
+        cookieManager.set("ta_analytics_enabled", "1");
+      } else {
+        cookieManager.remove("ta_analytics_enabled");
+      }
+    } catch (adminGroupsError) {
+      console.error("Fetch admin groups failed:", adminGroupsError);
+      dispatch(clearAdminGroups());
+      cookieManager.remove("ta_analytics_enabled");
+    }
 
     // Best-effort: existing diet-plan-status side effect. Use whichever id
     // the response provides (falls back through legacy).

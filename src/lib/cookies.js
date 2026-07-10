@@ -36,5 +36,6 @@ export const cookieManager = {
   clearAuth: () => {
     Cookies.remove('access_token');
     Cookies.remove('dietician');
+    Cookies.remove('ta_analytics_enabled');
   }
 };

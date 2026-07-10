@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
+import { useDispatch, useSelector } from "react-redux";
+import { getAdminGroups, selectAdminGroups, selectAdminGroupsRaw, selectPrimaryGroupName } from "@/store/adminGroupsSlice";
+import { getGroupDetails, selectGroupDetails, selectGroupDetailsLoading, selectGroupCounts } from "@/store/groupDetailsSlice";
 
 const TIMEZONES = { "America/Chicago": "Houston, TX", "Asia/Kolkata": "India (IST)" };
 const DEFAULT_TZ = "America/Chicago";
@@ -82,150 +85,88 @@ function pctChange(cur, prev) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   STATIC MOCK DATA
-   Replaces the previous API services. All dates are generated relative to
-   `new Date()` so the "today / this week / this month" panels stay accurate
-   whenever this component is opened.
+   REAL DATA ADAPTER — get_group_details.php
+   Maps the GETGROUPDETAILS response into the shape the dashboard renders from:
+     group_members (admins) → Trainer-Admin tabs (taList)
+     trainers               → trainers under their parent admin (trainersMap)
+     clients                → attributed to a TA via owner code (allClients)
+     trainers/clients total_tests → Tests count + reading-rate numerator
+     latest_test.date_time  → anchors the "today / this period" reads
+   The API gives test COUNTS (total_tests) but not per-test DATES, so count- and
+   rate-based metrics are exact while period/"today" reads use the latest test only.
    ══════════════════════════════════════════════════════════════════════ */
-
-function daysAgoISO(n, now = new Date()) {
-  const d = new Date(now);
-  d.setDate(d.getDate() - n);
-  d.setHours(9, 0, 0, 0);
-  return d.toISOString();
-}
-
-// Spread `count` reading days across the last `spanDays` days (today = offset 0).
-function spread(count, spanDays, now = new Date()) {
-  const out = [];
-  if (count <= 0) return out;
-  const span = Math.max(spanDays, 1);
-  if (count === 1) return [{ date: daysAgoISO(0, now) }];
-  for (let i = 0; i < count; i++) {
-    const offset = Math.round((i * (span - 1)) / (count - 1));
-    out.push({ date: daysAgoISO(offset, now) });
-  }
-  return out;
-}
-
-function clientEmail(name) {
-  return name.toLowerCase().replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "") + "@clientmail.com";
-}
-
-// Declarative spec — trainer.self = trainer's own device readings (via a self-test
-// record), each client has a target reading count over a join window.
-const MOCK_SPEC = [
-  {
-    name: "Derek Chen", email: "derek.chen@respyr.ai", partner_code: "DRKC", user_id: "ta_derek", createdDaysAgo: 210,
-    trainers: [
-      { name: "Marcus Reed", email: "marcus.reed@fitpro.com", code: "MRCS", joined: 130, self: 128, clients: [
-        { name: "Ava Thompson", goal: "fat_loss", joined: 45, readings: 45 },
-        { name: "Liam Carter", goal: "muscle_gain", joined: 40, readings: 34 },
-        { name: "Sophia Nguyen", goal: "weight_loss", joined: 30, readings: 18 },
-        { name: "Noah Kim", goal: "fat_loss", joined: 50, readings: 9 },
-      ] },
-      { name: "Elena Cruz", email: "elena.cruz@fitpro.com", code: "ELNC", joined: 90, self: 70, clients: [
-        { name: "Mia Patel", goal: "muscle_gain", joined: 25, readings: 24 },
-        { name: "Jackson Lee", goal: "weight_loss", joined: 32, readings: 25 },
-        { name: "Chloe Rivera", goal: "fat_loss", joined: 20, readings: 3 },
-      ] },
-      { name: "David Okoro", email: "david.okoro@fitpro.com", code: "DVDO", joined: 60, self: 39, clients: [
-        { name: "Ethan Brooks", goal: "fat_loss", joined: 22, readings: 22 },
-        { name: "Grace Bell", goal: "muscle_gain", joined: 28, readings: 20 },
-      ] },
-      { name: "Priya Sharma", email: "priya.sharma@fitpro.com", code: "PRYS", joined: 20, self: 19, clients: [
-        { name: "Lucas Martin", goal: "weight_loss", joined: 18, readings: 11 },
-        { name: "Zoe Adams", goal: "fat_loss", joined: 5, readings: 5 },
-      ] },
-      { name: "Tom Becker", email: "tom.becker@fitpro.com", code: "TOMB", joined: 45, self: 0, clients: [
-        { name: "Ryan Hughes", goal: "muscle_gain", joined: 30, readings: 8 },
-      ] },
-      { name: "Nina Volkov", email: "nina.volkov@fitpro.com", code: "NINV", joined: 4, self: 4, clients: [
-        { name: "Ella Foster", goal: "fat_loss", joined: 3, readings: 3 },
-      ] },
-    ],
-  },
-  {
-    name: "Evan Walsh", email: "evan.walsh@respyr.ai", partner_code: "EVNW", user_id: "ta_evan", createdDaysAgo: 180,
-    trainers: [
-      { name: "Sara Lopez", email: "sara.lopez@fitpro.com", code: "SARL", joined: 100, self: 82, clients: [
-        { name: "Owen Scott", goal: "weight_loss", joined: 35, readings: 33 },
-        { name: "Isla Green", goal: "fat_loss", joined: 40, readings: 28 },
-        { name: "Mason Clark", goal: "muscle_gain", joined: 26, readings: 15 },
-      ] },
-      { name: "Raj Mehta", email: "raj.mehta@fitpro.com", code: "RAJM", joined: 75, self: 60, clients: [
-        { name: "Aria Bennett", goal: "fat_loss", joined: 30, readings: 30 },
-        { name: "Leo Turner", goal: "weight_loss", joined: 24, readings: 17 },
-        { name: "Nora Hill", goal: "muscle_gain", joined: 33, readings: 7 },
-      ] },
-      { name: "Kim Park", email: "kim.park@fitpro.com", code: "KIMP", joined: 55, self: 34, clients: [
-        { name: "Finn Doyle", goal: "muscle_gain", joined: 28, readings: 25 },
-        { name: "Ruby Evans", goal: "fat_loss", joined: 20, readings: 12 },
-      ] },
-      { name: "Omar Hassan", email: "omar.hassan@fitpro.com", code: "OMRH", joined: 40, self: 0, clients: [
-        { name: "Ivy Cooper", goal: "weight_loss", joined: 25, readings: 6 },
-        { name: "Max Porter", goal: "fat_loss", joined: 30, readings: 5 },
-      ] },
-      { name: "Lily Nguyen", email: "lily.nguyen@fitpro.com", code: "LILN", joined: 6, self: 6, clients: [
-        { name: "Jade Morgan", goal: "muscle_gain", joined: 4, readings: 4 },
-      ] },
-    ],
-  },
-];
-
-function buildMockData(now = new Date()) {
+function buildFromGroupDetails(gd, now = new Date()) {
   const taList = [];
   const trainersMap = {};
   const allClients = [];
   const readingDatesMap = {};
-  let pid = 1000;
 
-  MOCK_SPEC.forEach(ta => {
+  const members = Array.isArray(gd?.group_members) ? gd.group_members : [];
+  const trainers = Array.isArray(gd?.trainers) ? gd.trainers : [];
+  const clients = Array.isArray(gd?.clients) ? gd.clients : [];
+
+  // Group members flagged "admin" become the Trainer-Admin tabs. If none are
+  // flagged, treat every member as an admin so the dashboard still populates.
+  const admins = members.filter(m => (m.role || "").toLowerCase() === "admin");
+  const taMembers = admins.length ? admins : members;
+
+  taMembers.forEach(m => {
+    const uid = m.dietician_id || m.email;
     taList.push({
-      user_id: ta.user_id, name: ta.name, email: ta.email,
-      partner_code: ta.partner_code, created_at: daysAgoISO(ta.createdDaysAgo, now),
+      user_id: uid,
+      name: m.name && m.name !== "NA" ? m.name : (m.email || "—"),
+      email: m.email || "",
+      partner_code: m.dietician_id || "",
+      created_at: null, // response carries no admin join date
     });
 
-    const trainers = [];
-    ta.trainers.forEach(tr => {
-      trainers.push({
-        user_id: `tr_${tr.code}`, name: tr.name, email: tr.email,
-        partner_code: tr.code, dietician_id: tr.code,
-        created_at: daysAgoISO(tr.joined, now), is_self: false,
-      });
+    // Trainers whose parent admin is this member.
+    const myTrainers = trainers
+      .filter(t => (t.parent_admin_email || "").toLowerCase() === (m.email || "").toLowerCase())
+      .map(t => ({
+        user_id: t.partner_code,
+        name: t.name && t.name !== "NA" ? t.name : (t.email || "—"),
+        email: t.email || "",
+        partner_code: t.partner_code || "",
+        dietician_id: t.partner_code || "",
+        created_at: t.created_at || null,
+        total_tests: typeof t.total_tests === "number" ? t.total_tests : null,
+        total_clients: typeof t.total_clients === "number" ? t.total_clients : null,
+        is_self: false,
+      }));
 
-      // Self-test record: gives the trainer their own device reading history.
-      if (tr.self > 0) {
-        const spid = `p_${pid++}`;
-        allClients.push({
-          profile_id: spid,
-          name: tr.name,           // same name + email → detected as self-test
-          email: tr.email,
-          dietitian_id: tr.code,
-          fitness_goal: "",
-          client: { joined_dttm: daysAgoISO(tr.joined, now) },
-        });
-        readingDatesMap[spid] = spread(tr.self, tr.joined, now);
-      }
+    // Self entry for the admin's own code so admin-owned clients are attributed
+    // to this TA without inflating the trainer count (is_self is excluded from
+    // the trainer list). Blank email → no client is mis-detected as a self-test.
+    const selfEntry = {
+      user_id: `self_${uid}`,
+      name: m.name && m.name !== "NA" ? m.name : (m.email || "—"),
+      email: "",
+      partner_code: m.dietician_id || "",
+      dietician_id: m.dietician_id || "",
+      created_at: null,
+      is_self: true,
+    };
 
-      // Real clients belonging to this trainer.
-      (tr.clients || []).forEach(cl => {
-        const cpid = `p_${pid++}`;
-        allClients.push({
-          profile_id: cpid,
-          name: cl.name,
-          email: clientEmail(cl.name),
-          dietitian_id: tr.code,
-          fitness_goal: cl.goal,
-          associated_dietitian: { name: tr.name },
-          client: { joined_dttm: daysAgoISO(cl.joined, now) },
-          test_history: { last_test_date_time: daysAgoISO(0, now) },
-        });
-        readingDatesMap[cpid] = spread(cl.readings, cl.joined, now);
-      });
+    trainersMap[uid] = { trainers: [...myTrainers, selfEntry] };
+  });
+
+  clients.forEach(c => {
+    const pid = c.profile_id;
+    if (!pid) return;
+    allClients.push({
+      profile_id: pid,
+      name: c.profile_name || "—",
+      email: c.email || "",
+      dietitian_id: c.dietician_id || c.owner?.partner_code || "",
+      fitness_goal: c.fitness_goal || "",
+      total_tests: typeof c.total_tests === "number" ? c.total_tests : null,
+      associated_dietitian: { name: c.owner?.name || "—" },
+      client: { joined_dttm: c.joined_dttm || c.created_at || null },
+      test_history: { last_test_date_time: c.latest_test?.date_time || null },
     });
-
-    trainersMap[ta.user_id] = { trainers };
+    // Per-test dates aren't in the response; the latest test anchors period/"today" reads.
+    readingDatesMap[pid] = c.latest_test?.date_time ? [{ date: c.latest_test.date_time }] : [];
   });
 
   return { taList, trainersMap, allClients, readingDatesMap };
@@ -327,6 +268,21 @@ function AccTable({ rows, cols }) {
 }
 
 export default function AnalyticsDashboard() {
+  const dispatch = useDispatch();
+  // MANAGEADMINGROUPS response — captured at login into Redux (setAdminGroups),
+  // re-fetched here if the in-memory store was reset (e.g. hard refresh).
+  const adminGroups = useSelector(selectAdminGroups);
+  const adminGroupsRaw = useSelector(selectAdminGroupsRaw);
+  // group_name for get_group_details comes from the MANAGEADMINGROUPS response.
+  const primaryGroupName = useSelector(selectPrimaryGroupName);
+  const groupDetails = useSelector(selectGroupDetails);
+  const groupDetailsLoading = useSelector(selectGroupDetailsLoading);
+  // Authoritative group totals { members, trainers, clients } from the response.
+  const groupCounts = useSelector(selectGroupCounts);
+
+  // Entire GETGROUPDETAILS response stored on this page (all client pages merged).
+  const [groupDetailsResponse, setGroupDetailsResponse] = useState(null);
+
   const [taList, setTaList] = useState([]);
   const [trainersMap, setTrainersMap] = useState({});
   const [allClients, setAllClients] = useState([]);
@@ -360,23 +316,75 @@ export default function AnalyticsDashboard() {
   }, []);
 
   const loadData = useCallback(async () => {
-    setLoading(true); setError(null);
+    setError(null);
     try {
       const now = new Date();
-      const { taList: tas, trainersMap: tMap, allClients: clients, readingDatesMap: dm } = buildMockData(now);
-      setTaList(tas);
-      setTrainersMap(tMap);
-      setAllClients(clients);
-      setReadingDatesMap(dm);
+      let source;
+      if (groupDetails) {
+        // Real data from get_group_details.php.
+        source = buildFromGroupDetails(groupDetails, now);
+      } else if (primaryGroupName) {
+        // We know which group to load but its details haven't arrived yet —
+        // keep the loader up; this effect re-runs once groupDetails lands.
+        setLoading(true);
+        return;
+      } else {
+        // No admin group in context — nothing to show.
+        source = { taList: [], trainersMap: {}, allClients: [], readingDatesMap: {} };
+      }
+      setTaList(source.taList);
+      setTrainersMap(source.trainersMap);
+      setAllClients(source.allClients);
+      setReadingDatesMap(source.readingDatesMap);
+      setLoading(false);
     } catch (e) {
       setError(e?.message || "Failed to load");
       toast.error(e?.message || "Failed");
-    } finally {
       setLoading(false);
     }
-  }, []);
+  }, [groupDetails, primaryGroupName]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // If the MANAGEADMINGROUPS payload wasn't handed off from login (e.g. the user
+  // hard-refreshed this page and the in-memory Redux store reset), re-fetch it.
+  useEffect(() => {
+    if (!adminGroupsRaw) dispatch(getAdminGroups());
+  }, [adminGroupsRaw, dispatch]);
+
+  // The stored MANAGEADMINGROUPS response is now available to this dashboard via
+  // `adminGroups` (response.groups) and `adminGroupsRaw` (full payload).
+  useEffect(() => {
+    if (adminGroupsRaw) console.log("Admin groups (from Redux):", adminGroupsRaw);
+  }, [adminGroupsRaw]);
+
+  // Once we know the group name (from Redux), pull that group's details. Use a
+  // high limit so every client loads in one shot — the dashboard's totals are
+  // derived from the loaded set, so partial pages would under-count.
+  useEffect(() => {
+    if (primaryGroupName) {
+      dispatch(getGroupDetails({ groupName: primaryGroupName, page: 1, limit: 50, search: "", fetchAll: true }));
+    }
+  }, [primaryGroupName, dispatch]);
+
+  // Refresh button: re-fetch the group from the API when we have a group name,
+  // otherwise just rebuild from whatever is in state.
+  const handleRefresh = useCallback(() => {
+    if (primaryGroupName) {
+      dispatch(getGroupDetails({ groupName: primaryGroupName, page: 1, limit: 50, search: "", fetchAll: true }));
+    } else {
+      loadData();
+    }
+  }, [primaryGroupName, dispatch, loadData]);
+
+  useEffect(() => {
+    if (groupDetails) {
+      // Store the entire GETGROUPDETAILS response in a page-level variable.
+      setGroupDetailsResponse(groupDetails);
+      console.log("GETGROUPDETAILS response:", groupDetails);
+    }
+  }, [groupDetails]);
+
   const now = tzNow(timezone);
 
   const computeTa = useCallback((ta) => {
@@ -390,7 +398,8 @@ export default function AnalyticsDashboard() {
 
     const enrich = c => {
       const dates = readingDatesMap[c.profile_id] || [];
-      const rd = dates.length;
+      // Prefer the API's authoritative test count; fall back to reading dates (mock).
+      const rd = c.total_tests != null ? c.total_tests : dates.length;
       const sorted = dates.map(d => d.date).filter(Boolean).sort();
       const last = sorted.length ? sorted[sorted.length - 1] : null;
       const onb = c.client?.joined_dttm || (sorted.length ? sorted[0] : null);
@@ -410,9 +419,11 @@ export default function AnalyticsDashboard() {
       const allDates = sc ? (readingDatesMap[sc.profile_id] || []) : [];
       const ds = t.created_at ? daysBetween(t.created_at, now) : 0;
       const dates = t.created_at ? allDates.filter(d => !d.date || new Date(d.date) >= new Date(new Date(t.created_at).getFullYear(), new Date(t.created_at).getMonth(), new Date(t.created_at).getDate())) : allDates;
-      const rd = dates.length;
+      // Prefer the API's authoritative counts; fall back to derived values (mock).
+      const rd = t.total_tests != null ? t.total_tests : dates.length;
       const pct = ds > 0 ? Math.min(100, Math.round((rd / ds) * 100)) : 0;
-      return { ...t, daysSince: ds, readingDays: rd, pct, cohort: getCohort(pct), realClientCount: clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc).length, hasSelfTest: !!sc, selfProfileId: sc?.profile_id || null };
+      const realClientCount = t.total_clients != null ? t.total_clients : clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc).length;
+      return { ...t, daysSince: ds, readingDays: rd, pct, cohort: getCohort(pct), realClientCount, hasSelfTest: !!sc, selfProfileId: sc?.profile_id || null };
     }).sort((a, b) => b.pct - a.pct || b.realClientCount - a.realClientCount);
 
     const goals = { weight_loss: 0, fat_loss: 0, muscle_gain: 0 };
@@ -448,13 +459,15 @@ export default function AnalyticsDashboard() {
   if (error) return (
     <div className="flex flex-col items-center justify-center gap-3" style={{ height: "calc(100vh - 130px)" }}>
       <div className="max-w-md text-center" style={{ background: "#fef2f2", border: `1px solid ${R.red}30`, color: R.red, borderRadius: R.rCard, padding: "16px", fontSize: "13px", letterSpacing: "-0.26px" }}>{error}</div>
-      <button onClick={loadData} className="cursor-pointer" style={{ borderRadius: R.rPill, background: R.blueLight, color: R.blue, fontSize: "12px", fontWeight: 600, padding: "8px 20px", letterSpacing: "-0.24px", border: "none" }}>Retry</button>
+      <button onClick={handleRefresh} className="cursor-pointer" style={{ borderRadius: R.rPill, background: R.blueLight, color: R.blue, fontSize: "12px", fontWeight: 600, padding: "8px 20px", letterSpacing: "-0.24px", border: "none" }}>Retry</button>
     </div>
   );
 
-  const tTotal = activeTab === "overview" ? totals.trainers : (selData?.totalTrainers ?? 0);
+  // Overview Trainers/Clients totals come from the authoritative `counts` in the
+  // GETGROUPDETAILS response, falling back to the derived totals (demo/mock).
+  const tTotal = activeTab === "overview" ? (groupCounts?.trainers ?? totals.trainers) : (selData?.totalTrainers ?? 0);
   const tActive = activeTab === "overview" ? totals.activeT : (selData?.activeTrainers ?? 0);
-  const cTotal = activeTab === "overview" ? totals.clients : (selData?.totalClients ?? 0);
+  const cTotal = activeTab === "overview" ? (groupCounts?.clients ?? totals.clients) : (selData?.totalClients ?? 0);
   const cActive = activeTab === "overview" ? totals.activeC : (selData?.activeClients ?? 0);
   const curGoals = activeTab === "overview" ? totals.goals : (selData?.goals || { fat_loss: 0, muscle_gain: 0, weight_loss: 0 });
 
@@ -673,7 +686,7 @@ export default function AnalyticsDashboard() {
         {/* ── Right: Controls ── */}
         <div className="flex items-center gap-3">
           {/* Refresh */}
-          <button onClick={loadData} className="flex items-center justify-center cursor-pointer transition-all duration-200"
+          <button onClick={handleRefresh} className="flex items-center justify-center cursor-pointer transition-all duration-200"
             style={{ width: 36, height: 36, borderRadius: "10px", backgroundColor: "#ffffff", border: "1px solid #EEF2F6", color: R.tm }}
             onMouseEnter={e => { e.currentTarget.style.backgroundColor = R.blueLight; e.currentTarget.style.color = R.blue; e.currentTarget.style.borderColor = R.blue + "40"; }}
             onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#ffffff"; e.currentTarget.style.color = R.tm; e.currentTarget.style.borderColor = "#EEF2F6"; }}>

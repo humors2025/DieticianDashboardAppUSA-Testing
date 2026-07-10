@@ -36,15 +36,32 @@ const MENU = [
   { name: "Earnings",         icon: "/icons/hugeicons_award-01.svg",       path: "/trainer-admin/earnings" },
 ];
 
+// The "TA Analytics" tab is hidden when the manage_admin_groups.php response
+// returned an empty `groups` array at login. Login sets the
+// "ta_analytics_enabled" cookie to "1" only when there is at least one group.
+const TA_ANALYTICS_PATH = "/trainer-admin/analytics";
+
 export default function TrainerAdminHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [active, setActive] = useState(pathname);
+  // Whether the TA Analytics tab is visible. Read from the cookie in an effect
+  // (js-cookie is client-only) so the first render matches the server and we
+  // avoid a hydration mismatch. Defaults to hidden until the flag is confirmed.
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   useEffect(() => {
     setActive(pathname);
   }, [pathname]);
+
+  useEffect(() => {
+    setShowAnalytics(cookieManager.get("ta_analytics_enabled") === "1");
+  }, []);
+
+  const menu = showAnalytics
+    ? MENU
+    : MENU.filter((m) => m.path !== TA_ANALYTICS_PATH);
 
   const handleLogout = () => {
     try {
@@ -73,7 +90,7 @@ export default function TrainerAdminHeader() {
         </div>
 
         <div className="flex gap-2 items-center">
-          {MENU.map((m) => {
+          {menu.map((m) => {
             const isActive =
               pathname === m.path ||
               pathname?.startsWith(m.path + "/") ||

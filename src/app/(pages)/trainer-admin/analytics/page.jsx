@@ -117,7 +117,7 @@ function buildFromGroupDetails(gd, now = new Date()) {
       name: m.name && m.name !== "NA" ? m.name : (m.email || "—"),
       email: m.email || "",
       partner_code: m.dietician_id || "",
-      created_at: null, // response carries no admin join date
+      created_at: m.created_at || null, // admin join date (added to group_members by the backend)
     });
 
     // Trainers whose parent admin is this member.
@@ -426,7 +426,9 @@ export default function AnalyticsDashboard() {
       const realClientCount = t.total_clients != null ? t.total_clients : clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc).length;
       // Clients under this trainer who have taken at least one test (backend-authoritative; fall back to deriving from reads).
       const testedClientCount = t.total_tested_clients != null ? t.total_tested_clients : clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc && (c.readingDays || 0) > 0).length;
-      return { ...t, daysSince: ds, readingDays: rd, pct, cohort: getCohort(pct), realClientCount, testedClientCount, hasSelfTest: !!sc, selfProfileId: sc?.profile_id || null };
+      // The trainer's OWN tests — from their self-test client profile (sc). 0 if the backend stripped it (email-matched self-profiles are excluded from the clients array).
+      const selfTests = sc ? (sc.total_tests != null ? sc.total_tests : (readingDatesMap[sc.profile_id] || []).length) : 0;
+      return { ...t, daysSince: ds, readingDays: rd, selfTests, pct, cohort: getCohort(pct), realClientCount, testedClientCount, hasSelfTest: !!sc, selfProfileId: sc?.profile_id || null };
     }).sort((a, b) => b.pct - a.pct || b.realClientCount - a.realClientCount);
 
     const goals = { weight_loss: 0, fat_loss: 0, muscle_gain: 0 };
@@ -541,9 +543,13 @@ export default function AnalyticsDashboard() {
     return s + (readingDatesMap[t.selfProfileId] || []).length;
   }, 0);
   const allTimeClientReads = tabCl.reduce((s, c) => s + (c.readingDays || 0), 0);
-  console.log("allTimeClientReads541:-", allTimeClientReads);
   const allTimeTotalReads = allTimeTrainerReads + allTimeClientReads;
-  console.log("allTimeTotalReads542:-", allTimeTotalReads);
+  // Readings-card split as people counts for the admin's trainer network:
+  // Trainers = number of trainers under the admin (parent_admin_email match, already reflected in tabTr);
+  // Clients  = clients owned by those trainers (owner = trainer, i.e. each trainer's total_clients).
+  const networkTrainerCount = tabTr.length;
+  const networkClientCount = tabTr.reduce((s, t) => s + (t.realClientCount || 0), 0);
+  const networkSplitTotal = networkTrainerCount + networkClientCount;
   const periodTrainerReads = range ? tabTr.reduce((s, t) => {
     if (!t.selfProfileId) return s;
     const dates = readingDatesMap[t.selfProfileId] || [];
@@ -611,7 +617,7 @@ export default function AnalyticsDashboard() {
     { key: "partner_code", label: "Code", val: r => r.partner_code || "—", className: "text-muted font-mono" },
     ...(activeTab === "overview" ? [{ key: "taName", label: "TA", val: r => r.taName || "—", className: "text-secondary" }] : []),
     { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
-    { key: "readingDays", label: "Readings", align: "center", val: r => r.readingDays ?? 0 },
+    { key: "selfTests", label: "Readings", align: "center", val: r => r.selfTests ?? 0 },
     { key: "pct", label: "Rate %", align: "right", render: r => <RateCell pct={r.pct} /> },
   ];
   const clientCols = [
@@ -831,12 +837,12 @@ export default function AnalyticsDashboard() {
                 </div>
               </div>
               <div className="flex flex-col gap-2 pt-3" style={{ borderTop: "1px solid #F1F5F9" }}>
-                {[["Trainers", allTimeTrainerReads, R.blue], ["Clients", allTimeClientReads, R.green]].map(([l, v, c]) => (
+                {[["Trainers", networkTrainerCount, R.blue], ["Clients", networkClientCount, R.green]].map(([l, v, c]) => (
                   <div key={l} className="flex items-center gap-2">
                     <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: c, flexShrink: 0 }} />
                     <span style={{ fontSize: "11px", color: R.ts, flex: 1 }}>{l}</span>
                     <span style={{ fontSize: "12px", fontWeight: 700, color: R.tp }}>{v}</span>
-                    {allTimeTotalReads > 0 && <span style={{ fontSize: "10px", color: R.tm }}>({Math.round((v / allTimeTotalReads) * 100)}%)</span>}
+                    {networkSplitTotal > 0 && <span style={{ fontSize: "10px", color: R.tm }}>({Math.round((v / networkSplitTotal) * 100)}%)</span>}
                   </div>
                 ))}
               </div>
@@ -1021,9 +1027,9 @@ export default function AnalyticsDashboard() {
                 </div>;
                 if (trainerTab === "all") return <AccTable rows={list} cols={[
                   { key: "name", label: "Trainer", val: r => r.name || "—" },
-                  { key: "realClientCount", label: "Clients", align: "center", val: r => r.realClientCount ?? 0, render: r => <span><span style={{ fontWeight: 600, color: (r.testedClientCount ?? 0) > 0 ? R.green : R.tm }}>{r.testedClientCount ?? 0}</span><span style={{ color: R.tm }}>/{r.realClientCount ?? 0}</span></span> },
+                  { key: "realClientCount", label: "Clients", align: "center", val: r => r.realClientCount ?? 0 },
                   { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
-                  { key: "readingDays", label: "Tests", align: "center", val: r => r.readingDays ?? 0 },
+                  { key: "selfTests", label: "Tests", align: "center", val: r => r.selfTests ?? 0 },
                   { key: "pct", label: "Rate", align: "right", render: r => <RateCell pct={r.pct} /> },
                   {
                     key: "status", label: "Status", align: "right", val: r => r.pct >= 100 ? 2 : r.pct >= ACTIVE_THRESHOLD ? 1 : 0, render: r => r.pct >= 100

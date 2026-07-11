@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { searchFoodService } from "../../services/authService";
 
 // Approximate grams (or ml, ~1g/ml) for one of each household unit. Tune these
 // to match your nutrition standards. "piece" has no fixed weight — it falls back
@@ -107,7 +108,7 @@ function buildUnitLabel(qty, unit, grams) {
   return `${fractionLabel(qty)} ${word} (${roundedG} g)`;
 }
 
-export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCancel }) {
+export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCancel, dietType = "", country = "" }) {
   const initialQty = parseFloat(food.portion) || parseFloat(food.base_portion) || 1;
   const initialUnitGrams = food.unit_grams || parseGramsFromLabel(food.portion_with_metric) || 100;
   const initialUnit = parseBaseLabelFromMetric(food.portion_with_metric) || "g";
@@ -349,17 +350,14 @@ export default function FoodEditPanel({ food, onSave, onChange, onRemove, onCanc
     searchAbortRef.current = controller;
     setSearching(true);
     try {
-      const res = await fetch(`/api/food/search?q=${encodeURIComponent(q)}&limit=6`, {
-        signal: controller.signal,
-      });
-      const data = await res.json();
+      const data = await searchFoodService(q, { limit: 6, dietType, country, signal: controller.signal });
       setSearchResults(data.results || []);
     } catch (err) {
       if (err.name !== "AbortError") setSearchResults([]);
     } finally {
       if (!controller.signal.aborted) setSearching(false);
     }
-  }, []);
+  }, [dietType, country]);
 
   const handleFoodNameChange = (e) => {
     const val = e.target.value;

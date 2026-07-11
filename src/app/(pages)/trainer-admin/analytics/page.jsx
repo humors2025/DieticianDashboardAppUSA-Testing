@@ -2,12 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import {
-  fetchTrainerAdminListService,
-  fetchDownstreamUsersService,
-  fetchSuperAdminAllClientsOverviewService,
-  fetchClientProfileDatesList,
-} from "@/services/authService";
+import { useDispatch, useSelector } from "react-redux";
+import { getAdminGroups, selectAdminGroups, selectAdminGroupsRaw, selectPrimaryGroupName } from "@/store/adminGroupsSlice";
+import { getGroupDetails, selectGroupDetails, selectGroupDetailsLoading, selectGroupCounts } from "@/store/groupDetailsSlice";
 
 const TIMEZONES = { "America/Chicago": "Houston, TX", "Asia/Kolkata": "India (IST)" };
 const DEFAULT_TZ = "America/Chicago";
@@ -78,6 +75,102 @@ function periodMetrics(clients, trainers, rdm, range) {
   let reads = 0, readers = 0;
   clients.forEach(c => { const d = rdm[c.profile_id] || []; const n = !range ? d.length : d.filter(x => inRange(x.date, range)).length; reads += n; if (n > 0) readers++; });
   return { newTrainers: nT, newClients: nC, reads, readers, adoption: clients.length > 0 ? Math.round((readers / clients.length) * 100) : 0 };
+}
+
+function pctChange(cur, prev) {
+  if (prev === 0 && cur === 0) return { val: 0, label: "0%" };
+  if (prev === 0) return { val: 100, label: "100%" };
+  const v = Math.round(((cur - prev) / prev) * 100);
+  return { val: v, label: `${Math.abs(v)}%` };
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   REAL DATA ADAPTER — get_group_details.php
+   Maps the GETGROUPDETAILS response into the shape the dashboard renders from:
+     group_members (admins) → Trainer-Admin tabs (taList)
+     trainers               → trainers under their parent admin (trainersMap)
+     clients                → attributed to a TA via owner code (allClients)
+     trainers/clients total_tests → Tests count + reading-rate numerator
+     latest_test.date_time  → anchors the "today / this period" reads
+   The API gives test COUNTS (total_tests) but not per-test DATES, so count- and
+   rate-based metrics are exact while period/"today" reads use the latest test only.
+   ══════════════════════════════════════════════════════════════════════ */
+function buildFromGroupDetails(gd, now = new Date()) {
+  const taList = [];
+  const trainersMap = {};
+  const allClients = [];
+  const readingDatesMap = {};
+
+  const members = Array.isArray(gd?.group_members) ? gd.group_members : [];
+  const trainers = Array.isArray(gd?.trainers) ? gd.trainers : [];
+  const clients = Array.isArray(gd?.clients) ? gd.clients : [];
+
+  // Group members flagged "admin" become the Trainer-Admin tabs. If none are
+  // flagged, treat every member as an admin so the dashboard still populates.
+  const admins = members.filter(m => (m.role || "").toLowerCase() === "admin");
+  const taMembers = admins.length ? admins : members;
+
+  taMembers.forEach(m => {
+    const uid = m.dietician_id || m.email;
+    taList.push({
+      user_id: uid,
+      name: m.name && m.name !== "NA" ? m.name : (m.email || "—"),
+      email: m.email || "",
+      partner_code: m.dietician_id || "",
+      created_at: m.created_at || null, // admin join date (added to group_members by the backend)
+    });
+
+    // Trainers whose parent admin is this member.
+    const myTrainers = trainers
+      .filter(t => (t.parent_admin_email || "").toLowerCase() === (m.email || "").toLowerCase())
+      .map(t => ({
+        user_id: t.partner_code,
+        name: t.name && t.name !== "NA" ? t.name : (t.email || "—"),
+        email: t.email || "",
+        partner_code: t.partner_code || "",
+        dietician_id: t.partner_code || "",
+        created_at: t.created_at || null,
+        total_tests: typeof t.total_tests === "number" ? t.total_tests : null,
+        total_clients: typeof t.total_clients === "number" ? t.total_clients : null,
+        total_tested_clients: typeof t.total_tested_clients === "number" ? t.total_tested_clients : null,
+        is_self: false,
+      }));
+
+    // Self entry for the admin's own code so admin-owned clients are attributed
+    // to this TA without inflating the trainer count (is_self is excluded from
+    // the trainer list). Blank email → no client is mis-detected as a self-test.
+    const selfEntry = {
+      user_id: `self_${uid}`,
+      name: m.name && m.name !== "NA" ? m.name : (m.email || "—"),
+      email: "",
+      partner_code: m.dietician_id || "",
+      dietician_id: m.dietician_id || "",
+      created_at: null,
+      is_self: true,
+    };
+
+    trainersMap[uid] = { trainers: [...myTrainers, selfEntry] };
+  });
+
+  clients.forEach(c => {
+    const pid = c.profile_id;
+    if (!pid) return;
+    allClients.push({
+      profile_id: pid,
+      name: c.profile_name || "—",
+      email: c.email || "",
+      dietitian_id: c.dietician_id || c.owner?.partner_code || "",
+      fitness_goal: c.fitness_goal || "",
+      total_tests: typeof c.total_tests === "number" ? c.total_tests : null,
+      associated_dietitian: { name: c.owner?.name || "—" },
+      client: { joined_dttm: c.joined_dttm || c.created_at || null },
+      test_history: { last_test_date_time: c.latest_test?.date_time || null },
+    });
+    // Per-test dates aren't in the response; the latest test anchors period/"today" reads.
+    readingDatesMap[pid] = c.latest_test?.date_time ? [{ date: c.latest_test.date_time }] : [];
+  });
+
+  return { taList, trainersMap, allClients, readingDatesMap };
 }
 
 const ICO_COLORS = { people: R.blue, person: R.green, "person-add": R.orange, trend: "#7c3aed" };
@@ -175,14 +268,22 @@ function AccTable({ rows, cols }) {
   );
 }
 
-function pctChange(cur, prev) {
-  if (prev === 0 && cur === 0) return { val: 0, label: "0%" };
-  if (prev === 0) return { val: 100, label: "100%" };
-  const v = Math.round(((cur - prev) / prev) * 100);
-  return { val: v, label: `${Math.abs(v)}%` };
-}
-
 export default function AnalyticsDashboard() {
+  const dispatch = useDispatch();
+  // MANAGEADMINGROUPS response — captured at login into Redux (setAdminGroups),
+  // re-fetched here if the in-memory store was reset (e.g. hard refresh).
+  const adminGroups = useSelector(selectAdminGroups);
+  const adminGroupsRaw = useSelector(selectAdminGroupsRaw);
+  // group_name for get_group_details comes from the MANAGEADMINGROUPS response.
+  const primaryGroupName = useSelector(selectPrimaryGroupName);
+  const groupDetails = useSelector(selectGroupDetails);
+  const groupDetailsLoading = useSelector(selectGroupDetailsLoading);
+  // Authoritative group totals { members, trainers, clients } from the response.
+  const groupCounts = useSelector(selectGroupCounts);
+
+  // Entire GETGROUPDETAILS response stored on this page (all client pages merged).
+  const [groupDetailsResponse, setGroupDetailsResponse] = useState(null);
+
   const [taList, setTaList] = useState([]);
   const [trainersMap, setTrainersMap] = useState({});
   const [allClients, setAllClients] = useState([]);
@@ -216,31 +317,75 @@ export default function AnalyticsDashboard() {
   }, []);
 
   const loadData = useCallback(async () => {
-    setLoading(true); setError(null);
+    setError(null);
     try {
-      setLoadingPhase("Fetching Trainer Admins...");
-      const taRes = await fetchTrainerAdminListService();
-      const tas = (taRes?.existing || []).filter(t => EXECUTIVE_TAS.some(n => (t.name || "").toLowerCase().includes(n.toLowerCase())));
-      setTaList(tas);
-      setLoadingPhase("Fetching trainer networks...");
-      const tMap = {};
-      await Promise.all(tas.map(async ta => { try { const r = await fetchDownstreamUsersService(ta.user_id); tMap[ta.user_id] = { trainers: r?.network?.trainers || [] }; } catch { tMap[ta.user_id] = { trainers: [] }; } }));
-      setTrainersMap(tMap);
-      setLoadingPhase("Fetching all clients...");
-      let arr = [], pg = 1, more = true;
-      while (more) { setLoadingPhase(`Fetching clients (page ${pg})...`); const r = await fetchSuperAdminAllClientsOverviewService({ page: pg, limit: 50, type: "all" }); const b = r?.clients || []; arr = arr.concat(b); more = r?.pagination?.has_more === true && b.length > 0; pg++; if (pg > 20) break; }
-      setAllClients(arr);
-      setLoadingPhase("Fetching reading history...");
-      const dm = {};
-      const batches = []; for (let i = 0; i < arr.length; i += 5) batches.push(arr.slice(i, i + 5));
-      let f = 0;
-      for (const batch of batches) { await Promise.all(batch.map(async c => { if (!c.profile_id) return; try { const r = await fetchClientProfileDatesList(c.profile_id, c.dietitian_id || ""); dm[c.profile_id] = r?.data?.dates || []; } catch { dm[c.profile_id] = []; } })); f += batch.length; setLoadingPhase(`Reading history (${f}/${arr.length})...`); }
-      setReadingDatesMap(dm);
-    } catch (e) { setError(e?.message || "Failed to load"); toast.error(e?.message || "Failed"); }
-    finally { setLoading(false); }
-  }, []);
+      const now = new Date();
+      let source;
+      if (groupDetails) {
+        // Real data from get_group_details.php.
+        source = buildFromGroupDetails(groupDetails, now);
+      } else if (primaryGroupName) {
+        // We know which group to load but its details haven't arrived yet —
+        // keep the loader up; this effect re-runs once groupDetails lands.
+        setLoading(true);
+        return;
+      } else {
+        // No admin group in context — nothing to show.
+        source = { taList: [], trainersMap: {}, allClients: [], readingDatesMap: {} };
+      }
+      setTaList(source.taList);
+      setTrainersMap(source.trainersMap);
+      setAllClients(source.allClients);
+      setReadingDatesMap(source.readingDatesMap);
+      setLoading(false);
+    } catch (e) {
+      setError(e?.message || "Failed to load");
+      toast.error(e?.message || "Failed");
+      setLoading(false);
+    }
+  }, [groupDetails, primaryGroupName]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // If the MANAGEADMINGROUPS payload wasn't handed off from login (e.g. the user
+  // hard-refreshed this page and the in-memory Redux store reset), re-fetch it.
+  useEffect(() => {
+    if (!adminGroupsRaw) dispatch(getAdminGroups());
+  }, [adminGroupsRaw, dispatch]);
+
+  // The stored MANAGEADMINGROUPS response is now available to this dashboard via
+  // `adminGroups` (response.groups) and `adminGroupsRaw` (full payload).
+  useEffect(() => {
+    if (adminGroupsRaw) console.log("Admin groups (from Redux):", adminGroupsRaw);
+  }, [adminGroupsRaw]);
+
+  // Once we know the group name (from Redux), pull that group's details. Use a
+  // high limit so every client loads in one shot — the dashboard's totals are
+  // derived from the loaded set, so partial pages would under-count.
+  useEffect(() => {
+    if (primaryGroupName) {
+      dispatch(getGroupDetails({ groupName: primaryGroupName, page: 1, limit: 50, search: "", fetchAll: true }));
+    }
+  }, [primaryGroupName, dispatch]);
+
+  // Refresh button: re-fetch the group from the API when we have a group name,
+  // otherwise just rebuild from whatever is in state.
+  const handleRefresh = useCallback(() => {
+    if (primaryGroupName) {
+      dispatch(getGroupDetails({ groupName: primaryGroupName, page: 1, limit: 50, search: "", fetchAll: true }));
+    } else {
+      loadData();
+    }
+  }, [primaryGroupName, dispatch, loadData]);
+
+  useEffect(() => {
+    if (groupDetails) {
+      // Store the entire GETGROUPDETAILS response in a page-level variable.
+      setGroupDetailsResponse(groupDetails);
+      console.log("GETGROUPDETAILS response:", groupDetails);
+    }
+  }, [groupDetails]);
+
   const now = tzNow(timezone);
 
   const computeTa = useCallback((ta) => {
@@ -254,7 +399,8 @@ export default function AnalyticsDashboard() {
 
     const enrich = c => {
       const dates = readingDatesMap[c.profile_id] || [];
-      const rd = dates.length;
+      // Prefer the API's authoritative test count; fall back to reading dates (mock).
+      const rd = c.total_tests != null ? c.total_tests : dates.length;
       const sorted = dates.map(d => d.date).filter(Boolean).sort();
       const last = sorted.length ? sorted[sorted.length - 1] : null;
       const onb = c.client?.joined_dttm || (sorted.length ? sorted[0] : null);
@@ -274,9 +420,15 @@ export default function AnalyticsDashboard() {
       const allDates = sc ? (readingDatesMap[sc.profile_id] || []) : [];
       const ds = t.created_at ? daysBetween(t.created_at, now) : 0;
       const dates = t.created_at ? allDates.filter(d => !d.date || new Date(d.date) >= new Date(new Date(t.created_at).getFullYear(), new Date(t.created_at).getMonth(), new Date(t.created_at).getDate())) : allDates;
-      const rd = dates.length;
+      // Prefer the API's authoritative counts; fall back to derived values (mock).
+      const rd = t.total_tests != null ? t.total_tests : dates.length;
       const pct = ds > 0 ? Math.min(100, Math.round((rd / ds) * 100)) : 0;
-      return { ...t, daysSince: ds, readingDays: rd, pct, cohort: getCohort(pct), realClientCount: clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc).length, hasSelfTest: !!sc, selfProfileId: sc?.profile_id || null };
+      const realClientCount = t.total_clients != null ? t.total_clients : clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc).length;
+      // Clients under this trainer who have taken at least one test (backend-authoritative; fall back to deriving from reads).
+      const testedClientCount = t.total_tested_clients != null ? t.total_tested_clients : clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc && (c.readingDays || 0) > 0).length;
+      // The trainer's OWN tests — from their self-test client profile (sc). 0 if the backend stripped it (email-matched self-profiles are excluded from the clients array).
+      const selfTests = sc ? (sc.total_tests != null ? sc.total_tests : (readingDatesMap[sc.profile_id] || []).length) : 0;
+      return { ...t, daysSince: ds, readingDays: rd, selfTests, pct, cohort: getCohort(pct), realClientCount, testedClientCount, hasSelfTest: !!sc, selfProfileId: sc?.profile_id || null };
     }).sort((a, b) => b.pct - a.pct || b.realClientCount - a.realClientCount);
 
     const goals = { weight_loss: 0, fat_loss: 0, muscle_gain: 0 };
@@ -312,13 +464,15 @@ export default function AnalyticsDashboard() {
   if (error) return (
     <div className="flex flex-col items-center justify-center gap-3" style={{ height: "calc(100vh - 130px)" }}>
       <div className="max-w-md text-center" style={{ background: "#fef2f2", border: `1px solid ${R.red}30`, color: R.red, borderRadius: R.rCard, padding: "16px", fontSize: "13px", letterSpacing: "-0.26px" }}>{error}</div>
-      <button onClick={loadData} className="cursor-pointer" style={{ borderRadius: R.rPill, background: R.blueLight, color: R.blue, fontSize: "12px", fontWeight: 600, padding: "8px 20px", letterSpacing: "-0.24px", border: "none" }}>Retry</button>
+      <button onClick={handleRefresh} className="cursor-pointer" style={{ borderRadius: R.rPill, background: R.blueLight, color: R.blue, fontSize: "12px", fontWeight: 600, padding: "8px 20px", letterSpacing: "-0.24px", border: "none" }}>Retry</button>
     </div>
   );
 
-  const tTotal = activeTab === "overview" ? totals.trainers : (selData?.totalTrainers ?? 0);
+  // Overview Trainers/Clients totals come from the authoritative `counts` in the
+  // GETGROUPDETAILS response, falling back to the derived totals (demo/mock).
+  const tTotal = activeTab === "overview" ? (groupCounts?.trainers ?? totals.trainers) : (selData?.totalTrainers ?? 0);
   const tActive = activeTab === "overview" ? totals.activeT : (selData?.activeTrainers ?? 0);
-  const cTotal = activeTab === "overview" ? totals.clients : (selData?.totalClients ?? 0);
+  const cTotal = activeTab === "overview" ? (groupCounts?.clients ?? totals.clients) : (selData?.totalClients ?? 0);
   const cActive = activeTab === "overview" ? totals.activeC : (selData?.activeClients ?? 0);
   const curGoals = activeTab === "overview" ? totals.goals : (selData?.goals || { fat_loss: 0, muscle_gain: 0, weight_loss: 0 });
 
@@ -390,6 +544,12 @@ export default function AnalyticsDashboard() {
   }, 0);
   const allTimeClientReads = tabCl.reduce((s, c) => s + (c.readingDays || 0), 0);
   const allTimeTotalReads = allTimeTrainerReads + allTimeClientReads;
+  // Readings-card split as people counts for the admin's trainer network:
+  // Trainers = number of trainers under the admin (parent_admin_email match, already reflected in tabTr);
+  // Clients  = clients owned by those trainers (owner = trainer, i.e. each trainer's total_clients).
+  const networkTrainerCount = tabTr.length;
+  const networkClientCount = tabTr.reduce((s, t) => s + (t.realClientCount || 0), 0);
+  const networkSplitTotal = networkTrainerCount + networkClientCount;
   const periodTrainerReads = range ? tabTr.reduce((s, t) => {
     if (!t.selfProfileId) return s;
     const dates = readingDatesMap[t.selfProfileId] || [];
@@ -457,7 +617,7 @@ export default function AnalyticsDashboard() {
     { key: "partner_code", label: "Code", val: r => r.partner_code || "—", className: "text-muted font-mono" },
     ...(activeTab === "overview" ? [{ key: "taName", label: "TA", val: r => r.taName || "—", className: "text-secondary" }] : []),
     { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
-    { key: "readingDays", label: "Readings", align: "center", val: r => r.readingDays ?? 0 },
+    { key: "selfTests", label: "Readings", align: "center", val: r => r.selfTests ?? 0 },
     { key: "pct", label: "Rate %", align: "right", render: r => <RateCell pct={r.pct} /> },
   ];
   const clientCols = [
@@ -537,7 +697,7 @@ export default function AnalyticsDashboard() {
         {/* ── Right: Controls ── */}
         <div className="flex items-center gap-3">
           {/* Refresh */}
-          <button onClick={loadData} className="flex items-center justify-center cursor-pointer transition-all duration-200"
+          <button onClick={handleRefresh} className="flex items-center justify-center cursor-pointer transition-all duration-200"
             style={{ width: 36, height: 36, borderRadius: "10px", backgroundColor: "#ffffff", border: "1px solid #EEF2F6", color: R.tm }}
             onMouseEnter={e => { e.currentTarget.style.backgroundColor = R.blueLight; e.currentTarget.style.color = R.blue; e.currentTarget.style.borderColor = R.blue + "40"; }}
             onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#ffffff"; e.currentTarget.style.color = R.tm; e.currentTarget.style.borderColor = "#EEF2F6"; }}>
@@ -677,12 +837,12 @@ export default function AnalyticsDashboard() {
                 </div>
               </div>
               <div className="flex flex-col gap-2 pt-3" style={{ borderTop: "1px solid #F1F5F9" }}>
-                {[["Trainers", allTimeTrainerReads, R.blue], ["Clients", allTimeClientReads, R.green]].map(([l, v, c]) => (
+                {[["Trainers", networkTrainerCount, R.blue], ["Clients", networkClientCount, R.green]].map(([l, v, c]) => (
                   <div key={l} className="flex items-center gap-2">
                     <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: c, flexShrink: 0 }} />
                     <span style={{ fontSize: "11px", color: R.ts, flex: 1 }}>{l}</span>
                     <span style={{ fontSize: "12px", fontWeight: 700, color: R.tp }}>{v}</span>
-                    {allTimeTotalReads > 0 && <span style={{ fontSize: "10px", color: R.tm }}>({Math.round((v / allTimeTotalReads) * 100)}%)</span>}
+                    {networkSplitTotal > 0 && <span style={{ fontSize: "10px", color: R.tm }}>({Math.round((v / networkSplitTotal) * 100)}%)</span>}
                   </div>
                 ))}
               </div>
@@ -869,7 +1029,7 @@ export default function AnalyticsDashboard() {
                   { key: "name", label: "Trainer", val: r => r.name || "—" },
                   { key: "realClientCount", label: "Clients", align: "center", val: r => r.realClientCount ?? 0 },
                   { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
-                  { key: "readingDays", label: "Tests", align: "center", val: r => r.readingDays ?? 0 },
+                  { key: "selfTests", label: "Tests", align: "center", val: r => r.selfTests ?? 0 },
                   { key: "pct", label: "Rate", align: "right", render: r => <RateCell pct={r.pct} /> },
                   {
                     key: "status", label: "Status", align: "right", val: r => r.pct >= 100 ? 2 : r.pct >= ACTIVE_THRESHOLD ? 1 : 0, render: r => r.pct >= 100

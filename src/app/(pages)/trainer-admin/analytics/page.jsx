@@ -132,6 +132,7 @@ function buildFromGroupDetails(gd, now = new Date()) {
         created_at: t.created_at || null,
         total_tests: typeof t.total_tests === "number" ? t.total_tests : null,
         total_clients: typeof t.total_clients === "number" ? t.total_clients : null,
+        total_tested_clients: typeof t.total_tested_clients === "number" ? t.total_tested_clients : null,
         is_self: false,
       }));
 
@@ -423,7 +424,9 @@ export default function AnalyticsDashboard() {
       const rd = t.total_tests != null ? t.total_tests : dates.length;
       const pct = ds > 0 ? Math.min(100, Math.round((rd / ds) * 100)) : 0;
       const realClientCount = t.total_clients != null ? t.total_clients : clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc).length;
-      return { ...t, daysSince: ds, readingDays: rd, pct, cohort: getCohort(pct), realClientCount, hasSelfTest: !!sc, selfProfileId: sc?.profile_id || null };
+      // Clients under this trainer who have taken at least one test (backend-authoritative; fall back to deriving from reads).
+      const testedClientCount = t.total_tested_clients != null ? t.total_tested_clients : clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc && (c.readingDays || 0) > 0).length;
+      return { ...t, daysSince: ds, readingDays: rd, pct, cohort: getCohort(pct), realClientCount, testedClientCount, hasSelfTest: !!sc, selfProfileId: sc?.profile_id || null };
     }).sort((a, b) => b.pct - a.pct || b.realClientCount - a.realClientCount);
 
     const goals = { weight_loss: 0, fat_loss: 0, muscle_gain: 0 };
@@ -538,7 +541,9 @@ export default function AnalyticsDashboard() {
     return s + (readingDatesMap[t.selfProfileId] || []).length;
   }, 0);
   const allTimeClientReads = tabCl.reduce((s, c) => s + (c.readingDays || 0), 0);
+  console.log("allTimeClientReads541:-", allTimeClientReads);
   const allTimeTotalReads = allTimeTrainerReads + allTimeClientReads;
+  console.log("allTimeTotalReads542:-", allTimeTotalReads);
   const periodTrainerReads = range ? tabTr.reduce((s, t) => {
     if (!t.selfProfileId) return s;
     const dates = readingDatesMap[t.selfProfileId] || [];
@@ -1016,7 +1021,7 @@ export default function AnalyticsDashboard() {
                 </div>;
                 if (trainerTab === "all") return <AccTable rows={list} cols={[
                   { key: "name", label: "Trainer", val: r => r.name || "—" },
-                  { key: "realClientCount", label: "Clients", align: "center", val: r => r.realClientCount ?? 0 },
+                  { key: "realClientCount", label: "Clients", align: "center", val: r => r.realClientCount ?? 0, render: r => <span><span style={{ fontWeight: 600, color: (r.testedClientCount ?? 0) > 0 ? R.green : R.tm }}>{r.testedClientCount ?? 0}</span><span style={{ color: R.tm }}>/{r.realClientCount ?? 0}</span></span> },
                   { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
                   { key: "readingDays", label: "Tests", align: "center", val: r => r.readingDays ?? 0 },
                   { key: "pct", label: "Rate", align: "right", render: r => <RateCell pct={r.pct} /> },

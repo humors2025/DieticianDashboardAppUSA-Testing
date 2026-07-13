@@ -9,7 +9,6 @@ import TestAnalysis from "./test-analysis";
 import DietAnalysis from "./diet-analysis";
 import MacrosAnalysis from "./macros-analysis";
 import HabitsAnalysis from "./habits-analysis";
-import WeightTrackingTab from "./weight-tracking-tab";
 // import TrainerDirection from "./trainer-direction";
 import TrainerDirection from "./training-direction/TrainerDirection";
 import RightSidebar from "./rightSidebar";
@@ -741,21 +740,6 @@ const transformDatesToDisplay = () => {
                 /> */}
               </div>
 
-              {/* <div
-                onClick={() => handleTabChange("weight")}
-                className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${activeTab === "weight"
-                  ? "bg-[#252525] cursor-pointer hover:bg-[#3a3a3a]"
-                  : "bg-[#F5F7FA] cursor-pointer hover:bg-[#e8eaed]"
-                  }`}
-              >
-                <p
-                  className={`text-[12px] font-semibold leading-[110%] tracking-[-0.24px] ${activeTab === "weight" ? "text-white" : "text-[#535359]"
-                    }`}
-                >
-                  Weight Tracking
-                </p>
-              </div> */}
-
              {/* <div
   onClick={() => handleTabChange("trainer")}
   className={`flex items-center gap-2.5 rounded-[6px] py-[11px] px-[31px] transition-all duration-200 ${
@@ -789,7 +773,7 @@ const transformDatesToDisplay = () => {
             </div>
           </div>
 
-          {activeTab === "habits" || activeTab === "weight" ? (
+          {activeTab === "habits" ? (
             <div className="border-b border-[#E1E6ED]"></div>
           ) : (
             <div className="flex items-center gap-[26px] border-t border-b border-[#E1E6ED] pl-[38px] py-[5px]">
@@ -955,13 +939,6 @@ const transformDatesToDisplay = () => {
           >
 
             <HabitsAnalysis />
-          </div>
-
-          <div
-            className={`scroll-target ${activeTab === "weight" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
-              }`}
-          >
-            <WeightTrackingTab profileData={individualProfileData?.data} />
           </div>
 
            <div

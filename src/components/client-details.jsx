@@ -961,7 +961,11 @@ const transformDatesToDisplay = () => {
             className={`scroll-target ${activeTab === "weight" ? "flex-1 overflow-y-auto scroll-hide" : "hidden"
               }`}
           >
-            <WeightTrackingTab profileData={individualProfileData?.data} />
+            <WeightTrackingTab
+              profileData={individualProfileData?.data}
+              profileId={profileId}
+              isActive={activeTab === "weight"}
+            />
           </div>
 
            <div

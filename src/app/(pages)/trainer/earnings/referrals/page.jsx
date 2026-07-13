@@ -459,6 +459,9 @@ function InviteForm({ partnerCode, onInviteSent }) {
             placeholder="jane@example.com"
             inputMode="email"
           />
+          <span className="text-[#A1A1A1] text-[11px] font-bold">
+            Use the same email as your trainer invite to onboard and get free app access.
+          </span>
         </div>
       </div>
 
@@ -493,9 +496,6 @@ function InviteForm({ partnerCode, onInviteSent }) {
         >
           {submitting ? "Sending..." : "Send invite"}
         </button>
-        <span className="text-[#A1A1A1] text-[11px]">
-          Client will receive a code for the {PLANS.find((p) => p.id === selectedPlan)?.label}.
-        </span>
       </div>
     </form>
   );

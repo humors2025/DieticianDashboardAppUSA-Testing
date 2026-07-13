@@ -921,7 +921,7 @@ export default function AnalyticsDashboard() {
                 <div style={{ width: `${engagementRate}%`, height: "100%", borderRadius: "2px", background: `linear-gradient(90deg, ${R.green}, #10B981)`, transition: "width 0.6s ease" }} />
               </div>
               <div className="flex items-center justify-between mt-1.5">
-                <span style={{ fontSize: "10px", color: R.tm }}>Engagement</span>
+                <span style={{ fontSize: "10px", color: R.tm }}>Engagements</span>
                 <span style={{ fontSize: "11px", fontWeight: 700, color: R.tp }}>{engagementRate}%</span>
               </div>
             </div>

@@ -110,6 +110,11 @@ function buildFromGroupDetails(gd, now = new Date()) {
   const admins = members.filter(m => (m.role || "").toLowerCase() === "admin");
   const taMembers = admins.length ? admins : members;
 
+  // Group members (admins) are NEVER clients. Any client profile whose email
+  // matches a group member's email is the admin themselves, not a real client,
+  // and must be excluded from all client lists/counts.
+  const memberEmails = new Set(members.map(m => (m.email || "").toLowerCase().trim()).filter(Boolean));
+
   taMembers.forEach(m => {
     const uid = m.dietician_id || m.email;
     taList.push({
@@ -152,9 +157,13 @@ function buildFromGroupDetails(gd, now = new Date()) {
     trainersMap[uid] = { trainers: [...myTrainers, selfEntry] };
   });
 
+  let excludedAdminCount = 0;
   clients.forEach(c => {
     const pid = c.profile_id;
     if (!pid) return;
+    // Skip admins — a client profile that matches a group member's email is the
+    // admin, not a client.
+    if (memberEmails.has((c.email || "").toLowerCase().trim())) { excludedAdminCount++; return; }
     allClients.push({
       profile_id: pid,
       name: c.profile_name || "—",
@@ -170,7 +179,7 @@ function buildFromGroupDetails(gd, now = new Date()) {
     readingDatesMap[pid] = c.latest_test?.date_time ? [{ date: c.latest_test.date_time }] : [];
   });
 
-  return { taList, trainersMap, allClients, readingDatesMap };
+  return { taList, trainersMap, allClients, readingDatesMap, excludedAdminCount };
 }
 
 const ICO_COLORS = { people: R.blue, person: R.green, "person-add": R.orange, trend: "#7c3aed" };
@@ -288,6 +297,9 @@ export default function AnalyticsDashboard() {
   const [trainersMap, setTrainersMap] = useState({});
   const [allClients, setAllClients] = useState([]);
   const [readingDatesMap, setReadingDatesMap] = useState({});
+  // Clients dropped because their email matched a group member (admin). Subtracted
+  // from the backend's authoritative client count so admins are never counted.
+  const [excludedAdminCount, setExcludedAdminCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingPhase, setLoadingPhase] = useState("Connecting...");
   const [error, setError] = useState(null);
@@ -331,12 +343,13 @@ export default function AnalyticsDashboard() {
         return;
       } else {
         // No admin group in context — nothing to show.
-        source = { taList: [], trainersMap: {}, allClients: [], readingDatesMap: {} };
+        source = { taList: [], trainersMap: {}, allClients: [], readingDatesMap: {}, excludedAdminCount: 0 };
       }
       setTaList(source.taList);
       setTrainersMap(source.trainersMap);
       setAllClients(source.allClients);
       setReadingDatesMap(source.readingDatesMap);
+      setExcludedAdminCount(source.excludedAdminCount || 0);
       setLoading(false);
     } catch (e) {
       setError(e?.message || "Failed to load");
@@ -394,7 +407,11 @@ export default function AnalyticsDashboard() {
     const nonSelf = all.filter(t => !t.is_self);
     const codes = new Set(all.map(t => (t.partner_code || t.dietician_id || "").toUpperCase()));
     const taCl = allClients.filter(c => codes.has((c.dietitian_id || c.partner_code || "").toUpperCase()));
-    const real = taCl.filter(c => !isSelfTest(c, all));
+    // Show ALL clients owned by this TA's codes — including profiles whose
+    // email/name matches a trainer (previously hidden as "self-tests").
+    const real = taCl;
+    // Still identify self-test profiles so each trainer's own test activity /
+    // adoption is computed from their self-profile below.
     const selfT = taCl.filter(c => isSelfTest(c, all));
 
     const enrich = c => {
@@ -472,7 +489,8 @@ export default function AnalyticsDashboard() {
   // GETGROUPDETAILS response, falling back to the derived totals (demo/mock).
   const tTotal = activeTab === "overview" ? (groupCounts?.trainers ?? totals.trainers) : (selData?.totalTrainers ?? 0);
   const tActive = activeTab === "overview" ? totals.activeT : (selData?.activeTrainers ?? 0);
-  const cTotal = activeTab === "overview" ? (groupCounts?.clients ?? totals.clients) : (selData?.totalClients ?? 0);
+  // Subtract admin profiles that the backend counted as clients (0 if it already excluded them).
+  const cTotal = activeTab === "overview" ? Math.max(0, (groupCounts?.clients ?? totals.clients) - excludedAdminCount) : (selData?.totalClients ?? 0);
   const cActive = activeTab === "overview" ? totals.activeC : (selData?.activeClients ?? 0);
   const curGoals = activeTab === "overview" ? totals.goals : (selData?.goals || { fat_loss: 0, muscle_gain: 0, weight_loss: 0 });
 
@@ -538,32 +556,28 @@ export default function AnalyticsDashboard() {
     return weeks;
   })();
 
-  const allTimeTrainerReads = tabTr.reduce((s, t) => {
-    if (!t.selfProfileId) return s;
-    return s + (readingDatesMap[t.selfProfileId] || []).length;
-  }, 0);
+  // All readings live on client profiles now (trainer self-test profiles are
+  // shown as clients too). Partition the client reads by whether the profile is
+  // a trainer's own self-test, so the Trainers/Clients split stays meaningful
+  // WITHOUT double-counting: Total == sum of client tests.
+  const selfPidSet = new Set(tabTr.map(t => t.selfProfileId).filter(Boolean));
   const allTimeClientReads = tabCl.reduce((s, c) => s + (c.readingDays || 0), 0);
-  const allTimeTotalReads = allTimeTrainerReads + allTimeClientReads;
+  const allTimeTrainerReads = tabCl.reduce((s, c) => selfPidSet.has(c.profile_id) ? s + (c.readingDays || 0) : s, 0);
+  const allTimeTotalReads = allTimeClientReads;
   // Readings-card split as people counts for the admin's trainer network:
   // Trainers = number of trainers under the admin (parent_admin_email match, already reflected in tabTr);
   // Clients  = clients owned by those trainers (owner = trainer, i.e. each trainer's total_clients).
   const networkTrainerCount = tabTr.length;
   const networkClientCount = tabTr.reduce((s, t) => s + (t.realClientCount || 0), 0);
   const networkSplitTotal = networkTrainerCount + networkClientCount;
-  const periodTrainerReads = range ? tabTr.reduce((s, t) => {
-    if (!t.selfProfileId) return s;
-    const dates = readingDatesMap[t.selfProfileId] || [];
-    return s + dates.filter(x => inRange(x.date, range)).length;
-  }, 0) : allTimeTrainerReads;
-  const periodClientReads = pm.reads;
-  const periodTotalReads = periodTrainerReads + periodClientReads;
-  const prevTrainerReads = prevR ? tabTr.reduce((s, t) => {
-    if (!t.selfProfileId) return s;
-    const dates = readingDatesMap[t.selfProfileId] || [];
-    return s + dates.filter(x => inRange(x.date, prevR)).length;
-  }, 0) : 0;
-  const prevClientReads = ppm ? ppm.reads : 0;
-  const prevTotalReads = prevTrainerReads + prevClientReads;
+  // Same partition for the selected period: total is the client reads in range;
+  // the trainer slice is the self-test subset of those, never an added bucket.
+  const periodTotalReads = pm.reads;
+  const periodTrainerReads = range
+    ? tabCl.reduce((s, c) => selfPidSet.has(c.profile_id) ? s + (readingDatesMap[c.profile_id] || []).filter(x => inRange(x.date, range)).length : s, 0)
+    : allTimeTrainerReads;
+  const periodClientReads = Math.max(0, periodTotalReads - periodTrainerReads);
+  const prevTotalReads = ppm ? ppm.reads : 0;
   const periodLabel = period === "today" ? `TODAY (${fmtDate(range?.start).toUpperCase()})`
     : period === "week" ? `THIS WEEK (${fmtRange(range).toUpperCase()})`
       : period === "month" ? `THIS MONTH (${fmtRange(range).toUpperCase()})`
@@ -617,7 +631,7 @@ export default function AnalyticsDashboard() {
     { key: "partner_code", label: "Code", val: r => r.partner_code || "—", className: "text-muted font-mono" },
     ...(activeTab === "overview" ? [{ key: "taName", label: "TA", val: r => r.taName || "—", className: "text-secondary" }] : []),
     { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
-    { key: "selfTests", label: "Readings", align: "center", val: r => r.selfTests ?? 0 },
+    { key: "readingDays", label: "Readings", align: "center", val: r => r.readingDays ?? 0 },
     { key: "pct", label: "Rate %", align: "right", render: r => <RateCell pct={r.pct} /> },
   ];
   const clientCols = [
@@ -1029,7 +1043,7 @@ export default function AnalyticsDashboard() {
                   { key: "name", label: "Trainer", val: r => r.name || "—" },
                   { key: "realClientCount", label: "Clients", align: "center", val: r => r.realClientCount ?? 0 },
                   { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
-                  { key: "selfTests", label: "Tests", align: "center", val: r => r.selfTests ?? 0 },
+                  { key: "readingDays", label: "Tests", align: "center", val: r => r.readingDays ?? 0 },
                   { key: "pct", label: "Rate", align: "right", render: r => <RateCell pct={r.pct} /> },
                   {
                     key: "status", label: "Status", align: "right", val: r => r.pct >= 100 ? 2 : r.pct >= ACTIVE_THRESHOLD ? 1 : 0, render: r => r.pct >= 100
@@ -1092,6 +1106,7 @@ export default function AnalyticsDashboard() {
             <div className="mt-3 pt-3" style={{ borderTop: "1px solid #EEF2F6", height: "200px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
               <AccTable rows={tabCl} cols={[
                 { key: "name", label: "Client", val: r => r.name || "—" },
+                { key: "profile_id", label: "Profile ID", val: r => r.profile_id || "—", className: "text-muted font-mono" },
                 { key: "fitness_goal", label: "Goal", val: r => goalLabel(r.fitness_goal), render: r => <span style={{ fontSize: "11px", fontWeight: 500, padding: "3px 10px", borderRadius: R.rPill, color: goalColor(r.fitness_goal), backgroundColor: goalColor(r.fitness_goal) + "15", letterSpacing: "-0.22px" }}>{goalLabel(r.fitness_goal)}</span> },
                 { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
                 { key: "readingDays", label: "Tests", align: "center", val: r => r.readingDays ?? 0 },
@@ -1191,7 +1206,7 @@ export default function AnalyticsDashboard() {
         {/* ═══ FOOTER ═══ */}
         <div className="flex items-start gap-2.5" style={{ fontSize: "11px", color: R.tm, letterSpacing: "-0.22px", padding: "10px 14px", backgroundColor: "#F8FAFC", borderRadius: "10px", border: "1px solid #EEF2F6" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={R.blue} strokeWidth="2" className="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-          <span><strong style={{ color: R.ts }}>Active</strong> = Reading rate {"≥"} {ACTIVE_THRESHOLD}% {"·"} <strong style={{ color: R.ts }}>Reading Rate</strong> = Reading days / Days since onboarded {"·"} Self-test by trainers are excluded from client counts but included in trainer adoption.</span>
+          <span><strong style={{ color: R.ts }}>Active</strong> = Reading rate {"≥"} {ACTIVE_THRESHOLD}% {"·"} <strong style={{ color: R.ts }}>Reading Rate</strong> = Reading days / Days since onboarded {"·"} All clients are counted, including trainer self-test profiles, which also feed trainer adoption.</span>
         </div>
       </div>
     </div>
@@ -2249,7 +2264,7 @@ export default function AnalyticsDashboard() {
 //         {/* ═══ FOOTER ═══ */}
 //         <div className="flex items-start gap-2.5" style={{ fontSize: "11px", color: R.tm, letterSpacing: "-0.22px", padding: "10px 14px", backgroundColor: "#F8FAFC", borderRadius: "10px", border: "1px solid #EEF2F6" }}>
 //           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={R.blue} strokeWidth="2" className="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-//           <span><strong style={{ color: R.ts }}>Active</strong> = Reading rate {"≥"} {ACTIVE_THRESHOLD}% {"·"} <strong style={{ color: R.ts }}>Reading Rate</strong> = Reading days / Days since onboarded {"·"} Self-test by trainers are excluded from client counts but included in trainer adoption.</span>
+//           <span><strong style={{ color: R.ts }}>Active</strong> = Reading rate {"≥"} {ACTIVE_THRESHOLD}% {"·"} <strong style={{ color: R.ts }}>Reading Rate</strong> = Reading days / Days since onboarded {"·"} All clients are counted, including trainer self-test profiles, which also feed trainer adoption.</span>
 //         </div>
 //       </div>
 //     </div>

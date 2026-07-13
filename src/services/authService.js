@@ -1568,6 +1568,47 @@ export const extendClientFreeTrialService = async ({ profileId, reason }) => {
 
 
 
+function getDietitianIdFromAccessToken() {
+  const decoded = decodeAccessTokenFromCookie();
+  return (
+    decoded?.dietician_id ??
+    decoded?.partner_code ??
+    decoded?.sub ??
+    null
+  );
+}
+
+
+export const fetchWeightTracking = async (profileId) => {
+  const accessToken = Cookies.get("access_token");
+
+  if (!accessToken) {
+    throw new Error("Access token missing. Please login again.");
+  }
+
+  const actorUserId = getActorUserIdFromAccessToken();
+  const dietitianId = getDietitianIdFromAccessToken();
+
+  if (!actorUserId || !dietitianId) {
+    throw new Error("Session expired. Please login again.");
+  }
+
+  return apiFetcher(API_ENDPOINTS.WEIGHTTRACKING.GETWEIGHTLOGS, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      profile_id: profileId,
+      dietician_id: dietitianId,
+      actor_user_id: actorUserId,
+    }),
+  });
+};
+
+
+
 // // services/authService.js
 
 // import { apiFetcher } from "../config/fetcher";

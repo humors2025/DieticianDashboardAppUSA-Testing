@@ -26,8 +26,8 @@ const RANGES = ["1W", "1M", "3M", "All"];
 const RANGE_DAYS = { "1W": 7, "1M": 30, "3M": 90, All: Infinity };
 
 // Target BMI used to derive a goal weight from the client's height.
-// 22 is the midpoint of the healthy BMI range (18.5–24.9).
-const TARGET_BMI = 22;
+// 21.5 sits in the healthy BMI range (18.5–24.9).
+const TARGET_BMI = 21.5;
 
 // goal weight (kg) = target BMI × height(m)², rounded to 1 decimal.
 const goalWeightFromHeight = (heightCm) => {
@@ -72,6 +72,8 @@ const normaliseLogs = (rawLogs) => {
 
 export default function WeightTrackingTab({ profileData, profileId, isActive }) {
   const [range, setRange] = useState("1M");
+  // Which tile's "how is this calculated" panel is open: "goal" | "progress" | null
+  const [infoSection, setInfoSection] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -140,11 +142,20 @@ export default function WeightTrackingTab({ profileData, profileId, isActive }) 
       ? Number(profileData.goal_weight)
       : goalWeightFromHeight(heightCm);
 
-  const totalLoss = currentWeight != null && startingWeight != null ? startingWeight - currentWeight : 0;
-  const totalGoal = goalWeight != null && startingWeight != null ? startingWeight - goalWeight : 0;
-  const progress = totalGoal > 0 ? Math.max(0, Math.min(100, Math.round((totalLoss / totalGoal) * 100))) : 0;
-  const remaining =
-    currentWeight != null && goalWeight != null ? (currentWeight - goalWeight).toFixed(1) : null;
+  // Overall progress toward the ideal (goal) weight = the fraction of the
+  // original gap that has been closed, measured from where the client is NOW.
+  // Works for both directions (loss and gain). Overshooting the goal reopens
+  // the gap (currentGap grows again), so progress falls back down instead of
+  // staying pinned at 100% — the client still has to move back toward ideal.
+  const totalGap =
+    goalWeight != null && startingWeight != null ? Math.abs(startingWeight - goalWeight) : 0;
+  const currentGap =
+    goalWeight != null && currentWeight != null ? Math.abs(currentWeight - goalWeight) : 0;
+  const progress =
+    totalGap > 0 ? Math.max(0, Math.min(100, Math.round((1 - currentGap / totalGap) * 100))) : 0;
+  // Reached once the client is essentially at the ideal weight (within 0.5 kg).
+  const reachedGoal = goalWeight != null && currentWeight != null && currentGap <= 0.5;
+  const remaining = currentWeight != null && goalWeight != null ? currentGap.toFixed(1) : null;
   // Most recent change between the last two weigh-ins.
   const weeklyChange = hasData ? logs[logs.length - 1].delta : 0;
 
@@ -289,23 +300,29 @@ export default function WeightTrackingTab({ profileData, profileId, isActive }) 
       highlight: true,
     },
     {
-      label: "Starting",
+      label: "Starting Weight",
       value: startingWeight != null ? startingWeight.toFixed(1) : "—",
       unit: "kg",
       sub: <p className="text-[#A1A1A1] text-[10px] font-semibold tracking-[-0.2px] mt-2">{startingDateLabel}</p>,
     },
     {
       label: "Goal",
+      info: "goal",
       value: goalWeight != null ? goalWeight.toFixed(1) : "—",
       unit: "kg",
       sub: (
-        <p className="text-[#A1A1A1] text-[10px] font-semibold tracking-[-0.2px] mt-2">
-          {remaining != null ? `${remaining} kg to go` : "Not set"}
+        <p
+          className={`text-[10px] font-semibold tracking-[-0.2px] mt-2 ${
+            reachedGoal ? "text-[#16a34a]" : "text-[#A1A1A1]"
+          }`}
+        >
+          {remaining == null ? "Not set" : reachedGoal ? "Goal reached" : `${remaining} kg to go`}
         </p>
       ),
     },
     {
       label: "Progress",
+      info: "progress",
       value: goalWeight != null ? progress : "—",
       unit: goalWeight != null ? "%" : "",
       sub: (
@@ -335,9 +352,24 @@ export default function WeightTrackingTab({ profileData, profileId, isActive }) 
                 : "bg-[#F5F7FA] border border-transparent hover:border-[#E1E6ED]"
             }`}
           >
-            <p className="text-[#A1A1A1] text-[10px] font-semibold leading-[110%] tracking-[-0.2px] uppercase mb-2">
-              {tile.label}
-            </p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[#A1A1A1] text-[10px] font-semibold leading-[110%] tracking-[-0.2px] uppercase">
+                {tile.label}
+              </p>
+              {tile.info && (
+                <button
+                  onClick={() => setInfoSection((prev) => (prev === tile.info ? null : tile.info))}
+                  aria-label={`How ${tile.label} is calculated`}
+                  className="flex-shrink-0 text-[#308BF9] cursor-pointer transition-opacity"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                </button>
+              )}
+            </div>
             <p className="text-[#252525] text-[24px] font-semibold tracking-[-1.2px] leading-none">
               {tile.value}
               <span className="text-[#535359] text-[13px] font-semibold tracking-[-0.26px] ml-1">
@@ -348,6 +380,93 @@ export default function WeightTrackingTab({ profileData, profileId, isActive }) 
           </div>
         ))}
       </div>
+
+      {/* Per-tile "how is this calculated" explanation, toggled from the Goal / Progress info icons */}
+      {infoSection === "goal" && (
+        <div className="rounded-[12px] border border-[#E1E6ED] bg-[#F9FAFB] p-5">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[#252525] text-[13px] font-semibold tracking-[-0.26px]">
+              How the goal (ideal) weight is calculated
+            </p>
+            <button
+              onClick={() => setInfoSection(null)}
+              aria-label="Close"
+              className="text-[#A1A1A1] hover:text-[#252525] transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-[#535359] text-[12px] leading-[165%] tracking-[-0.24px]">
+            Derived from the client&apos;s height using a target BMI of{" "}
+            <span className="font-semibold text-[#252525]">{TARGET_BMI}</span> (the middle of the
+            healthy range 18.5–24.9):
+          </p>
+          <p className="text-[#535359] text-[12px] leading-[165%] tracking-[-0.24px] mt-1">
+            Goal weight (kg) = Target BMI × (height in cm ÷ 100)²
+          </p>
+          <div className="mt-2 text-[12px] text-[#252525] bg-white border border-[#E1E6ED] rounded-[8px] px-3 py-2">
+            {heightCm ? (
+              <>
+                {TARGET_BMI} × ({heightCm} ÷ 100)² ={" "}
+                <span className="font-semibold">{goalWeight} kg</span>
+              </>
+            ) : (
+              "Height isn't available for this client, so an ideal weight can't be derived."
+            )}
+          </div>
+        </div>
+      )}
+
+      {infoSection === "progress" && (
+        <div className="rounded-[12px] border border-[#E1E6ED] bg-[#F9FAFB] p-5">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[#252525] text-[13px] font-semibold tracking-[-0.26px]">
+              How progress is calculated
+            </p>
+            <button
+              onClick={() => setInfoSection(null)}
+              aria-label="Close"
+              className="text-[#A1A1A1] hover:text-[#252525] transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-[#535359] text-[12px] leading-[165%] tracking-[-0.24px]">
+            The share of the original gap to the ideal weight that has been closed, measured from the
+            client&apos;s current weight:
+          </p>
+          <p className="text-[#535359] text-[12px] leading-[165%] tracking-[-0.24px] mt-1">
+            Progress = (1 − |current − goal| ÷ |starting − goal|) × 100
+          </p>
+          {startingWeight != null && currentWeight != null && goalWeight != null ? (
+            <div className="mt-2 text-[12px] text-[#252525] bg-white border border-[#E1E6ED] rounded-[8px] px-3 py-2 leading-[175%]">
+              <div>
+                Starting <span className="font-semibold">{startingWeight.toFixed(1)} kg</span> ·
+                Current <span className="font-semibold">{currentWeight.toFixed(1)} kg</span> ·
+                Goal <span className="font-semibold">{goalWeight.toFixed(1)} kg</span>
+              </div>
+              <div>
+                (1 − {currentGap.toFixed(1)} ÷ {totalGap.toFixed(1)}) × 100 ={" "}
+                <span className="font-semibold">{progress}%</span>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 text-[12px] text-[#252525] bg-white border border-[#E1E6ED] rounded-[8px] px-3 py-2">
+              Not enough data yet to calculate progress.
+            </div>
+          )}
+          <p className="text-[#A1A1A1] text-[11px] leading-[160%] tracking-[-0.22px] mt-2">
+            If the client moves past the ideal weight, the gap opens up again and progress falls —
+            because they now need to move back toward the ideal.
+          </p>
+        </div>
+      )}
 
       {/* Chart + Recent entries side by side */}
       <div className="flex gap-4" style={{ height: "320px" }}>
@@ -413,7 +532,7 @@ export default function WeightTrackingTab({ profileData, profileId, isActive }) 
               Recent entries
             </p>
             <span className="text-[#A1A1A1] text-[11px] font-semibold tracking-[-0.22px]">
-              {recentEntries.length}
+              {recentEntries.length} logs
             </span>
           </div>
 

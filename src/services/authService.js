@@ -996,6 +996,7 @@ export const fetchGroupDetailsService = async ({
   limit = 10,
   search = "",
   overviewDate = "",
+  overviewMember = "",
 } = {}) => {
   const accessToken = Cookies.get("access_token");
 
@@ -1022,6 +1023,8 @@ export const fetchGroupDetailsService = async ({
   };
   // Scopes period_overview to a single day (YYYY-MM-DD); omitted → backend default (today).
   if (overviewDate) body.overview_date = overviewDate;
+  // Scopes period_overview to one admin's sub-network (their partner_code); omitted → whole group.
+  if (overviewMember) body.overview_member = overviewMember;
 
   return apiFetcher(API_ENDPOINTS.ADMINPANEL.GETGROUPDETAILS, {
     method: "POST",
@@ -1035,11 +1038,12 @@ export const fetchGroupDetailsService = async ({
 
 // Lightweight GETGROUPDETAILS call used only to read a single day's period_overview.
 // The backend scopes period_overview to overview_date (one day), so multi-day (W/M)
-// totals are built by summing one of these per day. limit:1 keeps the payload small
+// totals are built by summing one of these per day. overviewMember scopes it to a
+// single admin's sub-network (omit → whole group). limit:1 keeps the payload small
 // — we ignore the clients list and just return the period_overview block.
-export const fetchGroupPeriodOverviewService = async ({ groupName, overviewDate } = {}) => {
+export const fetchGroupPeriodOverviewService = async ({ groupName, overviewDate, overviewMember } = {}) => {
   if (!groupName) throw new Error("Group name is required.");
-  const res = await fetchGroupDetailsService({ groupName, page: 1, limit: 1, search: "", overviewDate });
+  const res = await fetchGroupDetailsService({ groupName, page: 1, limit: 1, search: "", overviewDate, overviewMember });
   return res?.period_overview || null;
 };
 

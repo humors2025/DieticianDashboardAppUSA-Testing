@@ -149,6 +149,8 @@ function buildFromGroupDetails(gd, now = new Date()) {
         total_tests: typeof t.total_tests === "number" ? t.total_tests : null,
         total_clients: typeof t.total_clients === "number" ? t.total_clients : null,
         total_tested_clients: typeof t.total_tested_clients === "number" ? t.total_tested_clients : null,
+        // The trainer's OWN device tests (self-readings), straight from the backend.
+        self_reading_tests: typeof t.self_reading?.total_tests === "number" ? t.self_reading.total_tests : null,
         is_self: false,
       }));
 
@@ -169,6 +171,8 @@ function buildFromGroupDetails(gd, now = new Date()) {
       total_tests: typeof m.total_tests === "number" ? m.total_tests : null,
       total_clients: typeof m.total_clients === "number" ? m.total_clients : null,
       total_tested_clients: typeof m.total_tested_clients === "number" ? m.total_tested_clients : null,
+      // The admin's OWN device tests (self-readings), straight from the backend.
+      self_reading_tests: typeof m.self_reading?.total_tests === "number" ? m.self_reading.total_tests : null,
       is_self: false,
       is_admin: true,
     };
@@ -487,12 +491,17 @@ export default function AnalyticsDashboard() {
       const dates = t.created_at ? allDates.filter(d => !d.date || new Date(d.date) >= new Date(new Date(t.created_at).getFullYear(), new Date(t.created_at).getMonth(), new Date(t.created_at).getDate())) : allDates;
       // Prefer the API's authoritative counts; fall back to derived values (mock).
       const rd = t.total_tests != null ? t.total_tests : dates.length;
-      const pct = ds > 0 ? Math.min(100, Math.round((rd / ds) * 100)) : 0;
+      // The trainer's OWN tests — prefer the backend's authoritative self_reading count;
+      // fall back to their self-test client profile (sc). 0 if neither is available.
+      const selfTests = t.self_reading_tests != null
+        ? t.self_reading_tests
+        : (sc ? (sc.total_tests != null ? sc.total_tests : (readingDatesMap[sc.profile_id] || []).length) : 0);
+      // Rate = the trainer's OWN tests (self_reading.total_tests) ÷ days since they joined
+      // (created_at), as a percentage capped at 100. ~1 self-test/day ⇒ 100%.
+      const pct = ds > 0 ? Math.min(100, Math.round((selfTests / ds) * 100)) : 0;
       const realClientCount = t.total_clients != null ? t.total_clients : clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc).length;
       // Clients under this trainer who have taken at least one test (backend-authoritative; fall back to deriving from reads).
       const testedClientCount = t.total_tested_clients != null ? t.total_tested_clients : clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc && (c.readingDays || 0) > 0).length;
-      // The trainer's OWN tests — from their self-test client profile (sc). 0 if the backend stripped it (email-matched self-profiles are excluded from the clients array).
-      const selfTests = sc ? (sc.total_tests != null ? sc.total_tests : (readingDatesMap[sc.profile_id] || []).length) : 0;
       return { ...t, daysSince: ds, readingDays: rd, selfTests, pct, cohort: getCohort(pct), realClientCount, testedClientCount, hasSelfTest: !!sc, selfProfileId: sc?.profile_id || null };
     }).sort((a, b) => b.pct - a.pct || b.realClientCount - a.realClientCount);
 
@@ -1140,7 +1149,7 @@ export default function AnalyticsDashboard() {
                   { key: "name", label: "Trainer", val: r => r.name || "—" },
                   { key: "realClientCount", label: "Clients", align: "center", val: r => r.realClientCount ?? 0 },
                   { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
-                  { key: "readingDays", label: "Tests", align: "center", val: r => r.readingDays ?? 0 },
+                  { key: "selfTests", label: "Tests", align: "center", val: r => r.selfTests ?? 0 },
                   { key: "pct", label: "Rate", align: "right", render: r => <RateCell pct={r.pct} /> },
                   {
                     key: "status", label: "Status", align: "right", val: r => r.pct >= 100 ? 2 : r.pct >= ACTIVE_THRESHOLD ? 1 : 0, render: r => r.pct >= 100

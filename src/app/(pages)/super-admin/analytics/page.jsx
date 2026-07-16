@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import Calendar from "react-calendar";
+import "react-calendar/dist/Calendar.css";
 import { toast } from "sonner";
 import { useDispatch, useSelector } from "react-redux";
 import { getAdminGroups, selectAdminGroups, selectAdminGroupsRaw, selectPrimaryGroupName } from "@/store/adminGroupsSlice";
 import { getGroupDetails, selectGroupDetails, selectGroupDetailsLoading, selectGroupCounts } from "@/store/groupDetailsSlice";
+import { fetchGroupPeriodOverviewService } from "@/services/authService";
 
 const TIMEZONES = { "America/Chicago": "Houston, TX", "Asia/Kolkata": "India (IST)" };
 const DEFAULT_TZ = "America/Chicago";
@@ -21,7 +24,11 @@ const R = {
 };
 
 function tzNow(tz) { return new Date(new Date().toLocaleString("en-US", { timeZone: tz })); }
+function tzTime(tz) { return new Date().toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }); }
+function tzDay(tz) { return new Date().toLocaleDateString("en-US", { timeZone: tz, weekday: "long", month: "long", day: "numeric" }); }
 function fmtDate(d) { if (!d) return "—"; return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }); }
+// Local-date parts → "YYYY-MM-DD" (no UTC shift), for the API's overview_date param.
+function toYMD(d) { if (!d) return ""; return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 function fmtRange(r) { if (!r) return ""; return `${fmtDate(r.start)} – ${fmtDate(r.end)}`; }
 function daysBetween(a, b) {
   const da = new Date(a), db = new Date(b);
@@ -67,14 +74,30 @@ function getPrevRange(p, now) {
   return null;
 }
 function inRange(ds, r) { if (!r) return true; if (!ds) return false; const d = new Date(ds); if (isNaN(d)) return false; const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return day >= r.start && day <= r.end; }
-function prevLbl(p, now) { if (p === "today") return "yesterday"; if (p === "week") return "last week"; if (p === "month") return new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleString("en-US", { month: "short" }); return null; }
+// Every calendar day in an inclusive {start,end} range, as Date objects. Used to
+// fan out one period_overview call per day (the API only scopes a single day).
+function daysInRange(r) { if (!r) return []; const out = []; const d = new Date(r.start.getFullYear(), r.start.getMonth(), r.start.getDate()); const end = new Date(r.end.getFullYear(), r.end.getMonth(), r.end.getDate()); let guard = 0; while (d <= end && guard < 366) { out.push(new Date(d)); d.setDate(d.getDate() + 1); guard++; } return out; }
+function prevLbl(p, now) { if (p === "custom") return "prev day"; if (p === "today") return "yesterday"; if (p === "week") return "last week"; if (p === "month") return new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleString("en-US", { month: "short" }); return null; }
 
 function periodMetrics(clients, trainers, rdm, range) {
   const nT = !range ? trainers.length : trainers.filter(t => inRange(t.created_at, range)).length;
   const nC = !range ? clients.length : clients.filter(c => inRange(c.onboardedDate, range)).length;
-  let reads = 0, readers = 0;
-  clients.forEach(c => { const d = rdm[c.profile_id] || []; const n = !range ? d.length : d.filter(x => inRange(x.date, range)).length; reads += n; if (n > 0) readers++; });
-  return { newTrainers: nT, newClients: nC, reads, readers, adoption: clients.length > 0 ? Math.round((readers / clients.length) * 100) : 0 };
+  // A trainer's own device readings live on their self-reading profile. That
+  // profile can ALSO surface as a client row (a self-test returned in clients[]),
+  // so we attribute those reads to the trainer bucket and skip them in the client
+  // loop below — the read is counted exactly once.
+  const trainerSelfPids = new Set((trainers || []).map(t => t.selfProfileId).filter(Boolean));
+  const countIn = pid => { const d = rdm[pid] || []; return !range ? d.length : d.filter(x => inRange(x.date, range)).length; };
+  let clientReads = 0, readers = 0;
+  clients.forEach(c => {
+    if (trainerSelfPids.has(c.profile_id)) return; // counted as a trainer read
+    const n = countIn(c.profile_id);
+    clientReads += n; if (n > 0) readers++;
+  });
+  let trainerReads = 0;
+  trainerSelfPids.forEach(pid => { trainerReads += countIn(pid); });
+  const reads = clientReads + trainerReads;
+  return { newTrainers: nT, newClients: nC, reads, clientReads, trainerReads, readers, adoption: clients.length > 0 ? Math.round((readers / clients.length) * 100) : 0 };
 }
 
 function pctChange(cur, prev) {
@@ -230,6 +253,19 @@ function buildFromGroupDetails(gd, now = new Date()) {
     readingDatesMap[pid] = c.latest_test?.date_time ? [{ date: c.latest_test.date_time }] : [];
   });
 
+  // Seed the reading-dates map with each trainer's / admin's OWN self-reading
+  // (its latest_test date, keyed by the self-reading profile id) so period/day
+  // read totals include trainer device usage, not just clients. Skip profiles
+  // already present — a self-test that also came back as a client row keeps its
+  // client entry (same date), so no read is counted twice.
+  const seedSelf = (sr) => {
+    const spid = sr?.profile_id, dt = sr?.latest_test?.date_time;
+    if (!spid || !dt || readingDatesMap[spid]) return;
+    readingDatesMap[spid] = [{ date: dt }];
+  };
+  trainers.forEach(t => seedSelf(t.self_reading));
+  members.forEach(m => seedSelf(m.self_reading));
+
   return { taList, trainersMap, allClients, readingDatesMap, excludedAdminCount, excludedTrainerAdminCount, adminSelfByCode };
 }
 
@@ -340,6 +376,11 @@ export default function AnalyticsDashboard() {
   const groupDetailsLoading = useSelector(selectGroupDetailsLoading);
   // Authoritative group totals { members, trainers, clients } from the response.
   const groupCounts = useSelector(selectGroupCounts);
+  // Reading counts for the selected period, summed from the API's per-day
+  // period_overview. The backend scopes period_overview to a single overview_date,
+  // so W/M totals are built by fanning out one call per day in the range.
+  const [periodReads, setPeriodReads] = useState({ total: 0, trainer: 0, client: 0, loading: false });
+  const [readsNonce, setReadsNonce] = useState(0);
 
   // Entire GETGROUPDETAILS response stored on this page (all client pages merged).
   const [groupDetailsResponse, setGroupDetailsResponse] = useState(null);
@@ -363,9 +404,15 @@ export default function AnalyticsDashboard() {
   const [tabDdOpen, setTabDdOpen] = useState(false);
   const tabDdRef = useRef(null);
   const [period, setPeriod] = useState("today");
+  // A specific calendar day picked from the world-clock calendar. When set (and
+  // period === "custom") the Period Overview filters every metric to just that day.
+  const [selectedDate, setSelectedDate] = useState(null);
   const compare = true;
   const [timezone, setTimezone] = useState(DEFAULT_TZ);
   const [clock, setClock] = useState("");
+  const [calOpen, setCalOpen] = useState(false);
+  const [nowTick, setNowTick] = useState(() => 0);
+  const calRef = useRef(null);
   const [openAcc, setOpenAcc] = useState(new Set());
   const [trainerTab, setTrainerTab] = useState("all");
   const [cohortTab, setCohortTab] = useState(0);
@@ -383,6 +430,23 @@ export default function AnalyticsDashboard() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // Close the world-clock calendar on outside click / Escape.
+  useEffect(() => {
+    if (!calOpen) return;
+    const onDown = (e) => { if (calRef.current && !calRef.current.contains(e.target)) setCalOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setCalOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [calOpen]);
+
+  // Tick every second so the live times inside the open calendar stay current.
+  useEffect(() => {
+    if (!calOpen) return;
+    const id = setInterval(() => setNowTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [calOpen]);
 
   const loadData = useCallback(async () => {
     setError(null);
@@ -432,7 +496,9 @@ export default function AnalyticsDashboard() {
 
   // Once we know the group name (from Redux), pull that group's details. Use a
   // high limit so every client loads in one shot — the dashboard's totals are
-  // derived from the loaded set, so partial pages would under-count.
+  // derived from the loaded set, so partial pages would under-count. This payload
+  // (clients/trainers/counts) is all-time, so it does NOT depend on the selected
+  // period — the period readings are fetched separately below.
   useEffect(() => {
     if (primaryGroupName) {
       dispatch(getGroupDetails({ groupName: primaryGroupName, page: 1, limit: 50, search: "", fetchAll: true }));
@@ -440,8 +506,10 @@ export default function AnalyticsDashboard() {
   }, [primaryGroupName, dispatch]);
 
   // Refresh button: re-fetch the group from the API when we have a group name,
-  // otherwise just rebuild from whatever is in state.
+  // otherwise just rebuild from whatever is in state. Bump readsNonce so the
+  // period-readings aggregation re-runs too.
   const handleRefresh = useCallback(() => {
+    setReadsNonce(n => n + 1);
     if (primaryGroupName) {
       dispatch(getGroupDetails({ groupName: primaryGroupName, page: 1, limit: 50, search: "", fetchAll: true }));
     } else {
@@ -456,6 +524,33 @@ export default function AnalyticsDashboard() {
       console.log("GETGROUPDETAILS response:", groupDetails);
     }
   }, [groupDetails]);
+
+  // Period-readings aggregation. period_overview is a single-day snapshot server-side
+  // (scoped by overview_date), so a week/month total is the SUM of each day's snapshot
+  // across the period range. Fan out one lightweight call per day and add them up.
+  // D/custom = 1 day (1 call); W = Mon→today; M = 1st→today.
+  useEffect(() => {
+    if (!primaryGroupName) { setPeriodReads({ total: 0, trainer: 0, client: 0, loading: false }); return; }
+    const tnow = tzNow(timezone);
+    const range = period === "custom" && selectedDate
+      ? (() => { const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()); return { start: d, end: d }; })()
+      : (getPeriodRange(period, tnow) || getPeriodRange("today", tnow));
+    const days = daysInRange(range);
+    let cancelled = false;
+    setPeriodReads(p => ({ ...p, loading: true }));
+    Promise.all(days.map(d => fetchGroupPeriodOverviewService({ groupName: primaryGroupName, overviewDate: toYMD(d) }).catch(() => null)))
+      .then(results => {
+        if (cancelled) return;
+        const sum = results.reduce((a, po) => ({
+          total: a.total + (po?.total_readings || 0),
+          trainer: a.trainer + (po?.trainer_readings || 0),
+          client: a.client + (po?.client_readings || 0),
+        }), { total: 0, trainer: 0, client: 0 });
+        setPeriodReads({ ...sum, loading: false });
+      })
+      .catch(() => { if (!cancelled) setPeriodReads(p => ({ ...p, loading: false })); });
+    return () => { cancelled = true; };
+  }, [primaryGroupName, period, selectedDate, timezone, readsNonce]);
 
   const now = tzNow(timezone);
 
@@ -564,8 +659,15 @@ export default function AnalyticsDashboard() {
   const cActive = activeTab === "overview" ? totals.activeC : (selData?.activeClients ?? 0);
   const curGoals = activeTab === "overview" ? totals.goals : (selData?.goals || { fat_loss: 0, muscle_gain: 0, weight_loss: 0 });
 
-  const range = getPeriodRange(period, now);
-  const prevR = compare ? getPrevRange(period, now) : null;
+  // A calendar-picked date becomes a single-day "custom" period; its comparison
+  // baseline is the day before. Otherwise the D/W/M period anchors to `now`.
+  const customDay = period === "custom" && selectedDate
+    ? new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
+    : null;
+  const range = customDay ? { start: customDay, end: customDay } : getPeriodRange(period, now);
+  const prevR = customDay
+    ? (() => { const p = new Date(customDay); p.setDate(customDay.getDate() - 1); return { start: p, end: p }; })()
+    : (compare ? getPrevRange(period, now) : null);
   const pm = periodMetrics(tabCl, tabTr, readingDatesMap, range);
   const ppm = prevR ? periodMetrics(tabCl, tabTr, readingDatesMap, prevR) : null;
 
@@ -594,12 +696,15 @@ export default function AnalyticsDashboard() {
   const clientWeekDelta = wkStats.newClients - pwkStats.newClients;
 
   const last7Days = (() => {
+    // Trainer self-tests can also appear as client rows; count each profile once
+    // (client loop skips trainer self-profiles; the trainer loop counts them).
+    const trSelf = new Set(tabTr.map(t => t.selfProfileId).filter(Boolean));
     const days = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
       const r = { start: d, end: d };
       let count = 0;
-      tabCl.forEach(c => { (readingDatesMap[c.profile_id] || []).forEach(x => { if (inRange(x.date, r)) count++; }); });
+      tabCl.forEach(c => { if (trSelf.has(c.profile_id)) return; (readingDatesMap[c.profile_id] || []).forEach(x => { if (inRange(x.date, r)) count++; }); });
       tabTr.forEach(t => { if (t.selfProfileId) (readingDatesMap[t.selfProfileId] || []).forEach(x => { if (inRange(x.date, r)) count++; }); });
       days.push(count);
     }
@@ -626,13 +731,10 @@ export default function AnalyticsDashboard() {
     return weeks;
   })();
 
-  // All readings live on client profiles now (trainer self-test profiles are
-  // shown as clients too). Partition the client reads by whether the profile is
-  // a trainer's own self-test, so the Trainers/Clients split stays meaningful
-  // WITHOUT double-counting: Total == sum of client tests.
+  // Trainer self-test profiles also surface as client rows; this set marks them
+  // so the cohort's people-axis (real clients only) can exclude them.
   const selfPidSet = new Set(tabTr.map(t => t.selfProfileId).filter(Boolean));
   const allTimeClientReads = tabCl.reduce((s, c) => s + (c.readingDays || 0), 0);
-  const allTimeTrainerReads = tabCl.reduce((s, c) => selfPidSet.has(c.profile_id) ? s + (c.readingDays || 0) : s, 0);
   const allTimeTotalReads = allTimeClientReads;
   // Readings-card split as people counts — mirror the snapshot cards exactly so
   // the split totals match the Trainers/Clients cards above. Using cTotal (not the
@@ -641,18 +743,24 @@ export default function AnalyticsDashboard() {
   const networkTrainerCount = tTotal;
   const networkClientCount = cTotal;
   const networkSplitTotal = networkTrainerCount + networkClientCount;
-  // Same partition for the selected period: total is the client reads in range;
-  // the trainer slice is the self-test subset of those, never an added bucket.
-  const periodTotalReads = pm.reads;
-  const periodTrainerReads = range
-    ? tabCl.reduce((s, c) => selfPidSet.has(c.profile_id) ? s + (readingDatesMap[c.profile_id] || []).filter(x => inRange(x.date, range)).length : s, 0)
-    : allTimeTrainerReads;
-  const periodClientReads = Math.max(0, periodTotalReads - periodTrainerReads);
-  const prevTotalReads = ppm ? ppm.reads : 0;
-  const periodLabel = period === "today" ? `TODAY (${fmtDate(range?.start).toUpperCase()})`
-    : period === "week" ? `THIS WEEK (${fmtRange(range).toUpperCase()})`
-      : period === "month" ? `THIS MONTH (${fmtRange(range).toUpperCase()})`
-        : "ALL TIME";
+  // Period reads come from the API's period_overview, summed across the selected
+  // range (see the aggregation effect). No frontend recomputation of the counts
+  // themselves — the Reading Split shows each bucket; trainer + client = total.
+  const periodTotalReads = periodReads.total;
+  const periodTrainerReads = periodReads.trainer;
+  const periodClientReads = periodReads.client;
+  const periodLabel = customDay
+    ? customDay.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }).toUpperCase()
+    : period === "today" ? `TODAY (${fmtDate(range?.start).toUpperCase()})`
+      : period === "week" ? `THIS WEEK (${fmtRange(range).toUpperCase()})`
+        : period === "month" ? `THIS MONTH (${fmtRange(range).toUpperCase()})`
+          : "ALL TIME";
+  // Device-Adoption donut is period-scoped: the share of clients who logged a
+  // reading in the selected period (pm.adoption), NOT the all-time avg rate.
+  const adoptionSubLabel = period === "custom" ? "Clients Read That Day"
+    : period === "week" ? "Clients Read This Week"
+      : period === "month" ? "Clients Read This Month"
+        : "Clients Read Today";
 
   const CTIERS = [
     { label: "100%", min: 100, max: 100, color: R.blue },
@@ -849,13 +957,69 @@ export default function AnalyticsDashboard() {
               ))}
             </div>
             <div style={{ width: "1px", height: "20px", backgroundColor: R.border }} />
-            <div className="flex items-center gap-1.5 whitespace-nowrap" style={{ fontSize: "11px", color: R.tm, letterSpacing: "-0.22px" }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={R.blue} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-              <span>{clock}</span>
+            <div ref={calRef} style={{ position: "relative" }}>
+              <button type="button" onClick={() => setCalOpen(o => !o)} title="World clock"
+                className="flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-all duration-200"
+                style={{ fontSize: "11px", color: calOpen ? R.blue : R.tm, letterSpacing: "-0.22px", background: "transparent", border: "none", padding: 0 }}
+                onMouseEnter={e => { e.currentTarget.style.color = R.blue; }}
+                onMouseLeave={e => { e.currentTarget.style.color = calOpen ? R.blue : R.tm; }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={R.blue} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+                <span>{clock}</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ transition: "transform 0.2s", transform: calOpen ? "rotate(180deg)" : "none" }}><path d="M6 9l6 6 6-6" /></svg>
+              </button>
+
+              {calOpen && (
+                <div data-tick={nowTick} style={{ position: "absolute", top: "calc(100% + 12px)", right: 0, zIndex: 50, backgroundColor: R.white, borderRadius: R.rCard, border: `1px solid ${R.border}`, boxShadow: R.shadow, padding: "18px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    <div className="flex items-center gap-1.5">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={R.blue} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: R.tp, letterSpacing: "-0.24px" }}>{TIMEZONES[timezone]}</span>
+                    </div>
+                    <div>
+                      <div className="font-mono" style={{ fontSize: "22px", fontWeight: 700, color: R.tp, letterSpacing: "-0.5px", lineHeight: 1.1 }}>{tzTime(timezone)}</div>
+                      <div style={{ fontSize: "11px", color: R.tm, letterSpacing: "-0.22px", marginTop: "2px" }}>{tzDay(timezone)}</div>
+                    </div>
+                    <div className="wc-cal">
+                      <Calendar
+                        onChange={(d) => { const dt = Array.isArray(d) ? d[0] : d; if (dt) { setSelectedDate(dt); setPeriod("custom"); setCalOpen(false); } }}
+                        value={period === "custom" && selectedDate ? selectedDate : tzNow(timezone)}
+                        maxDate={tzNow(timezone)}
+                        showNeighboringMonth={false} locale="en-US" />
+                    </div>
+                    <div style={{ borderTop: `1px solid ${R.border}`, paddingTop: "10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                      <span style={{ fontSize: "10px", color: R.tm, letterSpacing: "-0.2px" }}>
+                        {period === "custom" && selectedDate ? "Filtering Period Overview" : "Pick a date to filter"}
+                      </span>
+                      {period === "custom" && selectedDate && (
+                        <button type="button" onClick={() => { setSelectedDate(null); setPeriod("today"); }}
+                          className="cursor-pointer" style={{ fontSize: "10px", fontWeight: 600, color: R.blue, background: R.blueLight, border: "none", borderRadius: R.rBadge, padding: "3px 8px" }}>Reset to today</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      <style jsx global>{`
+        .wc-cal .react-calendar { width: 232px; border: none; background: transparent; font-family: inherit; line-height: 1.2; }
+        .wc-cal .react-calendar button { border-radius: 8px; }
+        .wc-cal .react-calendar__navigation { height: 32px; margin-bottom: 4px; }
+        .wc-cal .react-calendar__navigation button { min-width: 30px; font-size: 13px; font-weight: 600; color: ${R.tp}; background: transparent; }
+        .wc-cal .react-calendar__navigation button:enabled:hover, .wc-cal .react-calendar__navigation button:enabled:focus { background: ${R.surface}; }
+        .wc-cal .react-calendar__navigation button:disabled { background: transparent; }
+        .wc-cal .react-calendar__month-view__weekdays { font-size: 10px; font-weight: 600; color: ${R.tm}; text-transform: uppercase; letter-spacing: 0.2px; }
+        .wc-cal .react-calendar__month-view__weekdays abbr { text-decoration: none; cursor: default; }
+        .wc-cal .react-calendar__tile { padding: 6px 4px; font-size: 11px; color: ${R.ts}; }
+        .wc-cal .react-calendar__tile:enabled:hover, .wc-cal .react-calendar__tile:enabled:focus { background: ${R.blueLight}; color: ${R.blue}; }
+        .wc-cal .react-calendar__month-view__days__day--weekend { color: ${R.red}; }
+        .wc-cal .react-calendar__month-view__days__day--neighboringMonth { color: ${R.td}; }
+        .wc-cal .react-calendar__tile--now { background: ${R.blueLight}; color: ${R.blue}; font-weight: 700; }
+        .wc-cal .react-calendar__tile--now:enabled:hover, .wc-cal .react-calendar__tile--now:enabled:focus { background: ${R.blueLight}; }
+        .wc-cal .react-calendar__tile--active, .wc-cal .react-calendar__tile--active:enabled:hover, .wc-cal .react-calendar__tile--active:enabled:focus { background: ${R.dark}; color: ${R.white}; font-weight: 700; }
+      `}</style>
 
       <div className="flex flex-col gap-5 pb-8 pt-2">
 
@@ -1002,18 +1166,10 @@ export default function AnalyticsDashboard() {
               </div>
             </div>
 
-            {/* Hero metric — Total Readings */}
+            {/* Hero metric — Total Readings (summed across the period) */}
             <div className="text-center" style={{ padding: "8px 0 20px" }}>
-              <div style={{ fontSize: "44px", fontWeight: 800, letterSpacing: "-2px", lineHeight: 1 }}>{periodTotalReads}</div>
+              <div style={{ fontSize: "44px", fontWeight: 800, letterSpacing: "-2px", lineHeight: 1, opacity: periodReads.loading ? 0.4 : 1, transition: "opacity 0.2s ease" }}>{periodTotalReads}</div>
               <div style={{ fontSize: "12px", color: "#64748b", marginTop: "6px", letterSpacing: "0.3px" }}>Total Readings</div>
-              {ppm && (
-                <div className="flex items-center justify-center gap-1.5 mt-2">
-                  <span style={{ fontSize: "11px", fontWeight: 600, color: periodTotalReads >= prevTotalReads ? "#4ade80" : "#f87171" }}>
-                    {periodTotalReads >= prevTotalReads ? "↑" : "↓"} {Math.abs(periodTotalReads - prevTotalReads)}
-                  </span>
-                  <span style={{ fontSize: "11px", color: "#475569" }}>vs {prevLbl(period, now)}</span>
-                </div>
-              )}
             </div>
 
             {/* Onboarding metrics — 2 compact cards side by side */}
@@ -1043,8 +1199,8 @@ export default function AnalyticsDashboard() {
               {/* Device Adoption — left column */}
               <div className="flex-1 flex flex-col items-center" style={{ borderRight: "1px solid rgba(148,163,184,0.1)", paddingRight: "16px" }}>
                 <div style={{ fontSize: "10px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.8px", fontWeight: 600, marginBottom: "16px" }}>Device Adoption</div>
-                <Donut pct={avgActivity} size={90} thickness={8} color={R.blue} bg="#0f172a" track="rgba(148,163,184,0.12)" textColor="#ffffff" />
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "#cbd5e1", marginTop: "12px" }}>Avg Reading Rate</div>
+                <Donut pct={pm.adoption} size={90} thickness={8} color={R.blue} bg="#0f172a" track="rgba(148,163,184,0.12)" textColor="#ffffff" />
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "#cbd5e1", marginTop: "12px" }}>{adoptionSubLabel}</div>
               </div>
 
               {/* Reading Split — right column */}

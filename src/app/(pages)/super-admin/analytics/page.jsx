@@ -379,7 +379,7 @@ export default function AnalyticsDashboard() {
   // Reading counts for the selected period, summed from the API's per-day
   // period_overview. The backend scopes period_overview to a single overview_date,
   // so W/M totals are built by fanning out one call per day in the range.
-  const [periodReads, setPeriodReads] = useState({ total: 0, trainer: 0, client: 0, loading: false });
+  const [periodReads, setPeriodReads] = useState({ total: 0, trainer: 0, client: 0, loading: false, scope: null });
   const [readsNonce, setReadsNonce] = useState(0);
 
   // Entire GETGROUPDETAILS response stored on this page (all client pages merged).
@@ -525,12 +525,21 @@ export default function AnalyticsDashboard() {
     }
   }, [groupDetails]);
 
+  // The admin whose readings the Period Overview is scoped to: the selected TA tab's
+  // partner_code, or "" on the Overview tab (whole group = all members, the default).
+  // Sent to the API as overview_member. Uppercased to match the network_codes casing.
+  const overviewMemberCode = useMemo(() => {
+    if (activeTab === "overview") return "";
+    const m = taList.find(t => t.user_id === activeTab);
+    return m?.partner_code ? String(m.partner_code).toUpperCase() : "";
+  }, [activeTab, taList]);
+
   // Period-readings aggregation. period_overview is a single-day snapshot server-side
-  // (scoped by overview_date), so a week/month total is the SUM of each day's snapshot
-  // across the period range. Fan out one lightweight call per day and add them up.
-  // D/custom = 1 day (1 call); W = Mon→today; M = 1st→today.
+  // (scoped by overview_date + optional overview_member), so a week/month total is the
+  // SUM of each day's snapshot across the period range. Fan out one lightweight call
+  // per day and add them up. D/custom = 1 day (1 call); W = Mon→today; M = 1st→today.
   useEffect(() => {
-    if (!primaryGroupName) { setPeriodReads({ total: 0, trainer: 0, client: 0, loading: false }); return; }
+    if (!primaryGroupName) { setPeriodReads({ total: 0, trainer: 0, client: 0, loading: false, scope: null }); return; }
     const tnow = tzNow(timezone);
     const range = period === "custom" && selectedDate
       ? (() => { const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()); return { start: d, end: d }; })()
@@ -538,7 +547,7 @@ export default function AnalyticsDashboard() {
     const days = daysInRange(range);
     let cancelled = false;
     setPeriodReads(p => ({ ...p, loading: true }));
-    Promise.all(days.map(d => fetchGroupPeriodOverviewService({ groupName: primaryGroupName, overviewDate: toYMD(d) }).catch(() => null)))
+    Promise.all(days.map(d => fetchGroupPeriodOverviewService({ groupName: primaryGroupName, overviewDate: toYMD(d), overviewMember: overviewMemberCode }).catch(() => null)))
       .then(results => {
         if (cancelled) return;
         const sum = results.reduce((a, po) => ({
@@ -546,11 +555,13 @@ export default function AnalyticsDashboard() {
           trainer: a.trainer + (po?.trainer_readings || 0),
           client: a.client + (po?.client_readings || 0),
         }), { total: 0, trainer: 0, client: 0 });
-        setPeriodReads({ ...sum, loading: false });
+        // Scope is identical across the range's days; keep the first non-null one.
+        const scope = results.find(po => po?.scope)?.scope || null;
+        setPeriodReads({ ...sum, loading: false, scope });
       })
       .catch(() => { if (!cancelled) setPeriodReads(p => ({ ...p, loading: false })); });
     return () => { cancelled = true; };
-  }, [primaryGroupName, period, selectedDate, timezone, readsNonce]);
+  }, [primaryGroupName, period, selectedDate, timezone, overviewMemberCode, readsNonce]);
 
   const now = tzNow(timezone);
 
@@ -1156,6 +1167,10 @@ export default function AnalyticsDashboard() {
               <div>
                 <div style={{ fontSize: "10px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.8px", fontWeight: 600, marginBottom: "4px" }}>Period Overview</div>
                 <span style={{ fontSize: "15px", fontWeight: 700, letterSpacing: "-0.3px" }}>{periodLabel}</span>
+                {/* Whose readings these are: the selected admin, or all members by default. */}
+                <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "3px", letterSpacing: "-0.1px" }}>
+                  {selTa ? (selTa.email || selTa.name || periodReads.scope?.name) : "All Members"}
+                </div>
               </div>
               <div className="flex items-center" style={{ backgroundColor: "rgba(148,163,184,0.12)", borderRadius: "8px", padding: "2px", gap: "2px" }}>
                 {[["today", "D"], ["week", "W"], ["month", "M"]].map(([k, l]) => (

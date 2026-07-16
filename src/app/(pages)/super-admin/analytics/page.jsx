@@ -151,6 +151,10 @@ function buildFromGroupDetails(gd, now = new Date()) {
         total_tested_clients: typeof t.total_tested_clients === "number" ? t.total_tested_clients : null,
         // The trainer's OWN device tests (self-readings), straight from the backend.
         self_reading_tests: typeof t.self_reading?.total_tests === "number" ? t.self_reading.total_tests : null,
+        // The backend-authoritative profile_id of the trainer's own self-reading (null
+        // if they have none). This — NOT a name/email guess — is the only profile that
+        // may be excluded from the cohort as a trainer self-test.
+        self_reading_profile_id: t.self_reading?.profile_id || null,
         is_self: false,
       }));
 
@@ -173,6 +177,8 @@ function buildFromGroupDetails(gd, now = new Date()) {
       total_tested_clients: typeof m.total_tested_clients === "number" ? m.total_tested_clients : null,
       // The admin's OWN device tests (self-readings), straight from the backend.
       self_reading_tests: typeof m.self_reading?.total_tests === "number" ? m.self_reading.total_tests : null,
+      // Backend-authoritative profile_id of the admin's own self-reading (see trainer note).
+      self_reading_profile_id: m.self_reading?.profile_id || null,
       is_self: false,
       is_admin: true,
     };
@@ -502,7 +508,14 @@ export default function AnalyticsDashboard() {
       const realClientCount = t.total_clients != null ? t.total_clients : clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc).length;
       // Clients under this trainer who have taken at least one test (backend-authoritative; fall back to deriving from reads).
       const testedClientCount = t.total_tested_clients != null ? t.total_tested_clients : clients.filter(c => (c.dietitian_id || "").toUpperCase() === tc && (c.readingDays || 0) > 0).length;
-      return { ...t, daysSince: ds, readingDays: rd, selfTests, pct, cohort: getCohort(pct), realClientCount, testedClientCount, hasSelfTest: !!sc, selfProfileId: sc?.profile_id || null };
+      // selfProfileId identifies the trainer's OWN reading device so the cohort
+      // people-axis and the readings split can separate it from real clients. Use the
+      // backend's authoritative self_reading.profile_id — a name/email match (sc)
+      // produces false positives when a real client shares the trainer's name (e.g. a
+      // trainer who also coaches clients under their own code), wrongly dropping active
+      // clients from the cohort.
+      const selfProfileId = t.self_reading_profile_id || null;
+      return { ...t, daysSince: ds, readingDays: rd, selfTests, pct, cohort: getCohort(pct), realClientCount, testedClientCount, hasSelfTest: !!selfProfileId, selfProfileId };
     }).sort((a, b) => b.pct - a.pct || b.realClientCount - a.realClientCount);
 
     const goals = { weight_loss: 0, fat_loss: 0, muscle_gain: 0 };

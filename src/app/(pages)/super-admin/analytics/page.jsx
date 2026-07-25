@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import {
   fetchTrainerAdminListService,
@@ -49,20 +49,24 @@ function isSelfTest(client, trainers) {
 
 function getPeriodRange(p, now) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (p === "yesterday") { const y = new Date(today); y.setDate(y.getDate() - 1); return { start: y, end: y }; }
   if (p === "today") return { start: today, end: today };
   if (p === "week") { const d = today.getDay(), m = new Date(today); m.setDate(today.getDate() - ((d + 6) % 7)); return { start: m, end: today }; }
+  if (p === "last_week") { const d = today.getDay(), m = new Date(today); m.setDate(today.getDate() - ((d + 6) % 7)); const ps = new Date(m); ps.setDate(m.getDate() - 1); const pm = new Date(ps); pm.setDate(ps.getDate() - 6); return { start: pm, end: ps }; }
   if (p === "month") return { start: new Date(today.getFullYear(), today.getMonth(), 1), end: today };
+  if (p === "last_month") return { start: new Date(today.getFullYear(), today.getMonth() - 1, 1), end: new Date(today.getFullYear(), today.getMonth(), 0) };
   return null;
 }
 function getPrevRange(p, now) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (p === "yesterday") { const d = new Date(today); d.setDate(d.getDate() - 2); return { start: d, end: d }; }
   if (p === "today") { const y = new Date(today); y.setDate(y.getDate() - 1); return { start: y, end: y }; }
   if (p === "week") { const d = today.getDay(), m = new Date(today); m.setDate(today.getDate() - ((d + 6) % 7)); const ps = new Date(m); ps.setDate(m.getDate() - 1); const pm = new Date(ps); pm.setDate(ps.getDate() - 6); return { start: pm, end: ps }; }
   if (p === "month") return { start: new Date(today.getFullYear(), today.getMonth() - 1, 1), end: new Date(today.getFullYear(), today.getMonth(), 0) };
   return null;
 }
 function inRange(ds, r) { if (!r) return true; if (!ds) return false; const d = new Date(ds); if (isNaN(d)) return false; const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return day >= r.start && day <= r.end; }
-function prevLbl(p, now) { if (p === "today") return "yesterday"; if (p === "week") return "last week"; if (p === "month") return new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleString("en-US", { month: "short" }); return null; }
+function prevLbl(p, now) { if (p === "yesterday") return "day before"; if (p === "today") return "yesterday"; if (p === "week") return "last week"; if (p === "month") return new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleString("en-US", { month: "short" }); return null; }
 
 function periodMetrics(clients, trainers, rdm, range) {
   const nT = !range ? trainers.length : trainers.filter(t => inRange(t.created_at, range)).length;
@@ -160,6 +164,18 @@ export default function AnalyticsDashboard() {
   const [timezone, setTimezone] = useState(DEFAULT_TZ);
   const [clock, setClock] = useState("");
   const [openAcc, setOpenAcc] = useState(new Set());
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [customRange, setCustomRange] = useState(null);
+  const [calMonth, setCalMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
+  const customRef = useRef(null);
+  const [calSelecting, setCalSelecting] = useState(null);
+  const [matchPeriod, setMatchPeriod] = useState(false);
+
+  useEffect(() => {
+    const handler = (e) => { if (customRef.current && !customRef.current.contains(e.target)) setShowCustomPicker(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   useEffect(() => {
     const tick = () => setClock(new Date().toLocaleString("en-US", { timeZone: timezone, weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }));
@@ -251,6 +267,30 @@ export default function AnalyticsDashboard() {
   const tabTr = activeTab === "overview" ? allTrainers : (selData?.trainers || []);
   const avgActivity = useMemo(() => { if (!tabCl.length) return 0; return Math.round(tabCl.reduce((s, c) => s + c.pct, 0) / tabCl.length); }, [tabCl]);
 
+  const range = period === "custom" ? customRange : getPeriodRange(period, now);
+
+  const periodTabTr = useMemo(() => {
+    if (!matchPeriod || !range) return tabTr;
+    return tabTr.map(t => {
+      const dates = readingDatesMap[t.selfProfileId] || [];
+      const rd = dates.filter(x => inRange(x.date, range)).length;
+      const ds = t.daysSince ?? 0;
+      const periodDs = range ? Math.max(1, Math.round((range.end - range.start) / 86400000) + 1) : ds;
+      const pct = periodDs > 0 ? Math.min(100, Math.round((rd / periodDs) * 100)) : 0;
+      return { ...t, readingDays: rd, daysSince: periodDs, pct, cohort: getCohort(pct) };
+    });
+  }, [matchPeriod, range, tabTr, readingDatesMap]);
+  const periodTabCl = useMemo(() => {
+    if (!matchPeriod || !range) return tabCl;
+    return tabCl.map(c => {
+      const dates = readingDatesMap[c.profile_id] || [];
+      const rd = dates.filter(x => inRange(x.date, range)).length;
+      const periodDs = Math.max(1, Math.round((range.end - range.start) / 86400000) + 1);
+      const pct = periodDs > 0 ? Math.min(100, Math.round((rd / periodDs) * 100)) : 0;
+      return { ...c, readingDays: rd, daysSince: periodDs, pct, cohort: getCohort(pct) };
+    });
+  }, [matchPeriod, range, tabCl, readingDatesMap]);
+
   if (loading) return (
     <div className="flex flex-col items-center justify-center gap-4" style={{ height: "calc(100vh - 130px)" }}>
       <div className="w-10 h-10 rounded-full border-[3px] border-[#E8F1FE] border-t-[#308BF9] animate-spin" />
@@ -271,8 +311,7 @@ export default function AnalyticsDashboard() {
   const cActive = activeTab === "overview" ? totals.activeC : (selData?.activeClients ?? 0);
   const curGoals = activeTab === "overview" ? totals.goals : (selData?.goals || { fat_loss: 0, muscle_gain: 0, weight_loss: 0 });
 
-  const range = getPeriodRange(period, now);
-  const prevR = compare ? getPrevRange(period, now) : null;
+  const prevR = compare && !["all", "custom", "last_week", "last_month"].includes(period) ? getPrevRange(period, now) : null;
   const pm = periodMetrics(tabCl, tabTr, readingDatesMap, range);
   const ppm = prevR ? periodMetrics(tabCl, tabTr, readingDatesMap, prevR) : null;
 
@@ -312,9 +351,13 @@ export default function AnalyticsDashboard() {
   }, 0) : allTimeTrainerReads;
   const periodClientReads = pm.reads;
   const periodTotalReads = periodTrainerReads + periodClientReads;
-  const periodLabel = period === "today" ? `TODAY (${fmtDate(range?.start).toUpperCase()})`
+  const periodLabel = period === "yesterday" ? `YESTERDAY (${fmtDate(range?.start).toUpperCase()})`
+    : period === "today" ? `TODAY (${fmtDate(range?.start).toUpperCase()})`
     : period === "week" ? `THIS WEEK (${fmtRange(range).toUpperCase()})`
+    : period === "last_week" ? `LAST WEEK (${fmtRange(range).toUpperCase()})`
     : period === "month" ? `THIS MONTH (${fmtRange(range).toUpperCase()})`
+    : period === "last_month" ? `LAST MONTH (${fmtRange(range).toUpperCase()})`
+    : period === "custom" ? (range ? fmtRange(range).toUpperCase() : "CUSTOM")
     : "ALL TIME";
 
   const CTIERS = [
@@ -324,10 +367,10 @@ export default function AnalyticsDashboard() {
     { label: "50% – 69%", min: 50, max: 69, color: BLUE },
     { label: "<30%", min: 0, max: 29, color: "#EF4444" },
   ];
-  const totalPeople = tabTr.length + tabCl.length;
+  const totalPeople = periodTabTr.length + periodTabCl.length;
   const cohortData = CTIERS.map(tier => {
-    const trainersIn = tabTr.filter(t => t.pct >= tier.min && t.pct <= tier.max);
-    const clientsIn = tabCl.filter(c => c.pct >= tier.min && c.pct <= tier.max);
+    const trainersIn = periodTabTr.filter(t => t.pct >= tier.min && t.pct <= tier.max);
+    const clientsIn = periodTabCl.filter(c => c.pct >= tier.min && c.pct <= tier.max);
     const count = trainersIn.length + clientsIn.length;
     return { ...tier, count, trainersIn, clientsIn, pctOfTotal: totalPeople > 0 ? Math.round((count / totalPeople) * 100) : 0 };
   });
@@ -384,16 +427,77 @@ export default function AnalyticsDashboard() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-[#E5E7EB] overflow-hidden">
-            {[["today", "Today"], ["week", "Week"], ["month", "Month"], ["all", "All"]].map(([k, l]) => (
-              <button key={k} onClick={() => { setPeriod(k); if (k === "all") setCompare(false); }}
+            {[["yesterday", "Yesterday"], ["today", "Today"], ["week", "Week"], ["month", "Month"]].map(([k, l]) => (
+              <button key={k} onClick={() => { setPeriod(k); setShowCustomPicker(false); setCompare(true); }}
                 className={`px-3 py-1.5 text-[13px] font-medium cursor-pointer transition-all ${period === k ? "bg-[#308BF9] text-white" : "bg-white text-[#6B7280] hover:bg-[#F9FAFB]"}`}>{l}</button>
             ))}
+            <div className="relative" ref={customRef}>
+              <button onClick={() => setShowCustomPicker(v => !v)}
+                className={`px-3 py-1.5 text-[13px] font-medium cursor-pointer transition-all flex items-center gap-1 ${["all", "custom", "last_week", "last_month"].includes(period) ? "bg-[#308BF9] text-white" : "bg-white text-[#6B7280] hover:bg-[#F9FAFB]"}`}>
+                Custom <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 4.5l3 3 3-3"/></svg>
+              </button>
+              {showCustomPicker && (
+                <div className="absolute right-0 top-full mt-1 bg-white rounded-xl border border-[#E5E7EB] shadow-lg z-50 flex" style={{ minWidth: 520 }}>
+                  <div className="w-[180px] border-r border-[#F1F5F9] p-2 flex flex-col gap-0.5">
+                    {[["today", "Today"], ["yesterday", "Yesterday"], ["week", "This Week"], ["last_week", "Last Week"], ["month", "This Month"], ["last_month", "Last Month"], ["all", "All Time"]].map(([k, l]) => (
+                      <button key={k} onClick={() => { setPeriod(k); setCustomRange(null); setCalSelecting(null); setShowCustomPicker(false); if (k === "all") setCompare(false); else setCompare(true); }}
+                        className={`text-left px-3 py-2 text-[13px] rounded-lg cursor-pointer transition-all ${period === k && !customRange ? "bg-[#EFF6FF] text-[#308BF9] font-semibold" : "text-[#374151] hover:bg-[#F9FAFB]"}`}>{l}</button>
+                    ))}
+                  </div>
+                  <div className="p-3 flex-1">
+                    <div className="flex items-center justify-between mb-3">
+                      <button onClick={() => setCalMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))} className="w-7 h-7 rounded-lg hover:bg-[#F1F5F9] flex items-center justify-center cursor-pointer text-[#6B7280]">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7.5 9L4.5 6l3-3"/></svg>
+                      </button>
+                      <span className="text-[14px] font-semibold text-[#0F172A]">{calMonth.toLocaleString("en-US", { month: "long", year: "numeric" })}</span>
+                      <button onClick={() => setCalMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))} className="w-7 h-7 rounded-lg hover:bg-[#F1F5F9] flex items-center justify-center cursor-pointer text-[#6B7280]">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4.5 3l3 3-3 3"/></svg>
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-7 gap-0 text-center">
+                      {["Mo","Tu","We","Th","Fr","Sa","Su"].map(d => <div key={d} className="text-[10px] font-semibold text-[#94A3B8] py-1">{d}</div>)}
+                      {(() => {
+                        const y = calMonth.getFullYear(), m = calMonth.getMonth();
+                        const first = new Date(y, m, 1).getDay();
+                        const offset = (first + 6) % 7;
+                        const daysInMonth = new Date(y, m + 1, 0).getDate();
+                        const cells = [];
+                        for (let i = 0; i < offset; i++) cells.push(<div key={`e${i}`} />);
+                        for (let d = 1; d <= daysInMonth; d++) {
+                          const dt = new Date(y, m, d);
+                          const isStart = calSelecting && dt.getTime() === calSelecting.getTime();
+                          const isInRange = customRange && dt >= customRange.start && dt <= customRange.end;
+                          const isEnd = customRange && dt.getTime() === customRange.end.getTime();
+                          const isToday = dt.toDateString() === new Date().toDateString();
+                          cells.push(
+                            <button key={d} onClick={() => {
+                              if (!calSelecting) { setCalSelecting(dt); setCustomRange(null); }
+                              else {
+                                const s = dt < calSelecting ? dt : calSelecting;
+                                const e = dt < calSelecting ? calSelecting : dt;
+                                setCustomRange({ start: s, end: e });
+                                setPeriod("custom"); setCalSelecting(null); setCompare(false); setShowCustomPicker(false);
+                              }
+                            }}
+                              className={`w-8 h-8 text-[12px] rounded-lg cursor-pointer transition-all ${isStart ? "bg-[#308BF9] text-white font-bold" : isEnd ? "bg-[#308BF9] text-white font-bold" : isInRange ? "bg-[#EFF6FF] text-[#308BF9] font-semibold" : isToday ? "ring-1 ring-[#308BF9] text-[#308BF9] font-semibold hover:bg-[#EFF6FF]" : "text-[#374151] hover:bg-[#F1F5F9]"}`}>
+                              {d}
+                            </button>
+                          );
+                        }
+                        return cells;
+                      })()}
+                    </div>
+                    {calSelecting && <div className="mt-2 text-[11px] text-[#94A3B8]">Click another date to complete the range</div>}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <label className="flex items-center gap-1.5 cursor-pointer select-none">
             <span className="text-[12px] text-[#94A3B8]">Compare</span>
-            <div className="relative w-8 h-[18px]" onClick={() => { if (period !== "all") setCompare(c => !c); }}>
-              <div className={`w-8 h-[18px] rounded-full transition-colors ${compare && period !== "all" ? "bg-[#308BF9]" : "bg-[#D1D5DB]"}`} />
-              <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-all ${compare && period !== "all" ? "left-[16px]" : "left-[2px]"}`} />
+            <div className="relative w-8 h-[18px]" onClick={() => { if (!["all", "custom", "last_week", "last_month"].includes(period)) setCompare(c => !c); }}>
+              <div className={`w-8 h-[18px] rounded-full transition-colors ${compare && !["all", "custom", "last_week", "last_month"].includes(period) ? "bg-[#308BF9]" : "bg-[#D1D5DB]"}`} />
+              <div className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-all ${compare && !["all", "custom", "last_week", "last_month"].includes(period) ? "left-[16px]" : "left-[2px]"}`} />
             </div>
           </label>
           <button onClick={loadData} className="w-8 h-8 rounded-lg bg-white border border-[#E5E7EB] flex items-center justify-center cursor-pointer text-[#6B7280] hover:bg-[#F9FAFB]">
@@ -485,14 +589,20 @@ export default function AnalyticsDashboard() {
                   <div className="flex items-center gap-2">
                     <Ico type="person-add" />
                     <div>
-                      <div className="text-[20px] font-extrabold text-[#0F172A] leading-none">{pm.newTrainers}</div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[20px] font-extrabold text-[#0F172A] leading-none">{pm.newTrainers}</span>
+                        {ppm && <span className={`text-[10px] font-bold ${pm.newTrainers >= ppm.newTrainers ? "text-[#10B981]" : "text-[#EF4444]"}`}>{pm.newTrainers >= ppm.newTrainers ? "↑" : "↓"}{Math.abs(pm.newTrainers - ppm.newTrainers)} vs {prevLbl(period, now)}</span>}
+                      </div>
                       <div className="text-[11px] text-[#6B7280]">Trainers Onboarded</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Ico type="person-add" />
                     <div>
-                      <div className="text-[20px] font-extrabold text-[#0F172A] leading-none">{pm.newClients}</div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[20px] font-extrabold text-[#0F172A] leading-none">{pm.newClients}</span>
+                        {ppm && <span className={`text-[10px] font-bold ${pm.newClients >= ppm.newClients ? "text-[#10B981]" : "text-[#EF4444]"}`}>{pm.newClients >= ppm.newClients ? "↑" : "↓"}{Math.abs(pm.newClients - ppm.newClients)} vs {prevLbl(period, now)}</span>}
+                      </div>
                       <div className="text-[11px] text-[#6B7280]">Clients Onboarded</div>
                     </div>
                   </div>
@@ -501,7 +611,10 @@ export default function AnalyticsDashboard() {
                   <div className="flex items-center gap-2">
                     <Ico type="people" />
                     <div>
-                      <div className="text-[20px] font-extrabold text-[#0F172A] leading-none">{periodTotalReads}</div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[20px] font-extrabold text-[#0F172A] leading-none">{periodTotalReads}</span>
+                        {ppm && <span className={`text-[10px] font-bold ${periodTotalReads >= ppm.reads ? "text-[#10B981]" : "text-[#EF4444]"}`}>{periodTotalReads >= ppm.reads ? "↑" : "↓"}{Math.abs(periodTotalReads - ppm.reads)} vs {prevLbl(period, now)}</span>}
+                      </div>
                       <div className="text-[11px] text-[#6B7280]">Total Readings</div>
                     </div>
                   </div>
@@ -590,7 +703,7 @@ export default function AnalyticsDashboard() {
 
           {/* Reading Split */}
           <div className={`${CS} p-5`} style={SH}>
-            <h2 className="text-[16px] font-bold text-[#0F172A]">Reading Split ({period === "today" ? "Today" : period === "week" ? "This Week" : period === "month" ? "This Month" : "All Time"})</h2>
+            <h2 className="text-[16px] font-bold text-[#0F172A]">Reading Split ({period === "yesterday" ? "Yesterday" : period === "today" ? "Today" : period === "week" ? "This Week" : period === "last_week" ? "Last Week" : period === "month" ? "This Month" : period === "last_month" ? "Last Month" : period === "custom" ? "Custom" : "All Time"})</h2>
             <p className="text-[12px] text-[#6B7280] mt-0.5">Who submitted the readings?</p>
             <div className="flex items-center gap-5 mt-4">
               <div className="shrink-0">
@@ -628,10 +741,16 @@ export default function AnalyticsDashboard() {
         <div className="grid grid-cols-3 gap-4">
           {/* Trainer Analytics */}
           <div className={`${CS} p-5`} style={SH}>
-            <h2 className="text-[16px] font-bold text-[#0F172A]">Trainer Analytics</h2>
-            <p className="text-[12px] text-[#6B7280] mt-0.5">{tabTr.length} trainers</p>
+            <div className="flex items-center justify-between">
+              <h2 className="text-[16px] font-bold text-[#0F172A]">Trainer Analytics</h2>
+              <div className="flex rounded-md border border-[#E5E7EB] overflow-hidden">
+                <button onClick={() => setMatchPeriod(false)} className={`px-2 py-1 text-[10px] font-medium cursor-pointer transition-all ${!matchPeriod ? "bg-[#308BF9] text-white" : "bg-white text-[#6B7280]"}`}>All Time</button>
+                <button onClick={() => setMatchPeriod(true)} className={`px-2 py-1 text-[10px] font-medium cursor-pointer transition-all ${matchPeriod ? "bg-[#308BF9] text-white" : "bg-white text-[#6B7280]"}`}>Match Period</button>
+              </div>
+            </div>
+            <p className="text-[12px] text-[#6B7280] mt-0.5">{periodTabTr.length} trainers{matchPeriod && range ? ` · ${fmtRange(range)}` : ""}</p>
             <div className="mt-3 overflow-x-auto">
-              <AccTable rows={tabTr} cols={[
+              <AccTable rows={periodTabTr} cols={[
                 { key: "name", label: "Trainer", val: r => r.name || "—" },
                 { key: "realClientCount", label: "Clients", align: "center", val: r => r.realClientCount ?? 0 },
                 { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
@@ -649,10 +768,16 @@ export default function AnalyticsDashboard() {
 
           {/* Client Analytics */}
           <div className={`${CS} p-5`} style={SH}>
-            <h2 className="text-[16px] font-bold text-[#0F172A]">Client Analytics</h2>
-            <p className="text-[12px] text-[#6B7280] mt-0.5">{tabCl.length} clients</p>
+            <div className="flex items-center justify-between">
+              <h2 className="text-[16px] font-bold text-[#0F172A]">Client Analytics</h2>
+              <div className="flex rounded-md border border-[#E5E7EB] overflow-hidden">
+                <button onClick={() => setMatchPeriod(false)} className={`px-2 py-1 text-[10px] font-medium cursor-pointer transition-all ${!matchPeriod ? "bg-[#308BF9] text-white" : "bg-white text-[#6B7280]"}`}>All Time</button>
+                <button onClick={() => setMatchPeriod(true)} className={`px-2 py-1 text-[10px] font-medium cursor-pointer transition-all ${matchPeriod ? "bg-[#308BF9] text-white" : "bg-white text-[#6B7280]"}`}>Match Period</button>
+              </div>
+            </div>
+            <p className="text-[12px] text-[#6B7280] mt-0.5">{periodTabCl.length} clients{matchPeriod && range ? ` · ${fmtRange(range)}` : ""}</p>
             <div className="mt-3 overflow-x-auto">
-              <AccTable rows={tabCl} cols={[
+              <AccTable rows={periodTabCl} cols={[
                 { key: "name", label: "Client", val: r => r.name || "—" },
                 { key: "fitness_goal", label: "Goal", val: r => goalLabel(r.fitness_goal), render: r => <span className="text-[10px] font-semibold px-1 py-0.5 rounded" style={{ color: goalColor(r.fitness_goal), backgroundColor: goalColor(r.fitness_goal) + "15" }}>{goalLabel(r.fitness_goal)}</span> },
                 { key: "daysSince", label: "Days", align: "center", val: r => r.daysSince ?? 0 },
@@ -664,8 +789,14 @@ export default function AnalyticsDashboard() {
 
           {/* Reading Rate Cohorts */}
           <div className={`${CS} p-5`} style={SH}>
-            <h2 className="text-[16px] font-bold text-[#0F172A]">Reading Rate Cohorts</h2>
-            <p className="text-[12px] text-[#6B7280] mt-0.5">Where do your clients & trainers stand?</p>
+            <div className="flex items-center justify-between">
+              <h2 className="text-[16px] font-bold text-[#0F172A]">Reading Rate Cohorts</h2>
+              <div className="flex rounded-md border border-[#E5E7EB] overflow-hidden">
+                <button onClick={() => setMatchPeriod(false)} className={`px-2 py-1 text-[10px] font-medium cursor-pointer transition-all ${!matchPeriod ? "bg-[#308BF9] text-white" : "bg-white text-[#6B7280]"}`}>All Time</button>
+                <button onClick={() => setMatchPeriod(true)} className={`px-2 py-1 text-[10px] font-medium cursor-pointer transition-all ${matchPeriod ? "bg-[#308BF9] text-white" : "bg-white text-[#6B7280]"}`}>Match Period</button>
+              </div>
+            </div>
+            <p className="text-[12px] text-[#6B7280] mt-0.5">Where do your clients & trainers stand?{matchPeriod && range ? ` · ${fmtRange(range)}` : ""}</p>
             <div className="flex flex-col gap-2.5 mt-4">
               {cohortData.map((tier, i) => (
                 <div key={i}>
